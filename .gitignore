@@ -1,0 +1,21 @@
+# Python venv
+venv/
+
+# Python cache
+__pycache__/
+
+# Environment variables (API keys)
+.env
+
+# SQLite databases
+*.sqlite
+
+# Node modules (when frontend created)
+node_modules/
+
+# Expo/React Native junk files
+.expo/
+.expo-shared/
+
+# macOS system files
+.DS_Store
