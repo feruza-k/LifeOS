@@ -87,18 +87,19 @@ This will serve as the foundation for scheduling, reminders, journaling, and fut
 
 #### Project Structure
 
-.
-├── 📁 LifeOS/
-├── ├── 📁 backend/
-├── │   ├── 📁 app/
-├── │   │   ├── 📁 ai/
-├── │   │   │   └── parser.py        # Intent parsing logic
-├── │   │   ├── 📁 models/
-├── │   │   │   └── intent.py        # Pydantic schema for Intent
-├── │   │   └── main.py              # FastAPI server
-├── │   ├── requirements.txt         # Python dependencies
-├── │   └── .env                     # Environment variables
-└── └── README.md                    # Project documentation
+```
+📁 LifeOS/
+├── 📁 backend/
+│ ├── 📁 app/
+│ │ ├── 📁 ai/
+│ │ │ └── parser.py        # Intent parsing logic
+│ │ ├── 📁 models/
+│ │ │ └── intent.py        # Pydantic schema for Intent
+│ │ └── main.py            # FastAPI server
+│ ├── requirements.txt     # Python dependencies
+│ └── .env                 # Environment variables
+└── README.md              # Project documentation
+```
 
 ---
 
@@ -190,29 +191,30 @@ LifeOS now has persistent memory, which is a major milestone.
 
 #### Project Structure (Day 2)
 
-.
-├── 📁 LifeOS/
-├── ├── 📁 backend/
-├── │   ├── 📁 app/
-├── │   │   ├── 📁 ai/           # NLP layer
-├── │   │   │   ├── parser.py
-├── │   │   │   └── processor.py
-├── │   │   ├── 📁 logic/        # Business logic
-├── │   │   │   └── intent_handler.py
-├── │   │   ├── 📁 models/       # Data models
-├── │   │   │   ├── base.py
-├── │   │   │   ├── diary.py
-├── │   │   │   ├── intent.py
-├── │   │   │   ├── memory.py
-├── │   │   │   └── task.py
-├── │   │   ├── 📁 routers/      # API layer
-├── │   │   │   └── intent.py
-├── │   │   ├── 📁 storage/      # Data layer
-├── │   │   │   └── repo.py
-├── │   │   └── main.py
-├── │   ├── requirements.txt
-├── │   └── .env
-└── └── README.md
+```
+📁 LifeOS/
+├── 📁 backend/
+│ ├── 📁 app/
+│ │ ├── 📁 ai/         # NLP layer
+│ │ │ ├── parser.py
+│ │ │ └── processor.py
+│ │ ├── 📁 logic/      # Business logic
+│ │ │ └── intent_handler.py
+│ │ ├── 📁 models/     # Data models
+│ │ │ ├── base.py
+│ │ │ ├── diary.py
+│ │ │ ├── intent.py
+│ │ │ ├── memory.py
+│ │ │ └── task.py
+│ │ ├── 📁 routers/    # API layer
+│ │ │ └── intent.py
+│ │ ├── 📁 storage/    # Data layer
+│ │ │ └── repo.py
+│ │ └── main.py
+│ ├── requirements.txt
+│ └── .env
+└── README.md
+```
 
 ---
 
