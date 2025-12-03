@@ -1,5 +1,96 @@
 {
-    "tasks": [],
+    "tasks": [
+        {
+            "id": "3334c151-9ef3-4c72-a705-2d8898a0b7a9",
+            "type": "event",
+            "title": "run",
+            "date": "2025-12-07",
+            "time": "10:00",
+            "datetime": "2025-12-07 10:00",
+            "category": "health",
+            "notes": null
+        },
+        {
+            "id": "739166ca-6125-48ca-9605-2287263348cd",
+            "type": "reminder",
+            "title": "buy flight tickets to Italy",
+            "date": "2025-12-05",
+            "time": "21:00",
+            "datetime": "2025-12-05 21:00",
+            "category": "travel",
+            "notes": null
+        },
+        {
+            "id": "41d8fe7e-9835-4b9b-9d26-6399a53a3d04",
+            "type": "reminder",
+            "title": "order cake for mom's birthday",
+            "date": "2025-12-20",
+            "time": "07:00",
+            "datetime": "2025-12-20 07:00",
+            "category": "personal",
+            "notes": null
+        },
+        {
+            "id": "39a47acb-87d8-4c5e-ad57-4df55079197e",
+            "type": "reminder",
+            "title": "order cake for mom's birthday",
+            "date": "2025-12-07",
+            "time": "07:00",
+            "datetime": "2025-12-07 07:00",
+            "category": "personal",
+            "notes": null
+        },
+        {
+            "id": "29c0970a-ba8b-464b-a586-d2a97af28375",
+            "type": "event",
+            "title": "run",
+            "date": "2025-12-07",
+            "time": "09:00",
+            "datetime": "2025-12-07 09:00",
+            "category": "health",
+            "notes": null
+        },
+        {
+            "id": "1d00813a-2bf3-4f76-b0be-6f41063f3c0a",
+            "type": "event",
+            "title": "gym",
+            "date": "2025-12-02",
+            "time": "18:00",
+            "datetime": "2025-12-02 18:00",
+            "category": "health",
+            "notes": "after work"
+        },
+        {
+            "id": "56653fab-ed6d-4d24-8e52-86e253056fa9",
+            "type": "event",
+            "title": "gym",
+            "date": "2025-12-05",
+            "time": "18:00",
+            "datetime": "2025-12-05 18:00",
+            "category": "health",
+            "notes": null
+        },
+        {
+            "id": "f73d6046-9a85-4d0a-9f6d-03c12a6af5a1",
+            "type": "event",
+            "title": "meeting with friends",
+            "date": "2025-12-22",
+            "time": "12:00",
+            "datetime": "2025-12-22 12:00",
+            "category": "social",
+            "notes": null
+        },
+        {
+            "id": "e246c0aa-93d1-4698-b375-37a2049b9ca1",
+            "type": "reminder",
+            "title": "call dad",
+            "date": "2025-12-02",
+            "time": "13:00",
+            "datetime": "2025-12-02 13:00",
+            "category": "personal",
+            "notes": null
+        }
+    ],
     "diary": [],
     "memories": []
 }

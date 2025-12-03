@@ -11,5 +11,14 @@ class Task(BaseItem):
     date: Optional[str] = None      # YYYY-MM-DD
     time: Optional[str] = None      # HH:MM
     datetime: Optional[str] = None  # full combined string
+    duration_minutes: Optional[int] = None
+    end_datetime: Optional[str] = None
     category: Optional[str] = "other"
     notes: Optional[str] = None     # extra details
+    completed: bool = False
+    energy: Optional[str] = None   # low / medium / high
+    context: Optional[str] = None
+
+
+   
+

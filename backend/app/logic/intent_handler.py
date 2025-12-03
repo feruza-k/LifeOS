@@ -11,9 +11,8 @@ def handle_intent(intent: Intent):
     Routes parsed intent to the correct storage action.
     """
 
-    # -------------------
-    # EVENT
-    # -------------------
+    # Event
+
     if intent.intent_type == "event":
         task = Task(
             type="event",
@@ -27,9 +26,8 @@ def handle_intent(intent: Intent):
         repo.add_task(task)
         return {"message": "Event saved", "event": task}
 
-    # -------------------
-    # REMINDER
-    # -------------------
+    # Reminder
+
     elif intent.intent_type == "reminder":
         task = Task(
             type="reminder",
