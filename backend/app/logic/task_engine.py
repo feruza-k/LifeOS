@@ -5,9 +5,8 @@ import pytz
 
 tz = pytz.timezone("Europe/London")
 
-
 # ---------------------------------------------------------
-# Helper: safely parse datetime
+# Helper: parse datetime
 # ---------------------------------------------------------
 def parse_datetime(task):
     """

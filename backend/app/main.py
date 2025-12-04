@@ -1,8 +1,10 @@
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from app.models.task import Task
 import os
+from fastapi import Query
 
 # AI
 from app.ai.parser import test_ai_connection, parse_intent
@@ -12,6 +14,15 @@ from app.storage.repo import repo, load_data, save_data
 
 # Logic
 from app.logic.intent_handler import handle_intent
+from app.logic.insight_engine import get_insights
+from app.logic.week_engine import (
+    get_week_view,
+    get_tasks_in_range,
+    get_week_stats,
+    get_week_summary_text,
+)
+
+from app.logic.conflict_engine import find_conflicts
 from app.logic.task_engine import (
     get_tasks_today,
     get_upcoming_tasks,
@@ -205,3 +216,88 @@ def stats():
 def add_task(task: Task):
     repo.add_task(task)
     return {"status": "saved", "task": task}
+
+
+@app.get("/tasks/week")
+def tasks_week():
+    """
+    Return tasks grouped by calendar week (Mon–Sun),
+    including both events and reminders. Frontend can style
+    reminders differently using the `type` field.
+    """
+    return get_week_view()
+
+
+@app.get("/reminders/today")
+def reminders_today():
+    data = load_data()
+    tasks = data.get("tasks", [])
+    today_str = datetime.now(tz).strftime("%Y-%m-%d")
+    return [
+        t for t in tasks
+        if t.get("type") == "reminder" and t.get("date") == today_str
+    ]
+
+
+@app.get("/tasks/calendar")
+def tasks_calendar(
+    start: str = Query(..., description="Start date YYYY-MM-DD"),
+    end: str = Query(..., description="End date YYYY-MM-DD"),
+):
+    """
+    Generic calendar endpoint.
+    Returns tasks grouped by day between start and end (inclusive).
+    Can be used for day/week/month views in the UI.
+    """
+    try:
+        return get_tasks_in_range(start, end)
+    except ValueError as e:
+        return {"error": str(e)}
+
+
+@app.get("/tasks/conflicts")
+def tasks_conflicts(
+    start: str | None = Query(
+        None, description="Optional start date YYYY-MM-DD (filter range)"
+    ),
+    end: str | None = Query(
+        None, description="Optional end date YYYY-MM-DD (filter range)"
+    ),
+):
+    """
+    Return overlapping tasks within an optional date range.
+
+    If no range is provided, checks all scheduled tasks.
+    """
+    return find_conflicts(start, end)
+
+@app.get("/tasks/week-summary")
+def tasks_week_summary():
+    """
+    JSON statistics for the current week (Mon–Sun).
+    Useful for dashboards and UI.
+    """
+    return get_week_stats()
+
+
+@app.get("/assistant/week-overview")
+def assistant_week_overview():
+    """
+    Human-readable overview of the current week.
+    This is what the future avatar/assistant could show in the UI.
+    """
+    return {
+        "stats": get_week_stats(),
+        "summary": get_week_summary_text(),
+    }
+
+
+@app.get("/assistant/insights")
+def assistant_insights():
+    """
+    Insight Engine v0 — produces small helpful insights about the user's
+    current schedule, weekly load, conflicts, free time, etc.
+    """
+    return {
+        "insights": get_insights()
+    }

@@ -16,6 +16,8 @@ now = datetime.now(tz)
 current_date = now.strftime("%Y-%m-%d")
 current_time = now.strftime("%H:%M")
 
+def test_ai_connection():
+    return "AI connection works."
 
 # ---------------------------------------------------------
 # SYSTEM PROMPT

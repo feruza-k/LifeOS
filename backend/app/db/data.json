@@ -89,8 +89,50 @@
             "datetime": "2025-12-02 13:00",
             "category": "personal",
             "notes": null
+        },
+        {
+            "id": "af9782ad-5e1c-4c5d-9089-9567b7a8ff5a",
+            "type": "event",
+            "title": "meeting with flatmates",
+            "date": "2025-12-28",
+            "time": "15:00",
+            "datetime": "2025-12-28 15:00",
+            "duration_minutes": null,
+            "end_datetime": null,
+            "category": "social",
+            "notes": null,
+            "completed": false,
+            "energy": null,
+            "context": null
+        },
+        {
+            "id": "7b277f6b-1760-4902-87fc-5b7ac12f6ce2",
+            "type": "event",
+            "title": "video call with relatives",
+            "date": "2025-12-28",
+            "time": "15:00",
+            "datetime": "2025-12-28 15:00",
+            "duration_minutes": null,
+            "end_datetime": null,
+            "category": "social",
+            "notes": null,
+            "completed": false,
+            "energy": null,
+            "context": null
         }
     ],
-    "diary": [],
-    "memories": []
+    "diary": [
+        {
+            "id": "a7b6fb16-cc23-45e8-a254-08b4559bbdf9",
+            "text": "I feel very tired today, low on energy",
+            "category": "health"
+        }
+    ],
+    "memories": [
+        {
+            "id": "3e6d2396-5965-4ae2-b480-6bda82e0ae59",
+            "text": "prays 5 times a day",
+            "category": "personal"
+        }
+    ]
 }
