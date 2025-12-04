@@ -10,7 +10,9 @@
   - [Day 1: Intent Parser](#day-1-intent-parser-dec-1-2025)
   - [Day 2: Data Models, Storage & CRUD API](#day-2-data-models-storage--crud-api-dec-2-2025)
   - [Day 3: Task Engine, Calendar Logic & Enhancements](#day-3-task-engine-calendar-logic--core-enhancements-dec-3-2025)
+  - [Day 4: Weekly View, Conflict Detection & Assistant Insights](#day-4-weekly-view-conflict-detection--assistant-insights-dec-4-2025)
 - [Next Steps](#next-steps)
+
 
 ---
 
@@ -278,7 +280,7 @@ LifeOS now has everything needed for a real schedule view.
 
 ---
 
-#### ⭐Engine Enhancements & Intelligence Prep
+#### ⭐ Engine Enhancements & Intelligence Prep
 
 Today I also added several foundational upgrades that will power future features.
 
@@ -344,12 +346,151 @@ These upgrades make the backend much more stable and professional.
 
 ---
 
-### Reflection
+#### Reflection
 
-Day 3 was the moment LifeOS stopped being just an LLM wrapper and became a **real system** with memory, structure, behaviour, and time awareness.
+Day 3 was the moment LifeOS stopped being just an LLM wrapper and became a **system** with memory, structure, behaviour, and time awareness.
 
-Building this reminded me why I started this challenge — to create something I would personally use every day, and to sharpen my engineering skills through real, hands-on work.
+Building this reminded me why I started this challenge - to create something I would personally use every day, and to sharpen my engineering skills through real, hands-on work.
 
-#### Next Step (Day 4)
+### **Day 4:** Weekly View, Conflict Detection & Assistant Insights (Dec 4, 2025)
 
-Tomorrow, I start moving toward **weekly logic, conflict detection, and intelligent suggestions**! LifeOS is slowly becoming the planner I always wanted for myself.
+Today I moved from looking at tasks “one day at a time” to something closer to how I actually think: weeks, patterns, and gentle insights about my schedule. LifeOS is starting to feel less like a list API and more like a small planning brain.
+
+---
+
+#### Weekly View & Calendar Range
+
+I added a proper **week engine** that understands a Monday–Sunday week in `Europe/London` time.
+
+**New logic (`week_engine.py`):**
+
+- `get_current_week_boundaries()` → finds this week’s **Monday–Sunday**
+- `get_week_view()` → groups tasks by day for the current week
+- `get_tasks_in_range(start, end)` → generic **calendar range helper** for any date window
+
+**New endpoints:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /tasks/week` | Current week view (Mon–Sun), tasks grouped by day |
+| `GET /tasks/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD` | Generic calendar range (day/week/month) |
+
+These will power the future weekly and monthly calendar views in the mobile app (e.g. “show me this week”, “show me my holiday week”, etc.).
+
+---
+
+#### Conflict Detection Engine (v1)
+
+To prepare for more intelligent planning, I built a **light conflict detection engine**.
+
+**New module:** `app/logic/conflict_engine.py`
+
+What it does:
+
+- Builds **time blocks** for each scheduled task using:
+  - `datetime`
+  - `duration_minutes`
+  - `end_datetime`
+- If duration isn’t set, it uses default assumptions:
+  - events → **60 minutes**
+  - reminders → **15 minutes**
+- Detects overlapping blocks and returns conflict pairs.
+
+**New endpoint:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /tasks/conflicts` | All overlaps across scheduled tasks |
+| `GET /tasks/conflicts?start=...&end=...` | Conflicts only within a specific date range |
+
+Example shape of a conflict:
+
+```json
+{
+  "task_a": { "...": "..." },
+  "task_b": { "...": "..." },
+  "overlap_start": "2025-12-05 18:00",
+  "overlap_end": "2025-12-05 18:30"
+}
+```
+
+Later this will allow LifeOS to say things like:
+
+> “Your 6pm gym overlaps with dinner at 6:30pm on Friday.”
+
+…without me having to manually spot it.
+
+---
+
+### **3️⃣ Week Statistics & Human Overview**
+
+I also added a **week summary engine** so LifeOS can see the *shape of my week*, not just individual tasks.
+
+#### **New helpers (`week_engine.py`):**
+
+- `get_week_stats()` → JSON stats for the current week:
+  - total tasks  
+  - total events / reminders  
+  - tasks per day  
+  - evening tasks (after 18:00)  
+  - busiest day  
+  - fully free days  
+- `get_week_summary_text()` → short, natural-language overview
+
+---
+
+#### **New endpoints:**
+
+| Endpoint | Description |
+|----------|-------------|
+| **GET /tasks/week-summary** | JSON statistics for the current week (Mon–Sun) |
+| **GET /assistant/week-overview** | Week stats + human-readable summary |
+
+---
+
+#### **Example summary**
+
+> “This week (2025-12-01 → 2025-12-07) you have 7 tasks in total (4 events and 3 reminders).  
+> Your busiest day is Sunday with 3 task(s).  
+> There are 3 task(s) scheduled for the evening (after 18:00).  
+> You still have fully free days on: Monday, Wednesday, Thursday, Saturday.”
+
+This is exactly the kind of thing a future **LifeOS avatar** could show during a weekly check-in.
+
+---
+
+### **4️⃣ Assistant Insights (v0 — First Real Logic)**
+
+Today I created the first version of the **Insight Engine** — a lightweight but meaningful intelligence layer.
+
+This is the earliest form of “assistant-like” behaviour:  
+LifeOS looks at the week and gives small, helpful observations.
+
+#### **New module:**  
+`app/logic/insight_engine.py`
+
+#### **For now, it generates insights such as:**  
+- “You have no tasks scheduled for today.”  
+- “Your next upcoming task is ‘gym’ at 2025-12-05 18:00.”  
+- “This week you have 7 tasks (4 events and 3 reminders).”  
+- “You have 3 evening task(s). Evenings might get busy.”  
+- “Your busiest day is Sunday with 3 task(s).”  
+- “You still have fully free days on: Monday, Wednesday, Thursday, Saturday.”  
+- “You have 1 scheduling conflict(s) that may need attention.”
+
+These are pulled from **real data** — not templates.
+
+---
+
+#### Reflection (Day 4)
+
+Day 3 was about understanding **time**.
+Day 4 was about understanding **weeks** and **patterns**.
+
+Today made me realise how much clarity comes from stepping back and looking at patterns, not individual tasks. Implementing the weekly logic and insights taught me how assistants evaluate load, detect conflicts and form summaries. It still isn’t “planning” yet, but the groundwork for actual decision support is now there.
+
+---
+
+#### Next Steps (Day 5)
+
+Next, I’ll start turning weekly stats and conflicts into richer insights, experimenting with light planning suggestions, and preparing the backend structures needed for the first mobile UI screens.
