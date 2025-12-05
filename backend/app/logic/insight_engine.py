@@ -1,8 +1,10 @@
-# app/logic/insight_engine.py
+# insight_engine.py
 
 from typing import List, Optional
 from datetime import datetime, timedelta
 import pytz
+from app.logic.today_engine import get_today_view
+
 
 # Import your real existing functions
 from app.logic.week_engine import (
@@ -27,7 +29,7 @@ def _insight(text: str) -> dict:
 
 def get_insights() -> List[dict]:
     """
-    Generate Insight Engine v0:
+    Generate Insight Engine:
     - Today load
     - Weekly load
     - Busiest/free days
@@ -159,6 +161,27 @@ def get_insights() -> List[dict]:
             insights.append(
                 _insight(f"You have free time block(s) today: {s}.")
             )
+
+        # -----------------------------------------------------
+    # 6) TODAY SUMMARY INSIGHT (single gentle observation)
+    # -----------------------------------------------------
+    today = get_today_view()
+
+    if today["load"] == "empty":
+        insights.append(_insight("Your day is completely free — good moment to reset or plan ahead."))
+    else:
+        # Example: "Your afternoon is completely free."
+        if today["morning_tasks"] and not today["afternoon_tasks"] and not today["evening_tasks"]:
+            insights.append(_insight("Your afternoon and evening are free — plenty of space to focus or rest."))
+
+        elif not today["morning_tasks"] and today["afternoon_tasks"]:
+            insights.append(_insight("Your morning is free, things pick up later in the day."))
+
+        elif today["load"] == "light":
+            insights.append(_insight("Today looks light and manageable."))
+
+        elif today["load"] == "heavy":
+            insights.append(_insight("Today is quite full — try to keep some breathing room where possible."))
 
 
     return insights

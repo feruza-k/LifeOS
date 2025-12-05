@@ -15,6 +15,10 @@ from app.storage.repo import repo, load_data, save_data
 # Logic
 from app.logic.intent_handler import handle_intent
 from app.logic.insight_engine import get_insights
+from app.logic.today_engine import get_today_view
+from app.logic.suggestion_engine import get_suggestions
+from app.logic.reschedule_engine import get_reschedule_options
+from app.logic.categories import get_category_colors
 from app.logic.week_engine import (
     get_week_view,
     get_tasks_in_range,
@@ -301,3 +305,31 @@ def assistant_insights():
     return {
         "insights": get_insights()
     }
+
+
+@app.get("/assistant/today")
+def assistant_today():
+    """
+    Return a structured view of today: tasks, free blocks, and load level.
+    """
+    return get_today_view()
+
+
+@app.get("/assistant/suggestions")
+def assistant_suggestions():
+    return get_suggestions()
+
+@app.get("/assistant/reschedule-options")
+def assistant_reschedule_options(task_id: str):
+    """
+    Suggest free time slots and lighter days for rescheduling a task.
+    """
+    return get_reschedule_options(task_id)
+
+
+@app.get("/meta/categories")
+def meta_categories():
+    """
+    Return category → color map for consistent UI coloring.
+    """
+    return get_category_colors()

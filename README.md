@@ -11,7 +11,9 @@
   - [Day 2: Data Models, Storage & CRUD API](#day-2-data-models-storage--crud-api-dec-2-2025)
   - [Day 3: Task Engine, Calendar Logic & Enhancements](#day-3-task-engine-calendar-logic--core-enhancements-dec-3-2025)
   - [Day 4: Weekly View, Conflict Detection & Assistant Insights](#day-4-weekly-view-conflict-detection--assistant-insights-dec-4-2025)
+  - [Day 5: Today View, Suggestions Engine & Smart Rescheduling](#day-5-today-view-suggestions-engine--smart-rescheduling-dec-5-2025)
 - [Next Steps](#next-steps)
+
 
 
 ---
@@ -491,6 +493,119 @@ Today made me realise how much clarity comes from stepping back and looking at p
 
 ---
 
-#### Next Steps (Day 5)
+### **Day 5:** Today View, Suggestions Engine & Smart Rescheduling (Dec 5, 2025)
 
-Next, I’ll start turning weekly stats and conflicts into richer insights, experimenting with light planning suggestions, and preparing the backend structures needed for the first mobile UI screens.
+Today’s focus was on moving beyond static insights and giving LifeOS the ability to interpret the day, surface actionable suggestions, and offer rescheduling options. These are the first features that start to feel genuinely “assistant-like” — the system now reacts to what it sees instead of simply reporting facts.
+
+---
+
+#### **Today Engine - Structured View of the Day**
+
+I added a dedicated module for understanding *today* with more nuance.  
+This includes:
+
+- grouping tasks into **morning / afternoon / evening**
+- detecting **free time blocks** between tasks
+- estimating **load** (`empty`, `light`, `medium`, `heavy`)
+- preparing data for the future Today screen in the UI
+
+**New module:** `app/logic/today_engine.py`
+
+**New endpoint:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /assistant/today` | Returns today’s tasks, free blocks, and load level |
+
+Example output:
+
+```json
+{
+  "date": "2025-12-04",
+  "tasks": [],
+  "free_blocks": [{"start": "06:00", "end": "22:00"}],
+  "load": "empty"
+}
+```
+
+Even this simple structure is extremely useful for building intelligent behaviour later.
+
+---
+
+### **2️⃣ Assistant Suggestions (v1)**
+
+The assistant can now scan the schedule and offer **light, non-intrusive suggestions**, nothing pushy, just helpful observations when they make sense.
+
+Suggestions are based on:
+
+- conflicts  
+- heavy days  
+- completely free days  
+- large free blocks  
+
+**New endpoint:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /assistant/suggestions` | Returns conflict, overload, and free-time suggestions |
+
+**Example suggestion:**
+
+```json
+{
+  "reason": "conflict",
+  "message": "'meeting with flatmates' overlaps with 'video call with relatives'."
+}
+```
+
+This sets the foundation for future:  
+**“Would you like me to move it?”** flows.
+
+---
+
+### **3️⃣ Rescheduling Engine (v1)**
+
+I added the first version of a **rescheduling helper**.  
+Given a specific task, the assistant now looks for:
+
+- free time blocks  
+- lighter days in the week  
+- reasonable alternative times  
+
+**New endpoint:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /assistant/reschedule-options?task_id=...` | Suggests new times or days for the selected task |
+
+Even at this early stage, it shows that LifeOS can reason about **where a task belongs**, not just that it exists.
+
+---
+
+### **4️⃣ Category → Colour Map for the UI**
+
+To prepare for the UI layer, LifeOS now exposes a simple category → colour map for consistent visual styling.
+
+**New endpoint:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /meta/categories` | Returns colour codes for each category |
+
+---
+
+### **Reflection (Day 5)**
+
+Day 5 shifted LifeOS from *storing* schedules to *interpreting* them.  
+Building the Today view, suggestions, and early rescheduling logic made me think more about how assistants spot friction and surface small, meaningful insights.  
+It’s still simple, but the system is now reacting to the shape of my day rather than just listing tasks — much closer to the behaviour I originally envisioned.
+
+---
+
+### **Next Steps (Day 6)**
+
+- Strengthen the suggestion engine with smarter, cleaner rules  
+- Finalise the data shapes for the **Today**, **Week**, and **Calendar** UI screens  
+- Add the first confirmation flow: *“Move this task to a better time?”*  
+- Improve prioritisation logic  
+- Start connecting backend structures to UI-friendly outputs  

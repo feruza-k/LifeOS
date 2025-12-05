@@ -93,7 +93,7 @@
         {
             "id": "af9782ad-5e1c-4c5d-9089-9567b7a8ff5a",
             "type": "event",
-            "title": "meeting with flatmates",
+            "title": "have a brunch with flatmates",
             "date": "2025-12-28",
             "time": "15:00",
             "datetime": "2025-12-28 15:00",
@@ -116,6 +116,21 @@
             "end_datetime": null,
             "category": "social",
             "notes": null,
+            "completed": false,
+            "energy": null,
+            "context": null
+        },
+        {
+            "id": "c0c9915c-49e0-4c0e-ba67-4938acc6246b",
+            "type": "reminder",
+            "title": "call GP to make appointment",
+            "date": "2025-12-05",
+            "time": "15:00",
+            "datetime": "2025-12-05 15:00",
+            "duration_minutes": null,
+            "end_datetime": null,
+            "category": "health",
+            "notes": "for next week",
             "completed": false,
             "energy": null,
             "context": null
