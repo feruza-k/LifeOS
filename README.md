@@ -12,9 +12,8 @@
   - [Day 3: Task Engine, Calendar Logic & Enhancements](#day-3-task-engine-calendar-logic--core-enhancements-dec-3-2025)
   - [Day 4: Weekly View, Conflict Detection & Assistant Insights](#day-4-weekly-view-conflict-detection--assistant-insights-dec-4-2025)
   - [Day 5: Today View, Suggestions Engine & Smart Rescheduling](#day-5-today-view-suggestions-engine--smart-rescheduling-dec-5-2025)
+  - [Day 6: Assistant Chat, Task Matching & Conflict-Aware Responses](#day-6-assistant-chat-v1-task-matching--conflict-aware-responses-dec-6-2025)
 - [Next Steps](#next-steps)
-
-
 
 ---
 
@@ -602,10 +601,103 @@ It’s still simple, but the system is now reacting to the shape of my day rathe
 
 ---
 
-### **Next Steps (Day 6)**
+### **Day 6:** Assistant Chat v1, Task Matching & Conflict-Aware Responses (Dec 6, 2025)
 
-- Strengthen the suggestion engine with smarter, cleaner rules  
-- Finalise the data shapes for the **Today**, **Week**, and **Calendar** UI screens  
-- Add the first confirmation flow: *“Move this task to a better time?”*  
-- Improve prioritisation logic  
-- Start connecting backend structures to UI-friendly outputs  
+Today I focused on making the assistant reliably understand task references, detect conflicts, and return clean, structured responses that the UI can act on. Instead of adding new features, this day was about tightening behaviour and making the AI predictable and safe to integrate later.
+
+---
+
+#### **1️⃣ `/assistant/chat` — Stable JSON-Only Assistant Endpoint**
+
+The chat endpoint now returns **strict, single JSON objects** — no markdown, no extra text.  
+This makes the assistant’s output consistent and UI-friendly.
+
+#### **2️⃣ Task Reference Detection (v1)**
+
+I added a safer task-matching utility (ai/utils.py) that prevents false matches (e.g., "run" matching "brunch") using:
+
+- exact match
+
+- whole-word match
+
+- fallback contains match
+
+This lets the assistant correctly identify when the user refers to an existing task.
+
+
+#### **3️⃣ Conflict-Aware Behaviour**
+
+When the user mentions a task and it has a scheduling conflict, the system bypasses the LLM and returns a structured reschedule flow.
+
+Example: 
+
+```json
+{
+  "assistant_response": "Your run is scheduled at 10:00 AM tomorrow. Confirm reschedule to 6:00 PM?",
+  "ui": {
+    "action": "confirm_reschedule",
+    "task_id": "...",
+    "options": ["18:00"]
+  }
+}
+```
+
+This is powered by:
+
+- updated conflict_engine
+
+- improved rescheduling helper
+
+- stricter system prompt rules
+
+#### **4️⃣ Rescheduling Engine Integration**
+
+I added a wrapper (`generate_reschedule_suggestions_for_task`) so both:
+
+- `/assistant/chat`
+
+- `/assistant/reschedule-options`
+
+use the same suggestion logic.
+This ensures consistent options across the whole system.
+
+#### **5️⃣ Cleanup and Alignment Across the API**
+
+- fixed imports (`get_all_tasks`, `load_data`)
+
+- updated main routes to match the new assistant logic
+
+- removed outdated code
+
+- stabilised JSON parsing
+
+The backend is now consistent and ready for UI integration.
+
+#### **Reflection (Day 6)**
+
+Today’s work wasn’t about big new features, it was about making the assistant reliable.
+
+It can now:
+
+- recognise tasks in natural language
+
+- detect when a change affects a scheduled item
+
+- surface rescheduling options cleanly
+
+- speak in predictable JSON the UI can read
+
+This is the first step toward a usable conversational layer.
+
+#### **Next Steps (Day 7)**
+
+- Build a simple web UI (chat + today panel)
+
+- Add yes/no confirmation handling
+
+- Finalise Today/Week/Calendar data shapes for the frontend
+
+- Add basic action execution (apply_reschedule)
+
+
+---

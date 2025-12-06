@@ -41,16 +41,6 @@
             "notes": null
         },
         {
-            "id": "29c0970a-ba8b-464b-a586-d2a97af28375",
-            "type": "event",
-            "title": "run",
-            "date": "2025-12-07",
-            "time": "09:00",
-            "datetime": "2025-12-07 09:00",
-            "category": "health",
-            "notes": null
-        },
-        {
             "id": "1d00813a-2bf3-4f76-b0be-6f41063f3c0a",
             "type": "event",
             "title": "gym",

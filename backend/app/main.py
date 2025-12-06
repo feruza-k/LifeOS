@@ -1,3 +1,5 @@
+# main.py
+
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +10,10 @@ from fastapi import Query
 
 # AI
 from app.ai.parser import test_ai_connection, parse_intent
+from pydantic import BaseModel
+from app.ai.assistant import generate_assistant_response
+class ChatRequest(BaseModel):
+    message: str
 
 # Storage
 from app.storage.repo import repo, load_data, save_data
@@ -17,15 +23,15 @@ from app.logic.intent_handler import handle_intent
 from app.logic.insight_engine import get_insights
 from app.logic.today_engine import get_today_view
 from app.logic.suggestion_engine import get_suggestions
-from app.logic.reschedule_engine import get_reschedule_options
 from app.logic.categories import get_category_colors
+from app.logic.ui_builder import build_today_ui, build_week_ui, build_calendar_ui
 from app.logic.week_engine import (
     get_week_view,
     get_tasks_in_range,
     get_week_stats,
     get_week_summary_text,
 )
-
+from app.logic.reschedule_engine import generate_reschedule_suggestions
 from app.logic.conflict_engine import find_conflicts
 from app.logic.task_engine import (
     get_tasks_today,
@@ -34,10 +40,10 @@ from app.logic.task_engine import (
     get_next_task,
     group_tasks_by_date,
     group_tasks_pretty,
-    get_today_timeline
+    get_today_timeline,
+    get_all_tasks
 )
 
-from pydantic import BaseModel
 
 
 # Load environment variables (.env file)
@@ -319,12 +325,25 @@ def assistant_today():
 def assistant_suggestions():
     return get_suggestions()
 
+
 @app.get("/assistant/reschedule-options")
 def assistant_reschedule_options(task_id: str):
     """
-    Suggest free time slots and lighter days for rescheduling a task.
+    Suggest rescheduling options for a specific task.
+    Uses new generate_reschedule_suggestions(task) API.
     """
-    return get_reschedule_options(task_id)
+    tasks = load_data().get("tasks", [])
+    task = next((t for t in tasks if t["id"] == task_id), None)
+
+    if not task:
+        return {"error": "Task not found"}
+
+    suggestions = generate_reschedule_suggestions(task)
+
+    return {
+        "task": task,
+        "suggestions": suggestions
+    }
 
 
 @app.get("/meta/categories")
@@ -333,3 +352,30 @@ def meta_categories():
     Return category → color map for consistent UI coloring.
     """
     return get_category_colors()
+
+
+@app.post("/assistant/chat")
+def assistant_chat(payload: ChatRequest):
+    """
+    LLM-powered assistant chat.
+    Expects: { "message": "..." }
+    """
+    result = generate_assistant_response(payload.message)
+    return result
+    
+
+
+
+@app.get("/ui/today")
+def ui_today():
+    return build_today_ui()
+
+
+@app.get("/ui/week")
+def ui_week():
+    return build_week_ui()
+
+
+@app.get("/ui/calendar")
+def ui_calendar(start: str, end: str):
+    return build_calendar_ui(start, end)
