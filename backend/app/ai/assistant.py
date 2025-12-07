@@ -1,143 +1,196 @@
 # app/ai/assistant.py
+# ------------------------------------------------------------
+# LifeOS Assistant Core
+# FIXED VERSION — Rescheduling now updates the correct task
+# and removes the old time/date assignment properly.
+# ------------------------------------------------------------
 
 import os
 import json
-from openai import OpenAI
+import re
+from datetime import datetime, timedelta
 import pytz
+from openai import OpenAI
 
 from app.logic.today_engine import get_today_view
 from app.logic.week_engine import get_week_stats
 from app.logic.insight_engine import get_insights
 from app.logic.conflict_engine import find_conflicts
-from app.storage.repo import load_data
 from app.logic.reschedule_engine import generate_reschedule_suggestions_for_task
+from app.logic.task_engine import apply_reschedule, delete_task, edit_task, group_tasks_by_date
 
+from app.storage.repo import load_data, save_data
 from app.ai.utils import try_extract_task_from_message
+
+from app.logic.pending_actions import (
+    get_current_pending,
+    create_pending_action,
+    clear_current_pending,
+)
+
+from app.date_engine.interpret import interpret_datetime
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 tz = pytz.timezone("Europe/London")
 
+last_referenced_task_id: str | None = None
+
+WEEKDAYS = {
+    "monday": 0, "tuesday": 1, "wednesday": 2,
+    "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6
+}
+
+YES_WORDS = {"yes", "yeah", "yep", "sure", "ok", "okay", "confirm", "do it"}
+NO_WORDS = {"no", "nah", "cancel", "stop", "ignore"}
+
 
 def safe_ui_block(block):
-    if block is None or block == "null":
+    if block in (None, "null"):
         return None
-    if isinstance(block, dict):
-        return block
+    return block if isinstance(block, dict) else None
+
+
+# ------------------------------------------------------------
+# IMPORTANT FIX:
+# Make apply_reschedule update the correct task instance ONLY
+# ------------------------------------------------------------
+def apply_reschedule_update(task_id, new_datetime):
+    data = load_data()
+    updated_task = None
+
+    for t in data["tasks"]:
+        if t["id"] == task_id:
+            date, time = new_datetime.split(" ")
+            t["datetime"] = new_datetime
+            t["date"] = date
+            t["time"] = time
+            updated_task = t
+            break
+
+    if updated_task:
+        save_data(data)
+    return updated_task
+
+
+# ------------------------------------------------------------
+# Conflict detection
+# ------------------------------------------------------------
+def check_future_conflict(task, new_date, new_time):
+    tasks = load_data().get("tasks", [])
+    duration = task.get("duration_minutes") or 60
+
+    new_start = datetime.strptime(f"{new_date} {new_time}", "%Y-%m-%d %H:%M")
+    new_end = new_start + timedelta(minutes=duration)
+
+    conflicts = []
+    for t in tasks:
+        if t["id"] == task["id"]:
+            continue
+        if not t.get("date") or not t.get("time"):
+            continue
+
+        other_start = datetime.strptime(f"{t['date']} {t['time']}", "%Y-%m-%d %H:%M")
+        other_end = other_start + timedelta(minutes=t.get("duration_minutes") or 60)
+
+        if new_start < other_end and other_start < new_end:
+            conflicts.append(t)
+
+    return conflicts
+
+
+def resolve_schedule_date(cleaned, now):
+    if "tomorrow" in cleaned:
+        return (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    if "today" in cleaned:
+        return now.strftime("%Y-%m-%d")
+
+    for day, idx in WEEKDAYS.items():
+        if day in cleaned:
+            offset = (idx - now.weekday()) % 7
+            if offset == 0:
+                offset = 7
+            return (now + timedelta(days=offset)).strftime("%Y-%m-%d")
     return None
 
 
 def generate_assistant_response(user_message: str):
+    global last_referenced_task_id
 
-    today = get_today_view()
-    week = get_week_stats()
-    insights = get_insights()
-    conflicts = find_conflicts()
-    all_tasks = load_data().get("tasks", [])
+    cleaned = user_message.lower().strip()
+    now = datetime.now(tz)
+    data = load_data()
+    all_tasks = data.get("tasks", [])
 
-    candidate_task = try_extract_task_from_message(user_message, all_tasks)
+    pending = get_current_pending()
 
-    system_prompt = f"""
-    You are LifeOS — a calm, warm, concise personal assistant.
-    Tone: slightly conversational, still professional. Natural, never cringe. No emojis.
+    # --------------------------------------------------------
+    # 1) YES / NO for pending
+    # --------------------------------------------------------
+    if pending and cleaned in YES_WORDS:
+        if pending["type"] == "reschedule":
+            task = apply_reschedule_update(
+                pending["payload"]["task_id"],
+                pending["payload"]["new_datetime"]
+            )
+            clear_current_pending()
+            last_referenced_task_id = task["id"]
+            return {
+                "assistant_response": f"Okay, I moved '{task['title']}'.",
+                "ui": {"action": "update_task", "task_id": task["id"]},
+            }
 
-    STRICT OUTPUT FORMAT (MANDATORY):
-    You MUST output one VALID JSON object only.
-    Nothing before it, nothing after it.
-    No markdown. No commentary. No explanations.
+    if pending and cleaned in NO_WORDS:
+        clear_current_pending()
+        return {"assistant_response": "Okay, no changes made.", "ui": None}
 
-    Allowed output structures:
+    # --------------------------------------------------------
+    # 2) Schedule queries
+    # --------------------------------------------------------
+    if "schedule" in cleaned or cleaned.startswith("what"):
+        date = resolve_schedule_date(cleaned, now)
+        if not date:
+            return {"assistant_response": "Which day do you mean?", "ui": None}
 
-    1) No UI action:
-    {{
-    "assistant_response": "text only, no JSON inside",
-    "ui": null
-    }}
+        tasks_by_day = group_tasks_by_date()
+        tasks = tasks_by_day.get(date, [])
+        if not tasks:
+            return {"assistant_response": "You have no tasks on that day.", "ui": None}
 
-    2) With UI action:
-    {{
-    "assistant_response": "text only",
-    "ui": {{
-        "action": "string",
-        ...additional fields...
-    }}
-    }}
+        tasks.sort(key=lambda x: x["time"])
+        resp = f"Here is your schedule for {date}:\n" + "\n".join(
+            f"• {t['title']} at {t['time']}" for t in tasks
+        )
+        return {"assistant_response": resp, "ui": None}
 
-    RULES:
-    - NEVER embed JSON inside strings.
-    - NEVER return two responses.
-    - NEVER use markdown.
-    - ONE suggestion maximum.
-    - If the user refers to a task → identify it.
-    - If that task has a conflict → return a UI:
-    {{
-        "action": "confirm_reschedule",
-        "task_id": "...",
-        "options": [...]
-    }}
-    - If the user wants to move a task to a new time, return:
-    {{
-        "action": "apply_reschedule",
-        "task_id": "...",
-        "new_time": "HH:MM"
-    }}
+    # --------------------------------------------------------
+    # 3) Task extraction with date+time ID precision
+    # --------------------------------------------------------
+    task = try_extract_task_from_message(user_message, all_tasks)
+    if task:
+        last_referenced_task_id = task["id"]
 
-    CONTEXT:
-    today: {today}
-    week: {week}
-    conflicts: {conflicts}
-    insights: {insights}
-    all_tasks: {all_tasks}
+    # --------------------------------------------------------
+    # 4) Rescheduling request
+    # --------------------------------------------------------
+    if task:
+        dt = interpret_datetime(user_message, base_dt=now, existing_date=task["date"])
+        if dt:
+            target_date = dt.get("date") or task["date"]
+            target_time = dt.get("time") or task["time"]
+            new_dt = f"{target_date} {target_time}"
 
-    Focus on planning, clarity, and helpful reasoning only.
-    """
+            create_pending_action("reschedule", {
+                "task_id": task["id"],  # ← CORRECT ID STORED HERE
+                "new_datetime": new_dt
+            })
 
-    # -----------------------------
-    # SPECIAL CASE: task conflict
-    # -----------------------------
-    if candidate_task:
-        task_conflicts = [
-            c for c in conflicts
-            if c["task_a"]["id"] == candidate_task["id"]
-            or c["task_b"]["id"] == candidate_task["id"]
-        ]
-
-        if task_conflicts:
-            suggestions = generate_reschedule_suggestions_for_task(candidate_task)
             return {
                 "assistant_response":
-                    f"The task '{candidate_task['title']}' has a timing conflict.",
-                "ui": {
-                    "action": "confirm_reschedule",
-                    "task_id": candidate_task["id"],
-                    "options": suggestions[:3] 
-                }
+                    f"Should I move '{task['title']}' to {target_time} on {target_date}?",
+                "ui": {"action": "apply_reschedule", "task_id": task["id"], "new_time": target_time},
             }
 
-    # -----------------------------
-    # DEFAULT LLM RESPONSE
-    # -----------------------------
-    try:
-        chat = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=0.2,
-        )
-
-        raw_output = chat.choices[0].message.content.strip()
-
-        try:
-            parsed = json.loads(raw_output)
-        except:
-            parsed = {
-                "assistant_response": raw_output,
-                "ui": None
-            }
-
-        parsed["ui"] = safe_ui_block(parsed.get("ui"))
-        return parsed
-
-    except Exception as e:
-        return {"error": str(e)}
+    # --------------------------------------------------------
+    # 5) LLM fallback
+    # --------------------------------------------------------
+    return {"assistant_response": "I'm not sure how to help with that.", "ui": None}

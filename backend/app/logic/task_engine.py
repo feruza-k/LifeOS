@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from app.storage.repo import load_data
+from app.storage.repo import load_data, save_data
 from app.logging import logger
 import pytz
 
@@ -148,3 +148,35 @@ def get_today_timeline():
     today.sort(key=lambda x: x.get("time") or "")
     return today
 
+
+def apply_reschedule(task_id: str, new_datetime: str):
+    data = load_data()
+    for task in data["tasks"]:
+        if task["id"] == task_id:
+            # update fields
+            task["datetime"] = new_datetime
+            date, time = new_datetime.split(" ")
+            task["date"] = date
+            task["time"] = time
+
+            save_data(data)
+            return task
+    return None
+
+
+def delete_task(task_id: str):
+    data = load_data()
+    data["tasks"] = [t for t in data["tasks"] if t["id"] != task_id]
+    save_data(data)
+    return True
+
+
+def edit_task(task_id: str, fields: dict):
+    data = load_data()
+    for task in data["tasks"]:
+        if task["id"] == task_id:
+            for k, v in fields.items():
+                task[k] = v
+            save_data(data)
+            return task
+    return None

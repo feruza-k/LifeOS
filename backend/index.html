@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LifeOS – Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    /* Layout */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: #e5e7eb;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 900px;
+      background: #020617;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+      box-sizing: border-box;
+    }
+
+    @media (max-width: 800px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Chat section */
+    .panel {
+      background: #020617;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid #1f2937;
+      font-size: 0.85rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #111827;
+      border: 1px solid #1f2937;
+      color: #9ca3af;
+    }
+
+    .messages {
+      padding: 12px;
+      overflow-y: auto;
+      height: 380px;
+      scrollbar-width: thin;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .message {
+      max-width: 90%;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: #1d283a;
+      color: #e5e7eb;
+      border-bottom-right-radius: 2px;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: #020617;
+      border: 1px solid #1f2937;
+      color: #e5e7eb;
+      border-bottom-left-radius: 2px;
+    }
+
+    .message.assistant.system {
+      font-size: 0.8rem;
+      opacity: 0.85;
+    }
+
+    .input-row {
+      padding: 10px;
+      border-top: 1px solid #1f2937;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: #020617;
+    }
+
+    textarea {
+      flex: 1;
+      resize: none;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      background: #020617;
+      color: #e5e7eb;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      outline: none;
+      min-height: 40px;
+      max-height: 80px;
+    }
+
+    textarea:focus {
+      border-color: #3b82f6;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      background: #3b82f6;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    button[disabled] {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    .secondary-btn {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #1f2937;
+    }
+
+    .tiny {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    /* UI action panel */
+    .ui-content {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ui-section {
+      padding: 10px;
+      border-radius: 10px;
+      background: #020617;
+      border: 1px solid #1f2937;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ui-section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+    }
+
+    .ui-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .pill {
+      display: inline-flex;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      background: #0b1120;
+      border: 1px solid #1f2937;
+      color: #9ca3af;
+    }
+
+    pre {
+      margin: 0;
+      padding: 8px;
+      background: #020617;
+      border-radius: 8px;
+      border: 1px solid #111827;
+      font-size: 0.75rem;
+      max-height: 120px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Left: Chat -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>LifeOS Assistant</span>
+        <span class="badge">Backend: /assistant/chat</span>
+      </div>
+
+      <div id="messages" class="messages"></div>
+
+      <div class="input-row">
+        <textarea id="input" placeholder="Type something like “move my 10am run tomorrow to 5pm”…"></textarea>
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+
+    <!-- Right: UI actions & debug -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>UI Actions</span>
+        <span class="tiny" id="uiStatus">No pending actions</span>
+      </div>
+      <div class="ui-content">
+        <div id="uiActionContainer" class="ui-section" style="display:none;"></div>
+
+        <div class="ui-section">
+          <div class="ui-section-title">Last raw UI payload</div>
+          <pre id="uiRaw">null</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------------------------
+    // Config: update base URL if needed
+    // ---------------------------------------------
+    const API_BASE = "http://127.0.0.1:8000";
+
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("input");
+    const sendBtn = document.getElementById("sendBtn");
+    const uiContainer = document.getElementById("uiActionContainer");
+    const uiRawEl = document.getElementById("uiRaw");
+    const uiStatusEl = document.getElementById("uiStatus");
+
+    let isSending = false;
+
+    // ---------------------------------------------
+    // Rendering helpers
+    // ---------------------------------------------
+    function addMessage(text, role) {
+      const div = document.createElement("div");
+      div.className = "message " + role;
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function setSending(state) {
+      isSending = state;
+      sendBtn.disabled = state;
+      sendBtn.textContent = state ? "Sending..." : "Send";
+    }
+
+    // Render UI.action block in the right-hand panel
+    function renderUiAction(ui) {
+      if (!ui) {
+        uiContainer.style.display = "none";
+        uiContainer.innerHTML = "";
+        uiStatusEl.textContent = "No pending actions";
+        uiRawEl.textContent = "null";
+        return;
+      }
+
+      uiContainer.style.display = "flex";
+      uiContainer.innerHTML = "";
+      uiStatusEl.textContent = `Action: ${ui.action}`;
+      uiRawEl.textContent = JSON.stringify(ui, null, 2);
+
+      const title = document.createElement("div");
+      title.className = "ui-section-title";
+      title.textContent = "Assistant Instructions";
+      uiContainer.appendChild(title);
+
+      const descr = document.createElement("div");
+      descr.className = "tiny";
+      uiContainer.appendChild(descr);
+
+      const optionsWrap = document.createElement("div");
+      optionsWrap.className = "ui-options";
+      uiContainer.appendChild(optionsWrap);
+
+      // Basic handling for known actions
+      if (ui.action === "confirm_reschedule") {
+        descr.textContent = "The assistant found a conflict. Choose an option or type your own message.";
+
+        if (Array.isArray(ui.options)) {
+          ui.options.forEach(opt => {
+            const btn = document.createElement("button");
+            btn.className = "secondary-btn";
+            btn.textContent = opt;
+            btn.onclick = () => sendMessage(opt);
+            optionsWrap.appendChild(btn);
+          });
+        }
+      } else if (ui.action === "apply_reschedule") {
+        descr.textContent = `Pending reschedule to ${ui.new_time}. You can confirm or cancel.`;
+
+        const yesBtn = document.createElement("button");
+        yesBtn.textContent = "Yes";
+        yesBtn.onclick = () => sendMessage("yes");
+
+        const noBtn = document.createElement("button");
+        noBtn.className = "secondary-btn";
+        noBtn.textContent = "No";
+        noBtn.onclick = () => sendMessage("no");
+
+        optionsWrap.appendChild(yesBtn);
+        optionsWrap.appendChild(noBtn);
+
+        const hint = document.createElement("div");
+        hint.className = "tiny";
+        hint.textContent = "These buttons just send 'yes' or 'no' into the chat – the backend handles the logic.";
+        uiContainer.appendChild(hint);
+      } else if (ui.action === "update_task") {
+        descr.textContent = "Task was updated. In a richer UI, this would refresh the task list.";
+      } else if (ui.action === "refresh") {
+        descr.textContent = "Data changed. You may want to refresh today/week views.";
+      } else {
+        descr.textContent = "The assistant returned a UI action. Use this payload to design richer screens later.";
+      }
+    }
+
+    // ---------------------------------------------
+    // Core: send a message to /assistant/chat
+    // ---------------------------------------------
+    async function sendMessage(text) {
+      if (!text.trim() || isSending) return;
+
+      addMessage(text.trim(), "user");
+      inputEl.value = "";
+      renderUiAction(null); // clear old UI state
+      setSending(true);
+
+      try {
+        const res = await fetch(`${API_BASE}/assistant/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text.trim() })
+        });
+
+        const data = await res.json();
+
+        addMessage(data.assistant_response || "(no response)", "assistant");
+        renderUiAction(data.ui || null);
+      } catch (err) {
+        console.error(err);
+        addMessage("Something went wrong talking to the backend.", "assistant system");
+      } finally {
+        setSending(false);
+      }
+    }
+
+    // ---------------------------------------------
+    // Event wiring
+    // ---------------------------------------------
+    sendBtn.addEventListener("click", () => {
+      sendMessage(inputEl.value);
+    });
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage(inputEl.value);
+      }
+    });
+
+    // Initial system message
+    addMessage(
+      "✨ Welcome to LifeOS.\nYour schedule, habits, and responsibilities — all managed through simple, natural language.",
+      "assistant system"
+    );
+
+  </script>
+</body>
+</html>

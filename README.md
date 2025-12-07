@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 2, 2025
+**Current Date:** December 7, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -9,10 +9,11 @@
 - [Daily Progress](#daily-progress)
   - [Day 1: Intent Parser](#day-1-intent-parser-dec-1-2025)
   - [Day 2: Data Models, Storage & CRUD API](#day-2-data-models-storage--crud-api-dec-2-2025)
-  - [Day 3: Task Engine, Calendar Logic & Enhancements](#day-3-task-engine-calendar-logic--core-enhancements-dec-3-2025)
+  - [Day 3: Task Engine, Calendar Logic & Core Enhancements](#day-3-task-engine-calendar-logic--core-enhancements-dec-3-2025)
   - [Day 4: Weekly View, Conflict Detection & Assistant Insights](#day-4-weekly-view-conflict-detection--assistant-insights-dec-4-2025)
   - [Day 5: Today View, Suggestions Engine & Smart Rescheduling](#day-5-today-view-suggestions-engine--smart-rescheduling-dec-5-2025)
-  - [Day 6: Assistant Chat, Task Matching & Conflict-Aware Responses](#day-6-assistant-chat-v1-task-matching--conflict-aware-responses-dec-6-2025)
+  - [Day 6: Assistant Chat v1, Task Matching & Conflict-Aware Responses](#day-6-assistant-chat-v1-task-matching--conflict-aware-responses-dec-6-2025)
+  - [Day 7: Confirmations, Executable Actions & First Web Client](#day-7-confirmations-executable-actions--first-web-client-dec-7-2025)
 - [Next Steps](#next-steps)
 
 ---
@@ -689,15 +690,156 @@ It can now:
 
 This is the first step toward a usable conversational layer.
 
-#### **Next Steps (Day 7)**
-
-- Build a simple web UI (chat + today panel)
-
-- Add yes/no confirmation handling
-
-- Finalise Today/Week/Calendar data shapes for the frontend
-
-- Add basic action execution (apply_reschedule)
-
 
 ---
+
+
+### **Day 7: Confirmation Flow, Executable Actions & Full Assistant Stabilisation (Dec 7, 2025)**
+
+Today was a turning point.  
+Instead of adding new endpoints, I focused on making the assistant *actually able to act* — reliably, deterministically, and without confusion.
+
+This was the foundation needed before building the UI.
+
+---
+
+#### **1️⃣ Implemented Confirmation Workflow (Core of Day 7)**
+
+I created a full pending action system so LifeOS can now:
+
+- ask for confirmation (“Should I move ‘run’ to 19:00?”)
+- wait for the user’s answer
+- execute the action only when the user says “yes”
+- cancel cleanly on “no”
+
+This added a real assistant behaviour loop for the first time:
+
+NLP → intent → ask → confirm → execute → update UI
+
+**
+**New features added:**
+
+- `create_pending_action`
+- `get_current_pending`
+- `clear_current_pending`
+- persistent storage inside `data.json`
+
+---
+
+#### **2️⃣ Full Yes/No Understanding Inside the Chat Endpoint**
+
+Inside `/assistant/chat`, I implemented deterministic routing:
+
+- **“yes”, “ok”, “sure”, “confirm”** → apply pending action  
+- **“no”, “cancel”, “ignore”** → cancel pending action  
+- otherwise → normal NLP flow
+
+This made the assistant’s behaviour stable and predictable for the UI.
+
+---
+
+#### **3️⃣ Added Executable Task Actions**
+
+I added backend functions that actually *change* the schedule:
+
+- **apply_reschedule(task_id, new_datetime)**
+- **edit_task(task_id, fields)**
+- **delete_task(task_id)**
+
+These directly mutate the JSON store so the UI updates instantly after confirmation.
+
+They are used by both:
+
+- `/assistant/chat`
+- `/assistant/confirm`
+
+---
+
+#### **4️⃣ Built `/assistant/confirm` Endpoint**
+
+This endpoint executes whichever pending action exists.  
+The UI later will call this when a “Yes” button is pressed.
+
+**Example response:**
+
+```json
+{
+  "assistant_response": "Okay, I moved 'run'.",
+  "ui": { "action": "update_task", "task_id": "…" }
+}
+```
+
+#### **5️⃣ Repaired Task Extraction, Date Matching & Time Understanding**
+
+Throughout the day we resolved several deep issues:
+
+- the assistant confusing **“run”** with **“gym”**
+- wrong task selected when multiple tasks shared the same title
+- pending actions referencing the wrong task ID
+- date parser overriding explicit dates incorrectly
+- time parser failing on inputs like “8 am”, “6pm”, etc.
+
+**Fixes included:**
+
+##### ✔ Rewriting the Task Extractor (`try_extract_task_from_message`)  
+Now it is:
+
+- **time-aware**
+- **date-aware**
+- strict in **title-matching**
+- safe against fuzzy or misleading matches  
+  (e.g., “run” no longer matches “brunch”)
+
+##### ✔ Upgrading the Date Engine (`interpret_datetime`)  
+It now correctly interprets:
+
+- **tomorrow / today**
+- **weekdays** (Monday–Sunday)
+- **explicit numeric times** (“5pm”, “08:30”)
+- **semantic times** (morning, afternoon, evening)
+
+These improvements were essential for correct, predictable, conflict-free rescheduling.
+
+---
+
+#### **6️⃣ Added UI Action Schema + Minimal Web Client Connected**
+
+To prepare for the frontend, I finalised stable UI instruction formats such as:
+
+```json
+{
+  "action": "apply_reschedule",
+  "task_id": "...",
+  "new_time": "17:00"
+}
+```
+
+
+I also built a minimal web client that:
+
+- sends chat messages to **`/assistant/chat`**
+- displays backend responses
+- shows **pending actions**
+- supports **Yes/No confirmation** flows
+
+This created the first fully working **end-to-end conversational assistant loop**.
+
+---
+
+#### **Reflection (Day 7)**
+
+Today’s work transformed LifeOS from a **smart parser** into a **real assistant**.
+
+It can now:
+
+- identify tasks accurately  
+- propose schedule changes  
+- ask for confirmation  
+- execute real mutations  
+- update the UI  
+- behave consistently across conversations  
+
+This stability was essential before continuing into the React Native UI phase.
+
+#### **Next Steps**
+Next, I’ll start building the frontend: a simple chat screen and Today/Week views that connect directly to the assistant. After that, I’ll add interactive UI actions (confirm, reschedule, edit, update) so the assistant can fully control the schedule through the app.

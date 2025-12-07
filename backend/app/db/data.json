@@ -1,16 +1,6 @@
 {
     "tasks": [
         {
-            "id": "3334c151-9ef3-4c72-a705-2d8898a0b7a9",
-            "type": "event",
-            "title": "run",
-            "date": "2025-12-07",
-            "time": "10:00",
-            "datetime": "2025-12-07 10:00",
-            "category": "health",
-            "notes": null
-        },
-        {
             "id": "739166ca-6125-48ca-9605-2287263348cd",
             "type": "reminder",
             "title": "buy flight tickets to Italy",
@@ -45,8 +35,8 @@
             "type": "event",
             "title": "gym",
             "date": "2025-12-02",
-            "time": "18:00",
-            "datetime": "2025-12-02 18:00",
+            "time": "17:00",
+            "datetime": "2025-12-02 17:00",
             "category": "health",
             "notes": "after work"
         },
@@ -124,6 +114,36 @@
             "completed": false,
             "energy": null,
             "context": null
+        },
+        {
+            "id": "2400c33e-9adb-4dd0-bc73-5fda6bb95dda",
+            "type": "event",
+            "title": "run",
+            "date": "2025-12-09",
+            "time": "19:00",
+            "datetime": "2025-12-09 19:00",
+            "duration_minutes": null,
+            "end_datetime": null,
+            "category": "health",
+            "notes": null,
+            "completed": false,
+            "energy": null,
+            "context": null
+        },
+        {
+            "id": "9f6c1b5e-82c2-40a8-aa3b-2d6904cec06a",
+            "type": "event",
+            "title": "gym",
+            "date": "2025-12-08",
+            "time": "17:00",
+            "datetime": "2025-12-08 17:00",
+            "duration_minutes": null,
+            "end_datetime": null,
+            "category": "health",
+            "notes": null,
+            "completed": false,
+            "energy": null,
+            "context": null
         }
     ],
     "diary": [
@@ -139,5 +159,6 @@
             "text": "prays 5 times a day",
             "category": "personal"
         }
-    ]
+    ],
+    "pending": {}
 }
