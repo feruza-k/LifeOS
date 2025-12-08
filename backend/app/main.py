@@ -323,7 +323,11 @@ from app.models.ui import AssistantReply
 @app.post("/assistant/chat", response_model=AssistantReply)
 def assistant_chat(payload: ChatRequest):
     reply = generate_assistant_response(payload.message)
-    return reply
+    return {
+        "assistant_response": reply.get("assistant_response", "Something went wrong."),
+        "ui": reply.get("ui")
+    }
+
 
 
 # -----------------------------------------------------
@@ -338,3 +342,14 @@ def assistant_confirm():
     """
     return generate_assistant_response("yes")
 
+
+@app.get("/assistant/bootstrap")
+def assistant_bootstrap():
+    return {
+        "today": get_today_view(),
+        "week": get_week_stats(),
+        "suggestions": get_suggestions(),
+        "conflicts": find_conflicts(),
+        "categories": get_category_colors(),
+        "pending": load_data().get("pending", {})
+    }

@@ -14,6 +14,7 @@
   - [Day 5: Today View, Suggestions Engine & Smart Rescheduling](#day-5-today-view-suggestions-engine--smart-rescheduling-dec-5-2025)
   - [Day 6: Assistant Chat v1, Task Matching & Conflict-Aware Responses](#day-6-assistant-chat-v1-task-matching--conflict-aware-responses-dec-6-2025)
   - [Day 7: Confirmations, Executable Actions & First Web Client](#day-7-confirmations-executable-actions--first-web-client-dec-7-2025)
+  - [Day 8: Backend → Mobile Connection & Smarter Task Creation](#day-8-backend--mobile-connection--smarter-task-creation-dec-8-2025)
 - [Next Steps](#next-steps)
 
 ---
@@ -703,7 +704,7 @@ This was the foundation needed before building the UI.
 
 ---
 
-#### **1️⃣ Implemented Confirmation Workflow (Core of Day 7)**
+#### **1️⃣ Implemented Confirmation Workflow**
 
 I created a full pending action system so LifeOS can now:
 
@@ -826,7 +827,7 @@ This created the first fully working **end-to-end conversational assistant loop*
 
 ---
 
-#### **Reflection (Day 7)**
+#### **Reflection**
 
 Today’s work transformed LifeOS from a **smart parser** into a **real assistant**.
 
@@ -841,5 +842,102 @@ It can now:
 
 This stability was essential before continuing into the React Native UI phase.
 
+
+
+---
+
+
+### **Day 8: Backend → Mobile Connection & Smarter Task Creation (Dec 8, 2025)**
+
+Today wasn’t about visuals — it was about **making LifeOS actually run on a real device** and stabilising the conversational engine.  
+Most of the work focused on *connecting*, *fixing*, and *making the assistant behave reliably*, not designing final UI elements.
+
+
+
+#### **1️⃣ Smarter Task Creation (Time Ranges, Weekdays, Better Parsing)**
+
+Improved natural-language understanding for:
+
+- “add gym at 6pm”
+- “work from 9 to 5”
+- “add study session tomorrow at 8am”
+- “meeting Friday afternoon”
+
+Fixes included:
+
+- detecting natural time ranges (`from X to Y`)
+- auto-calculating duration + end time
+- improved weekday mapping
+- more accurate date/time interpretation
+
+This made task creation consistent and predictable.
+
+
+#### **2️⃣ Early Conflict Detection + Simple Slot Suggestion**
+
+Before creating or rescheduling a task, the assistant now:
+
+- checks for overlaps  
+- warns the user  
+- suggests the nearest free slot  
+
+This is the first step toward full conflict-awareness in the UI.
+
+
+#### **3️⃣ Added `/assistant/bootstrap` Endpoint**
+
+Created a new unified bootstrap endpoint returning:
+
+- Today view  
+- Week stats  
+- Suggestions  
+- Conflict info  
+- Category colors  
+- Pending actions  
+
+This prepares the backend for proper app screens (Today, Week, Calendar).
+
+
+
+#### **4️⃣ React Native App Setup (Expo) + Real Device Backend Connection**
+
+Main achievement of the day.
+
+Completed:
+
+- Created the React Native + Expo project
+- Added tab navigation (Today, Assistant, Explore)
+- Built a functional chat screen
+- Connected the iPhone Expo Go app to FastAPI backend
+- Fixed network/localhost issues (using device IP instead of 127.0.0.1)
+- Verified real device → backend communication
+
+The UI is still minimal — the focus was functionality.
+
+
+
+#### **5️⃣ First True End-to-End Loop on Mobile**
+
+From the phone, I successfully:
+
+- checked today/tomorrow schedules  
+- created events  
+- rescheduled tasks  
+- confirmed actions  
+- watched the JSON data update live  
+
+LifeOS officially became a **mobile assistant**, not just a backend.
+
+---
+
+#### **Reflection**
+
+Day 8 wasn’t a “design” day — it was a **plumbing, fixing, and connecting day**.
+
+But it achieved something huge:
+
+> ✨ LifeOS now runs fully on a real device and responds intelligently through natural-language chat.
+
 #### **Next Steps**
-Next, I’ll start building the frontend: a simple chat screen and Today/Week views that connect directly to the assistant. After that, I’ll add interactive UI actions (confirm, reschedule, edit, update) so the assistant can fully control the schedule through the app.
+Tomorrow (Day 9) will focus on the **proper Today screen UI**, bootstrap integration, and clean layout improvements.
+
