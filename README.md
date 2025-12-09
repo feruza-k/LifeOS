@@ -15,7 +15,9 @@
   - [Day 6: Assistant Chat v1, Task Matching & Conflict-Aware Responses](#day-6-assistant-chat-v1-task-matching--conflict-aware-responses-dec-6-2025)
   - [Day 7: Confirmations, Executable Actions & First Web Client](#day-7-confirmations-executable-actions--first-web-client-dec-7-2025)
   - [Day 8: Backend → Mobile Connection & Smarter Task Creation](#day-8-backend--mobile-connection--smarter-task-creation-dec-8-2025)
+  - [Day 9: Today View Refinement & UI Foundation](#day-9-today-view-refinement--ui-foundation-dec-9-2025)
 - [Next Steps](#next-steps)
+
 
 ---
 
@@ -938,6 +940,35 @@ But it achieved something huge:
 
 > ✨ LifeOS now runs fully on a real device and responds intelligently through natural-language chat.
 
+### **Day 9:** Today View Refinement & UI Foundation (Dec 9, 2025)
+
+Today was a lighter day, but an important one for aligning the direction of the mobile UI.
+
+Building on yesterday’s backend → mobile integration, I focused on improving the structure and clarity of the **Today View**. This included:
+
+- adding the first version of the **time-aware greeting**  
+- connecting the **load meter** from the backend to the UI  
+- cleaning the layout of the **morning / afternoon / evening** sections  
+- rendering **free time blocks** and early **insights**  
+- fixing several UI bugs (component imports, routing, and null mappings)
+
+These are small but necessary steps toward a clean, minimal iOS-style interface.
+
+I also finalised the **visual direction** for LifeOS:  
+a calm, neutral, minimal iOS aesthetic with moderately rounded components. This foundation will guide all UI improvements going forward.
+
+Not a big feature day — but still consistent progress, keeping the momentum of the challenge.
+
+#### **Reflection (Day 9)**
+
+Even though today’s progress was small, it felt meaningful. After several days of backend-heavy work, shifting attention toward the mobile UI made the project feel more “real” and closer to what I ultimately want LifeOS to become. 
+
+Defining the visual direction, calm, minimal, and iOS-native, created a sense of clarity for the rest of the challenge. The Today View is still early, but the structure is forming, and every small improvement makes the app feel more coherent.
+
+---
+
+
 #### **Next Steps**
-Tomorrow (Day 9) will focus on the **proper Today screen UI**, bootstrap integration, and clean layout improvements.
+
+With the backend and core intelligence stabilised, the next phase of the challenge focuses on **designing and implementing the mobile frontend**. The goal is to transform LifeOS from a functional assistant into a clean, calm, iOS-native experience.
 
