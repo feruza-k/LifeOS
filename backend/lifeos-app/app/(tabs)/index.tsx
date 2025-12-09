@@ -1,282 +1,157 @@
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
-import { Text, Card, ActivityIndicator, FAB } from "react-native-paper";
+// /app/(tabs)/index.tsx
+import React, { useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from "react-native";
+import { FAB } from "react-native-paper";
 import { useRouter } from "expo-router";
+import { useBootstrap } from "../../hooks/useBootstrap";
+import { getDynamicGreeting } from "../../utils/getGreeting";
 
-// --- THEME COLORS ---
-const COLORS = {
-  Primary: "#8F5774",    // Deep Blush/Mauve (Primary Accent)
-  Background: "#F7F4F0", // Pale Off-White/Linen
-  TextPrimary: "#333333", // Soft Black
-  TextSecondary: "rgba(51, 51, 51, 0.6)", // Soft Black with opacity for subtitles
-};
+import { SectionHeader } from "../../components/SectionHeader";
+import { TaskCard } from "../../components/TaskCard";
+import { FreeBlockCard } from "../../components/FreeBlockCard";
+import { InsightCard } from "../../components/InsightCard";
+import { LoadMeter } from "../../components/LoadMeter";
 
-// --- CONFIGURATION ---
-const BASE_URL = "http://127.0.0.1:8000"; 
-/* 🚨 IMPORTANT FIX FOR NETWORK ERROR:
-    If you still see "Network request failed", replace "127.0.0.1" 
-    above with your host machine's local network IP address (e.g., "http://192.168.1.5:8000").
-*/
-
-// ------------------------------------------
-// TYPES (UPDATED)
-// ------------------------------------------
-type TaskItem = {
-  id: string;
-  title: string;
-  time: string;
-  end_datetime?: string | null;
-  category?: string | null;
-};
-
-type TaskGroup = {
-  label: string;
-  tasks: TaskItem[];
-};
-
-type LoadLevel = "Light" | "Optimal" | "Heavy" | "Unknown";
-
-type TodayResponse = {
-  groups: TaskGroup[];
-  // New field for Load Awareness
-  current_load_level: LoadLevel; 
-};
-
-// ------------------------------------------
-// COMPONENT: Load Status Header
-// ------------------------------------------
-type LoadStatusProps = {
-    loadLevel: LoadLevel;
-};
-
-function LoadStatusHeader({ loadLevel }: LoadStatusProps) {
-    let color;
-    let message;
-
-    switch (loadLevel) {
-        case "Heavy":
-            color = "#FF9A8D"; // Soft Red/Salmon
-            message = "Heavy Load. Be gentle with yourself today.";
-            break;
-        case "Optimal":
-            color = COLORS.Primary;
-            message = "Optimal Load. Ready to build consistency.";
-            break;
-        case "Light":
-            color = "#A6D9B6"; // Soft Green
-            message = "Light Load. Time for a small, meaningful win.";
-            break;
-        case "Unknown":
-        default:
-            color = "#E0E0E0"; // Soft Gray
-            message = "Checking your energy level...";
-            break;
-    }
-
-    return (
-        <View style={[styles.loadStatusContainer, { backgroundColor: color }]}>
-            <Text style={styles.loadStatusText}>{message}</Text>
-        </View>
-    );
-}
-
-// ------------------------------------------
-// MAIN COMPONENT
-// ------------------------------------------
 export default function TodayScreen() {
-  const [loading, setLoading] = useState(true);
-  const [todayData, setTodayData] = useState<TodayResponse | null>(null);
   const router = useRouter();
+  const { data, loading, refreshing, refresh, fetchBootstrap } = useBootstrap();
 
   useEffect(() => {
-    fetchToday();
+    fetchBootstrap();
   }, []);
 
-  async function fetchToday() {
-    try {
-      setLoading(true);
-      // 🚨 FIX: Use the configured BASE_URL
-      const res = await fetch(`${BASE_URL}/assistant/today`);
-      
-      const data = await res.json();
-      setTodayData(data);
-    } catch (err) {
-      console.log("Error fetching today:", err);
-      // Fallback data structure to prevent crash if backend is down
-      setTodayData({
-        groups: [],
-        current_load_level: "Unknown",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const todayString = new Date().toLocaleDateString("en-GB", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  const today = data?.today;
+  const suggestions = data?.suggestions?.suggestions ?? [];
+  const conflicts = data?.conflicts ?? [];
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.header}>Today</Text>
-        <Text style={styles.date}>{todayString}</Text>
-      </View>
+      {/* GREETING */}
+      <Text style={styles.greeting}>{getDynamicGreeting()}</Text>
 
-      {/* LOAD STATUS DASHBOARD ELEMENT */}
-      {todayData?.current_load_level && (
-        <LoadStatusHeader loadLevel={todayData.current_load_level} />
-      )}
-      
+      {/* LOAD METER */}
+      {today && <LoadMeter load={today.load} />}
 
-      {/* LOADING */}
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} size="large" color={COLORS.Primary} />
-      ) : (
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* GROUPS */}
-          {todayData?.groups?.map((group: TaskGroup, idx: number) => (
-            <View key={idx} style={styles.groupSection}>
-              <Text style={styles.groupLabel}>{group.label}</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+        }
+      >
+        {/* MORNING */}
+        <SectionHeader title="Morning" />
+        {today?.morning_tasks?.length ? (
+          today.morning_tasks.map((t: any) => (
+            <TaskCard
+              key={t.id}
+              task={t}
+              onPress={() =>
+                router.push({
+                  pathname: "../task/[id]",
+                  params: { id: t.id },
+                })
+              }
+            />
+          ))
+        ) : (
+          <Text style={styles.empty}>No morning tasks.</Text>
+        )}
 
-              {group.tasks.length === 0 ? (
-                <Text style={styles.emptyText}>No tasks here.</Text>
-              ) : (
-                group.tasks.map((task: TaskItem) => (
-                  <Card key={task.id} style={styles.card} elevation={2}>
-                    <Card.Title
-                      title={task.title}
-                      subtitle={
-                        task.end_datetime
-                          ? `${task.time} – ${task.end_datetime.split(" ")[1]}`
-                          : task.time
-                      }
-                      titleStyle={styles.cardTitle}
-                      subtitleStyle={styles.cardSubtitle}
-                    />
-                  </Card>
-                ))
-              )}
-            </View>
-          ))}
-          {/* Add padding at the bottom for FAB clearance */}
-          <View style={{ height: 100 }} /> 
-        </ScrollView>
-      )}
+        {/* AFTERNOON */}
+        <SectionHeader title="Afternoon" />
+        {today?.afternoon_tasks?.length ? (
+          today.afternoon_tasks.map((t: any) => (
+            <TaskCard
+              key={t.id}
+              task={t}
+              onPress={() =>
+                router.push({
+                  pathname: "../task/[id]",
+                  params: { id: t.id },
+                })
+              }
+            />
+          ))
+        ) : (
+          <Text style={styles.empty}>No afternoon tasks.</Text>
+        )}
 
-      {/* FAB — Opens Chat */}
+        {/* EVENING */}
+        <SectionHeader title="Evening" />
+        {today?.evening_tasks?.length ? (
+          today.evening_tasks.map((t: any) => (
+            <TaskCard
+              key={t.id}
+              task={t}
+              onPress={() =>
+                router.push({
+                  pathname: "../task/[id]",
+                  params: { id: t.id },
+                })
+              }
+            />
+          ))
+        ) : (
+          <Text style={styles.empty}>No evening tasks.</Text>
+        )}
+
+        {/* FREE BLOCKS */}
+        <SectionHeader title="Free Blocks" />
+        {today?.free_blocks?.length ? (
+          today.free_blocks.map((b: any, idx: number) => (
+            <FreeBlockCard key={idx} block={b} />
+          ))
+        ) : (
+          <Text style={styles.empty}>No free blocks today.</Text>
+        )}
+
+        {/* INSIGHTS */}
+        <SectionHeader title="Insights" />
+
+        {suggestions.map((s: any, idx: number) => (
+          <InsightCard key={idx} insight={s.message} />
+        ))}
+
+        {conflicts.length > 0 && (
+          <InsightCard insight={`You have ${conflicts.length} conflict(s) today.`} />
+        )}
+
+        <View style={{ height: 80 }} />
+      </ScrollView>
+
+      {/* FAB */}
       <FAB
         icon="message-plus"
         label="Assistant"
         style={styles.fab}
         color="white"
-        onPress={() => {
-          router.push("/chat"); 
-        }}
+        onPress={() => router.push("/chat")}
       />
     </View>
   );
 }
 
-// ------------------------------------------
-// STYLES
-// ------------------------------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 22,
     paddingTop: 60,
-    backgroundColor: COLORS.Background,
+    backgroundColor: "#F7F4F0",
   },
-  scrollView: {
-    marginTop: 20,
-  },
-
-  // HEADER
-  headerContainer: {
-    marginBottom: 10,
-  },
-  header: {
-    fontSize: 34,
-    fontWeight: "700",
-    color: COLORS.TextPrimary,
-  },
-  date: {
-    fontSize: 16,
-    color: COLORS.TextSecondary,
-    marginTop: -4,
-  },
-
-  // LOAD STATUS STYLES (NEW)
-  loadStatusContainer: {
-    padding: 14,
-    borderRadius: 12,
-    marginTop: 15,
-    marginBottom: 25,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3, 
-  },
-  loadStatusText: {
-    fontSize: 15,
+  greeting: {
+    fontSize: 20,
     fontWeight: "600",
-    color: "white", 
-    textAlign: "center",
+    color: "#333",
   },
-  // --- END LOAD STATUS STYLES ---
-
-
-  // GROUPS
-  groupSection: {
-    marginBottom: 28,
-  },
-  groupLabel: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 10,
-    color: COLORS.TextPrimary,
-  },
-  emptyText: {
-    color: COLORS.TextSecondary,
+  empty: {
+    color: "rgba(51,51,51,0.6)",
     fontSize: 14,
-    marginLeft: 4,
+    marginTop: 4,
   },
-
-  // CARDS
-  card: {
-    backgroundColor: "white",
-    borderRadius: 14,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1.5,
-    elevation: 2, 
-    paddingVertical: 2,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.TextPrimary,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: COLORS.TextSecondary,
-    marginTop: -2,
-  },
-
-  // FAB
   fab: {
     position: "absolute",
     bottom: 30,
     right: 20,
-    backgroundColor: COLORS.Primary,
-    borderRadius: 40,
-    zIndex: 10, 
+    backgroundColor: "#8F5774",
   },
 });
