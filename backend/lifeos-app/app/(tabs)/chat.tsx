@@ -22,8 +22,7 @@ const COLORS = {
 };
 
 // --- BACKEND URL ---
-// ⚠️ IMPORTANT: Replace with your local IP if using Expo Go on phone
-const BASE_URL = "http://192.168.1.9:8000";
+const BASE_URL = "http://192.168.1.5:8000";
 
 
 export default function ChatScreen() {

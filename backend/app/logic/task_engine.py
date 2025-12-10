@@ -2,7 +2,7 @@
 
 from datetime import datetime, date, timedelta
 from app.storage.repo import load_data, save_data
-from app.logging import logger
+from backend.app.app_logging import logger
 import pytz
 
 tz = pytz.timezone("Europe/London")

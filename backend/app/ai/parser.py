@@ -3,7 +3,7 @@
 
 from openai import OpenAI
 from app.models.intent import Intent
-from app.logging import logger
+from backend.app.app_logging import logger
 import os
 import json
 from dotenv import load_dotenv

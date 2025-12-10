@@ -3,7 +3,7 @@
 import json
 import uuid
 from pathlib import Path
-from app.logging import logger
+from backend.app.app_logging import logger
 
 
 # Compute correct absolute path to db/data.json

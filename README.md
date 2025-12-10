@@ -16,6 +16,7 @@
   - [Day 7: Confirmations, Executable Actions & First Web Client](#day-7-confirmations-executable-actions--first-web-client-dec-7-2025)
   - [Day 8: Backend → Mobile Connection & Smarter Task Creation](#day-8-backend--mobile-connection--smarter-task-creation-dec-8-2025)
   - [Day 9: Today View Refinement & UI Foundation](#day-9-today-view-refinement--ui-foundation-dec-9-2025)
+  - [Day 10: UI Stability, Bug Fixes & Early Design Planning](#day-10-ui-stability-bug-fixes--early-design-planning-dec-10-2025)
 - [Next Steps](#next-steps)
 
 
@@ -967,6 +968,26 @@ Defining the visual direction, calm, minimal, and iOS-native, created a sense of
 
 ---
 
+### **Day 10:** UI Stability, Bug Fixes & Early Design Planning (Dec 10, 2025)
+
+Today was a quiet but important day focused on stabilising the mobile UI and preparing for the next stage of design work.
+
+I spent most of the time:
+
+- fixing UI bugs (imports, routing, undefined elements)  
+- resolving backend ↔ frontend naming mismatches  
+- cleaning the Today View layout for consistency  
+- improving task grouping and free-block rendering  
+- thinking through the broader app structure (Today → Week → Month)
+
+Not a big visual day, but a strong foundational one — the app feels more stable and ready for the deeper design work ahead.
+
+#### **Reflection**
+
+Even without major new features, today’s progress mattered.  
+Fixing small issues, improving consistency, and clarifying how the UI should flow helps prevent rework later and keeps the project aligned with the long-term vision.
+
+---
 
 #### **Next Steps**
 
