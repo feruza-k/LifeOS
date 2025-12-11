@@ -999,8 +999,8 @@ Today was focused on getting the redesigned LifeOS Today View fully aligned with
 - **Horizontal Day Scroller (WIP):** Implemented the UI and began wiring logic to load tasks for specific dates.
 - **Energy Status Card:** Connected the BalanceScoreCard to backend load calculations so the app now reflects daily workload and completion progress in real time.
 - **Task Structure Update:** Replaced the old morning/afternoon/evening buckets with a simpler format:
-  - **Scheduled tasks** → tasks with time  
-  - **Anytime tasks** → flexible tasks without a time  
+  - **Scheduled tasks** → tasks with time;
+  - **Anytime tasks** → flexible tasks without a time;
 - **Manual Task Creation:** Implemented the AddTask modal; new tasks now appear instantly in the Today View and update the energy/load indicator.
 
 #### **Backend Updates**
