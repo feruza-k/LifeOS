@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>LifeOS - Your Executive Assistant with a Soul</title>
+    <meta name="description" content="LifeOS helps you align your daily actions with your future self. A calm, supportive life management app that understands your values." />
+    <meta name="author" content="LifeOS" />
+    <meta name="theme-color" content="#8F5774" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <meta property="og:title" content="LifeOS - Your Executive Assistant with a Soul" />
+    <meta property="og:description" content="Align your daily actions with your future self. Calm, supportive, intelligent life management." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@LifeOS" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <style>
+      /* Safe area padding for iOS */
+      :root {
+        --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .pb-safe {
+        padding-bottom: max(0.5rem, var(--safe-area-inset-bottom));
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -80,16 +80,20 @@ def _get_free_blocks(sorted_tasks: List[dict]) -> List[Dict]:
 
 
 def _categorize_tasks(tasks: List[dict]):
-    """Split tasks into morning/afternoon/evening buckets."""
+    """Split tasks into morning/afternoon/evening buckets.
+    Matches frontend logic: Morning < 12, Afternoon < 17, Evening >= 17.
+    Tasks without time go to afternoon.
+    """
     morning, afternoon, evening = [], [], []
 
     for t in tasks:
         if not t.get("time"):
+            afternoon.append(t)  # Tasks without time go to afternoon
             continue
         hour = int(t["time"][:2])
         if hour < 12:
             morning.append(t)
-        elif hour < 18:
+        elif hour < 17:  # Match frontend: afternoon is < 17, evening is >= 17
             afternoon.append(t)
         else:
             evening.append(t)

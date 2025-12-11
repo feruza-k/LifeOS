@@ -17,6 +17,7 @@
   - [Day 8: Backend → Mobile Connection & Smarter Task Creation](#day-8-backend--mobile-connection--smarter-task-creation-dec-8-2025)
   - [Day 9: Today View Refinement & UI Foundation](#day-9-today-view-refinement--ui-foundation-dec-9-2025)
   - [Day 10: UI Stability, Bug Fixes & Early Design Planning](#day-10-ui-stability-bug-fixes--early-design-planning-dec-10-2025)
+  - [Day 11: Today View UI Alignment & Backend Sync](#day-11-today-view-ui-alignment--backend-sync-dec-11-2025)
 - [Next Steps](#next-steps)
 
 
@@ -989,7 +990,38 @@ Fixing small issues, improving consistency, and clarifying how the UI should flo
 
 ---
 
+### **Day 11:** Today View UI Alignment & Backend Sync (Dec 11, 2025)
+
+Today was focused on getting the redesigned LifeOS Today View fully aligned with the backend. After finalising the app’s core layout in Lovable and adding the frontend code, I shifted my attention to rebuilding the logic and data flow needed to support the cleaner UI structure.
+
+#### **What I Worked On**
+
+- **Horizontal Day Scroller (WIP):** Implemented the UI and began wiring logic to load tasks for specific dates.
+- **Energy Status Card:** Connected the BalanceScoreCard to backend load calculations so the app now reflects daily workload and completion progress in real time.
+- **Task Structure Update:** Replaced the old morning/afternoon/evening buckets with a simpler format:
+  - **Scheduled tasks** → tasks with time  
+  - **Anytime tasks** → flexible tasks without a time  
+- **Manual Task Creation:** Implemented the AddTask modal; new tasks now appear instantly in the Today View and update the energy/load indicator.
+
+#### **Backend Updates**
+
+To support the new frontend architecture, several backend components were rebuilt:
+
+- **Frontend Adapter Layer:** Converts backend task objects into the format expected by the UI.
+- **Extended Task Model:** Added duration, endTime calculation, and value/category mapping.
+- **Updated Today View Engine:** Now returns structured data with grouped tasks, load level, and free blocks.
+- **New & Updated Endpoints:** Added create/update/delete/move task endpoints in frontend-compatible format, and extended `/assistant/today` with optional date support.
+
+#### **Reflection (Day 11)**
+
+This was a structural day, but an important one. The frontend and backend finally speak the same language, and the Today View now feels coherent and responsive. There’s still design polishing ahead, but the foundation is now strong enough to build on.
+
+---
+
 #### **Next Steps**
 
-With the backend and core intelligence stabilised, the next phase of the challenge focuses on **designing and implementing the mobile frontend**. The goal is to transform LifeOS from a functional assistant into a clean, calm, iOS-native experience.
+- Complete backend loading for the horizontal day scroller  
+- Wire up Settings, Reminders, and Check-in flows  
+- Improve task toggling, deletion, and overall state consistency  
+- Begin integrating the conversational assistant  
 

@@ -1,0 +1,17 @@
+{
+  "name": "LifeOS - Your Executive Assistant with a Soul",
+  "short_name": "LifeOS",
+  "description": "Align your daily actions with your future self. Calm, supportive, intelligent life management.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F4F0",
+  "theme_color": "#8F5774",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

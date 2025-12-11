@@ -2,7 +2,8 @@
 
 from datetime import datetime, date, timedelta
 from app.storage.repo import load_data, save_data
-from backend.app.app_logging import logger
+from app.logging import logger
+
 import pytz
 
 tz = pytz.timezone("Europe/London")
@@ -114,7 +115,7 @@ def get_today_timeline():
 
 
 # ---------------------------------------------------------
-# Mutations: reschedule, edit, delete
+# Reschedule, edit, delete
 # ---------------------------------------------------------
 def apply_reschedule(task_id: str, new_datetime: str):
     data = load_data()
