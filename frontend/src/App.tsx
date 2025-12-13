@@ -8,6 +8,9 @@ import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Calendar from "./pages/Calendar";
 import Explore from "./pages/Explore";
+import Reminders from "./pages/Reminders";
+import Settings from "./pages/Settings";
+import Categories from "./pages/Categories";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -31,6 +34,9 @@ const App = () => (
             <Route path="/week" element={<Week />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/explore" element={<Explore />} />
+            <Route path="/reminders" element={<Reminders />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/categories" element={<Categories />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

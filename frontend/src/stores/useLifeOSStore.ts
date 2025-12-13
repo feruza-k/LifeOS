@@ -1,7 +1,53 @@
 import { create } from "zustand";
 import { api } from "@/lib/api";
+import { Category } from "@/types/lifeos";
 
-export const useLifeOSStore = create((set, get) => ({
+interface LifeOSStore {
+  // State
+  today: any;
+  tasks: any[];
+  reminders: any[];
+  note: any;
+  checkIn: any;
+  monthFocus: any;
+  settings: {
+    coreAIName: string;
+  };
+  categories: Category[];
+  conversations: any[];
+  
+  // Methods
+  loadBootstrap: () => Promise<void>;
+  loadToday: (date: Date | string) => Promise<void>;
+  addTask: (task: any) => Promise<void>;
+  toggleTask: (id: string) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  moveTask: (id: string, newDate: Date | string) => Promise<void>;
+  getTasksForDate: (date: string | Date) => Promise<any[]>;
+  getTasksForDateSync: (date: string | Date) => any[];
+  loadTasksForDateRange: (start: Date | string, end: Date | string) => Promise<any[]>;
+  loadReminders: () => Promise<void>;
+  addReminder: (reminder: any) => Promise<void>;
+  updateReminder: (id: string, updates: any) => Promise<any>;
+  deleteReminder: (id: string) => Promise<void>;
+  loadNote: (date: string) => Promise<any>;
+  getNoteForDate: (date: Date | string) => any;
+  saveNote: (date: Date | string, content: string) => Promise<any>;
+  loadCheckIn: (date: string) => Promise<void>;
+  saveCheckIn: (
+    date: Date | string,
+    completedIds: string[],
+    incompleteIds: string[],
+    movedTasks: { taskId: string; newDate: string }[],
+    note?: string,
+    mood?: string
+  ) => Promise<void>;
+  setCurrentMonthFocus: (title: string, description?: string) => Promise<void>;
+  addMessage: (role: "user" | "assistant", content: string, actions?: any[]) => any;
+  clearConversations: () => void;
+}
+
+export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   // --- STATE ---
   today: null,
   tasks: [],
@@ -12,6 +58,13 @@ export const useLifeOSStore = create((set, get) => ({
   settings: {
     coreAIName: "SolAI",
   },
+  categories: [
+    { id: "health", label: "Health", color: "#C7DED5" }, // Muted Sage
+    { id: "growth", label: "Growth", color: "#C9DCEB" }, // Pale Sky
+    { id: "family", label: "Family", color: "#F4D6E4" }, // Dusty Rose
+    { id: "work", label: "Work", color: "#DCD0E6" }, // Lavender Mist
+    { id: "creativity", label: "Creativity", color: "#FFF5E0" }, // Creamy Yellow
+  ],
 
   // -------- LOADERS -------- //
 
@@ -133,6 +186,21 @@ export const useLifeOSStore = create((set, get) => ({
   addReminder: async (reminder) => {
     const created = await api.createReminder(reminder);
     set({ reminders: [...get().reminders, created] });
+    return created;
+  },
+
+  updateReminder: async (id: string, updates: any) => {
+    try {
+      const updated = await api.updateReminder(id, updates);
+      if (updated) {
+        set({
+          reminders: get().reminders.map((r) => (r.id === id ? updated : r)),
+        });
+        return updated;
+      }
+    } catch (error) {
+      console.error("Failed to update reminder:", error);
+    }
   },
 
   deleteReminder: async (id) => {

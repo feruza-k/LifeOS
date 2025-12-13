@@ -19,6 +19,7 @@
   - [Day 10: UI Stability, Bug Fixes & Early Design Planning](#day-10-ui-stability-bug-fixes--early-design-planning-dec-10-2025)
   - [Day 11: Today View UI Alignment & Backend Sync](#day-11-today-view-ui-alignment--backend-sync-dec-11-2025)
   - [Day 12: Check-In System & Energy Status](#day-12-check-in-system--energy-status-dec-12-2025)
+  - [Day 13: Reminders & Settings](#day-13-reminders--settings-dec-13-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1078,9 +1079,60 @@ LifeOS now feels less like a task app and more like an operating system that und
 
 ---
 
-#### **Next Steps**
 
-- Finalise Today View polish and edge cases  
-- Fully align Calendar and Today behaviour  
-- Introduce a minimal Explore v0 (read-only insights)  
-- Begin layering intelligence on top of stable, deterministic foundations  
+### **Day 13:** Reminders & Settings (Dec 13, 2025)
+
+Today focused on completing two core system layers in LifeOS: **Reminders** and **Settings**, with a strong emphasis on simplicity, consistency, and calm UX.
+
+---
+
+#### **What Was Built**
+
+##### **Reminders**
+- Full CRUD reminders flow with backend sync
+- Grouped views: **Today**, **Upcoming**, **Past**
+- Two reminder types:
+  - **Notify** → sends a notification at a set time
+  - **Show** → appears on Today View only (no time required)
+- Reminders surface directly on the **Today screen**
+- Removed urgency levels and multiple notification counts to reduce complexity
+
+---
+
+##### **Settings**
+- Clean, minimal structure with only essential options:
+  - Profile (user, timezone, language)
+  - Task categories & week start
+  - Reminder defaults
+  - Data & privacy actions
+- Navigation and spacing aligned with Reminders page
+
+---
+
+##### **Category Colors**
+- Centralized category color system
+- Dynamic color usage across:
+  - Month Calendar
+  - Week Timetable
+  - Today View
+- Removed hardcoded colors; added consistent fallback
+
+---
+
+##### **Backend**
+- Added reminder update endpoint
+- Ensured reminders without time are supported
+- Backend remains source of truth with frontend sync
+
+---
+
+#### **Reflection (Day 13)**
+
+LifeOS now handles **remembering**, **showing**, and **configuring** in a calm, intentional way. The system feels more complete, less noisy, and closer to a real personal operating system.
+
+---
+
+## **Next**
+- Final Today & Calendar polish  
+- Explore v0 (read-only insights)  
+- Start layering assistant intelligence  

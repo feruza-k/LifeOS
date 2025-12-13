@@ -1,5 +1,5 @@
 import { useLocalStorage } from "./useLocalStorage";
-import { Task, DailyNote, CheckIn, Reminder, MonthlyFocus, UserSettings, ConversationMessage } from "@/types/lifeos";
+import { Task, DailyNote, CheckIn, Reminder, MonthlyFocus, UserSettings, ConversationMessage, Category } from "@/types/lifeos";
 import { format, parseISO, isToday, addDays } from "date-fns";
 
 const defaultSettings: UserSettings = {
@@ -8,6 +8,14 @@ const defaultSettings: UserSettings = {
   coreAIName: "SolAI",
   theme: "system",
 };
+
+const defaultCategories: Category[] = [
+  { id: "health", label: "Health", color: "#C7DED5" }, // Muted Sage
+  { id: "growth", label: "Growth", color: "#C9DCEB" }, // Pale Sky
+  { id: "family", label: "Family", color: "#F4D6E4" }, // Dusty Rose
+  { id: "work", label: "Work", color: "#DCD0E6" }, // Lavender Mist
+  { id: "creativity", label: "Creativity", color: "#FFF5E0" }, // Creamy Yellow
+];
 
 const initialTasks: Task[] = [
   // Today's tasks - Morning (before 12:00)
@@ -52,7 +60,8 @@ export function useLifeOSStore() {
   const [monthlyFocus, setMonthlyFocus] = useLocalStorage<MonthlyFocus | null>("lifeos-monthly-focus", null);
   const [settings, setSettings] = useLocalStorage<UserSettings>("lifeos-settings", defaultSettings);
   const [conversations, setConversations] = useLocalStorage<ConversationMessage[]>("lifeos-conversations", []);
-
+  const [categories, setCategories] = useLocalStorage<Category[]>("lifeos-categories", defaultCategories);
+  
   // Task operations
   const getTasksForDate = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -144,18 +153,69 @@ export function useLifeOSStore() {
   };
 
   // Reminders
-  const addReminder = (reminder: Omit<Reminder, "id" | "createdAt">) => {
-    const newReminder: Reminder = {
-      ...reminder,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    setReminders(prev => [...prev, newReminder]);
-    return newReminder;
+  const addReminder = async (reminder: Omit<Reminder, "id" | "createdAt">) => {
+    try {
+      const { api } = await import("@/lib/api");
+      const created = await api.createReminder(reminder);
+      setReminders(prev => [...prev, created]);
+      return created;
+    } catch (error) {
+      console.error("Failed to add reminder:", error);
+      // Fallback to local storage if API fails
+      const newReminder: Reminder = {
+        ...reminder,
+        urgency: reminder.urgency || "normal",
+        notificationCount: reminder.notificationCount || 1,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      };
+      setReminders(prev => [...prev, newReminder]);
+      return newReminder;
+    }
+  };
+  
+  const updateReminder = async (id: string, updates: Partial<Reminder>) => {
+    try {
+      const { api } = await import("@/lib/api");
+      const updated = await api.updateReminder(id, updates);
+      if (updated) {
+        setReminders(prev => prev.map(r => r.id === id ? updated : r));
+        return updated;
+      }
+    } catch (error) {
+      console.error("Failed to update reminder:", error);
+    }
+    // Fallback to local storage if API fails
+    setReminders(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
+  
+  const deleteReminder = async (id: string) => {
+    try {
+      const { api } = await import("@/lib/api");
+      await api.deleteReminder(id);
+      setReminders(prev => prev.filter(r => r.id !== id));
+    } catch (error) {
+      console.error("Failed to delete reminder:", error);
+      // Fallback to local storage if API fails
+      setReminders(prev => prev.filter(r => r.id !== id));
+    }
   };
 
-  const deleteReminder = (id: string) => {
-    setReminders(prev => prev.filter(r => r.id !== id));
+  const loadReminders = async () => {
+    try {
+      const { api } = await import("@/lib/api");
+      const loaded = await api.getAllReminders();
+      if (loaded && Array.isArray(loaded)) {
+        // Always use backend data if available, even if empty array
+        // This overwrites any localStorage data
+        setReminders(loaded);
+        return loaded;
+      }
+    } catch (error) {
+      console.error("Failed to load reminders from backend:", error);
+      // Keep existing local storage reminders if API fails
+    }
+    return reminders;
   };
 
   // Monthly focus
@@ -206,15 +266,38 @@ export function useLifeOSStore() {
       completedTasks: completed.length,
       completionRate: periodTasks.length ? Math.round((completed.length / periodTasks.length) * 100) : 0,
       checkInCount: periodCheckIns.length,
-      categoryBreakdown: settings.categories.reduce((acc, cat) => {
-        const catTasks = periodTasks.filter(t => t.value === cat);
-        acc[cat] = {
+      categoryBreakdown: categories.reduce((acc, cat) => {
+        const catTasks = periodTasks.filter(t => t.value === cat.id);
+        acc[cat.id] = {
           total: catTasks.length,
           completed: catTasks.filter(t => t.completed).length,
         };
         return acc;
       }, {} as Record<string, { total: number; completed: number }>),
     };
+  };
+
+  //  Categories operations
+  const addCategory = (label: string, color: string) => {
+    const newCategory: Category = {
+      id: `custom-${Date.now()}`,
+      label,
+      color,
+    };
+    setCategories(prev => [...prev, newCategory]);
+    return newCategory;
+  };
+
+  const updateCategory = (id: string, updates: Partial<Omit<Category, 'id'>>) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const deleteCategory = (id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+  };
+
+  const getCategoryColor = (id: string) => {
+    return categories.find(c => c.id === id)?.color || "#EBEBEB";
   };
 
   return {
@@ -226,7 +309,8 @@ export function useLifeOSStore() {
     monthlyFocus,
     settings,
     conversations,
-    
+    categories,
+
     // Task operations
     getTasksForDate,
     addTask,
@@ -249,11 +333,20 @@ export function useLifeOSStore() {
     
     // Reminders
     addReminder,
+    updateReminder,
     deleteReminder,
+    loadReminders,
     setReminders,
     
     // Settings
     setSettings,
+
+    // Categories
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    getCategoryColor,
+    setCategories,
     
     // Conversations
     addMessage,

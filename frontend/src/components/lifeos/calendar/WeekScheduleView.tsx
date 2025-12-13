@@ -2,27 +2,25 @@ import { useState } from "react";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { Task } from "@/components/lifeos/TaskItem";
 import { ValueType } from "@/components/lifeos/ValueTag";
+import { Category } from "@/types/lifeos";
 import { cn } from "@/lib/utils";
 import { useSwipeable } from "react-swipeable";
 
+interface CalendarTask extends Task {
+  date?: string;
+}
+
 interface WeekScheduleViewProps {
   selectedDate: Date;
-  tasks: Task[];
+  tasks: CalendarTask[];
   selectedCategories: ValueType[];
   onToggleTask: (id: string) => void;
   onWeekChange: (date: Date) => void;
+  categories: Category[];
 }
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const categoryColors: Record<ValueType, string> = {
-  health: "bg-tag-health",
-  growth: "bg-primary",
-  family: "bg-tag-family",
-  work: "bg-tag-work",
-  creativity: "bg-tag-creativity",
-};
 
 export function WeekScheduleView({
   selectedDate,
@@ -30,8 +28,23 @@ export function WeekScheduleView({
   selectedCategories,
   onToggleTask,
   onWeekChange,
+  categories,
 }: WeekScheduleViewProps) {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+
+  // Get category color by id
+  const getCategoryColor = (categoryId: string): string => {
+    const category = categories.find(c => c.id === categoryId);
+    return category?.color || "#EBEBEB";
+  };
+
+  // Convert hex color to rgba with opacity
+  const hexToRgba = (hex: string, opacity: number): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  };
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
@@ -193,20 +206,23 @@ export function WeekScheduleView({
                   {scheduled.map((task) => {
                     const duration = getDuration(task);
                     const style = getTaskStyle(task.time!, duration);
+                    const categoryColor = getCategoryColor(task.value);
                     return (
                       <button
                         key={task.id}
                         onClick={() => onToggleTask(task.id)}
-                        style={{ top: style.top, height: style.height }}
+                        style={{ 
+                          top: style.top, 
+                          height: style.height,
+                          backgroundColor: hexToRgba(categoryColor, 0.6),
+                          opacity: task.completed ? 0.5 : 1
+                        }}
                         className={cn(
-                          "absolute left-0.5 right-0.5 rounded px-0.5 py-0.5 overflow-hidden transition-all",
-                          categoryColors[task.value as ValueType],
-                          task.completed ? "opacity-40" : "opacity-90",
-                          "hover:opacity-100"
+                          "absolute left-0.5 right-0.5 rounded px-0.5 py-0.5 overflow-hidden transition-all"
                         )}
                       >
                         <p className={cn(
-                          "text-[8px] font-sans font-medium text-white truncate leading-tight",
+                          "text-[8px] font-sans font-medium text-foreground truncate leading-tight",
                           task.completed && "line-through"
                         )}>
                           {task.title}
@@ -239,25 +255,29 @@ export function WeekScheduleView({
               const { anytime } = getTasksForDate(day.fullDate);
               return (
                 <div key={day.fullDate} className="space-y-1">
-                  {anytime.map((task) => (
-                    <button
-                      key={task.id}
-                      onClick={() => onToggleTask(task.id)}
-                      className={cn(
-                        "w-full p-2 rounded-lg text-left transition-all",
-                        categoryColors[task.value as ValueType],
-                        task.completed ? "opacity-40" : "opacity-90",
-                        "hover:opacity-100"
-                      )}
-                    >
-                      <p className={cn(
-                        "text-[9px] font-sans font-medium text-white truncate",
-                        task.completed && "line-through"
-                      )}>
-                        {task.title}
-                      </p>
-                    </button>
-                  ))}
+                  {anytime.map((task) => {
+                    const categoryColor = getCategoryColor(task.value);
+                    return (
+                      <button
+                        key={task.id}
+                        onClick={() => onToggleTask(task.id)}
+                        style={{
+                          backgroundColor: hexToRgba(categoryColor, 0.6),
+                          opacity: task.completed ? 0.5 : 1
+                        }}
+                        className={cn(
+                          "w-full p-2 rounded-lg text-left transition-all"
+                        )}
+                      >
+                        <p className={cn(
+                          "text-[9px] font-sans font-medium text-foreground truncate",
+                          task.completed && "line-through"
+                        )}>
+                          {task.title}
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
               );
             })}

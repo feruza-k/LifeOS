@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
-import { Settings } from "lucide-react";
+import { Link } from "react-router-dom";
+import { format, isSameDay, parseISO } from "date-fns";
+import { Settings, Bell } from "lucide-react";
 import { Header } from "@/components/lifeos/Header";
 import { HorizontalDayStrip } from "@/components/lifeos/HorizontalDayStrip";
 import { BalanceScoreCard } from "@/components/lifeos/BalanceScoreCard";
@@ -10,7 +11,6 @@ import { BottomNav } from "@/components/lifeos/BottomNav";
 import { DailyNoteModal } from "@/components/lifeos/DailyNoteModal";
 import { CheckInModal } from "@/components/lifeos/CheckInModal";
 import { SetFocusModal } from "@/components/lifeos/SetFocusModal";
-import { RemindersSheet } from "@/components/lifeos/RemindersSheet";
 import { AddTaskModal } from "@/components/lifeos/AddTaskModal";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
@@ -54,6 +54,8 @@ const Index = () => {
     // Re-load when the user changes the date
     useEffect(() => {
       store.loadToday(selectedDate);
+      // Also reload reminders when date changes to ensure we have latest data
+      store.loadReminders();
     }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
   
     const todayTasks = store.tasks ?? [];
@@ -101,6 +103,62 @@ const Index = () => {
   };
 
   const energyStatus = mapEnergyStatus(store.today?.energy?.status);
+
+  // Get "show" type reminders for the selected date
+  // Only show reminders that match the selected date exactly
+  const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+  
+  // Debug: log all reminders first
+  console.log("=== SHOW REMINDERS DEBUG ===");
+  console.log("All reminders from store:", store.reminders);
+  console.log("Selected date:", selectedDateStr);
+  console.log("Selected date object:", selectedDate);
+  
+  const showReminders = (store.reminders || []).filter(r => {
+    // Debug each reminder
+    console.log("Checking reminder:", {
+      id: r.id,
+      title: r.title,
+      type: r.type,
+      dueDate: r.dueDate,
+      visible: r.visible
+    });
+    
+    // Check type first
+    if (r.type !== "show") {
+      console.log("  -> Not 'show' type, skipping");
+      return false;
+    }
+    if (r.visible === false) {
+      console.log("  -> Not visible, skipping");
+      return false;
+    }
+    // Must have a dueDate and it must match the selected date
+    if (!r.dueDate) {
+      console.log("  -> No dueDate, skipping");
+      return false;
+    }
+    try {
+      // Extract just the date part (YYYY-MM-DD) from the reminder's dueDate
+      // Handle both ISO format (with time) and date-only format (YYYY-MM-DD)
+      const reminderDateOnly = r.dueDate.split('T')[0]; // Get just the date part
+      const matches = reminderDateOnly === selectedDateStr;
+      
+      console.log("  -> Date comparison:", {
+        reminderDateOnly,
+        selectedDateStr,
+        matches
+      });
+      
+      return matches;
+    } catch (error) {
+      console.error("  -> Error parsing reminder date:", r.dueDate, error);
+      return false;
+    }
+  });
+  
+  console.log("Filtered show reminders:", showReminders);
+  console.log("=== END DEBUG ===");
 
   const handleAddTask = (task: { title: string; time?: string; endTime?: string; value: any; date: string }) => {
     store.addTask({
@@ -162,14 +220,17 @@ const Index = () => {
           <Header />
         </div>
         <div className="flex items-center gap-2">
-          <RemindersSheet
-            reminders={store.reminders}
-            onAddReminder={store.addReminder}
-            onDeleteReminder={store.deleteReminder}
-          />
-          <button className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+        <Link to="/reminders" className="relative w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+            <Bell className="w-4 h-4 text-muted-foreground" />
+            {store.reminders.filter(r => r.visible).length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
+                {store.reminders.filter(r => r.visible).length}
+              </span>
+            )}
+          </Link>
+          <Link to="/settings" className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
             <Settings className="w-4 h-4 text-muted-foreground" />
-          </button>
+          </Link>
         </div>
       </div>
       <HorizontalDayStrip 
@@ -177,6 +238,27 @@ const Index = () => {
         onDateSelect={setSelectedDate} 
       />
       
+      {/* Show Reminders - displayed before Energy Status */}
+      {showReminders.length > 0 && (
+        <div className="mt-4 px-4">
+          <div className="space-y-3">
+            {showReminders.map((reminder) => (
+              <div
+                key={reminder.id}
+                className="flex items-start gap-3"
+              >
+                <Bell className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#E6C86A', fill: '#FFF5E0', strokeWidth: 1.5 }} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-sans font-medium text-foreground text-base">{reminder.title}</p>
+                  {reminder.note && (
+                    <p className="text-sm text-muted-foreground mt-1">{reminder.note}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       <div className="mt-4">
         <BalanceScoreCard 

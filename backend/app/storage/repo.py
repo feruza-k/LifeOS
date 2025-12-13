@@ -14,6 +14,15 @@ DATA_FILE = BASE_DIR / "data.json"
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 # If file doesn't exist, create it
+# Default categories matching frontend defaults
+DEFAULT_CATEGORIES = [
+    {"id": "health", "label": "Health", "color": "#C7DED5"},  # Muted Sage
+    {"id": "growth", "label": "Growth", "color": "#C9DCEB"},  # Pale Sky
+    {"id": "family", "label": "Family", "color": "#F4D6E4"},  # Dusty Rose
+    {"id": "work", "label": "Work", "color": "#DCD0E6"},  # Lavender Mist
+    {"id": "creativity", "label": "Creativity", "color": "#FFF5E0"},  # Creamy Yellow
+]
+
 if not DATA_FILE.exists():
     DATA_FILE.write_text(json.dumps(
         {
@@ -24,7 +33,8 @@ if not DATA_FILE.exists():
             "notes": [],
             "checkins": [],
             "reminders": [],
-            "monthly_focus": []
+            "monthly_focus": [],
+            "categories": DEFAULT_CATEGORIES
         },
         indent=4
     ))
@@ -67,8 +77,11 @@ class Repo:
             self.data["reminders"] = []
         if "monthly_focus" not in self.data:
             self.data["monthly_focus"] = []
+        if "categories" not in self.data:
+            # Migrate existing data: add default categories
+            self.data["categories"] = DEFAULT_CATEGORIES
         # Save if we added new fields
-        if any(key not in load_data() for key in ["notes", "checkins", "reminders", "monthly_focus"]):
+        if any(key not in load_data() for key in ["notes", "checkins", "reminders", "monthly_focus", "categories"]):
             save_data(self.data)
 
     # -----------------------------
@@ -241,6 +254,18 @@ class Repo:
         logger.info(f"Reminder added: {reminder_dict['id']}")
         return reminder_dict
 
+    def update_reminder(self, reminder_id: str, updates: dict):
+        """Update a reminder by ID."""
+        reminders = self.data.get("reminders", [])
+        for i, reminder in enumerate(reminders):
+            if reminder.get("id") == reminder_id:
+                reminders[i] = {**reminder, **updates}
+                self.data["reminders"] = reminders
+                save_data(self.data)
+                logger.info(f"Reminder updated: {reminder_id}")
+                return reminders[i]
+        return None
+
     def delete_reminder(self, reminder_id: str):
         """Delete a reminder by ID."""
         reminders = self.data.get("reminders", [])
@@ -280,6 +305,53 @@ class Repo:
         save_data(self.data)
         logger.info(f"Monthly focus saved: {focus_dict.get('month')}")
         return focus_dict
+
+    # -----------------------------
+    # Categories operations
+    # -----------------------------
+    def get_categories(self):
+        """Get all categories."""
+        return self.data.get("categories", [])
+
+    def get_category(self, category_id: str):
+        """Get a category by ID."""
+        categories = self.data.get("categories", [])
+        return next((c for c in categories if c.get("id") == category_id), None)
+
+    def add_category(self, category_dict: dict):
+        """Add a new category."""
+        if "id" not in category_dict:
+            category_dict["id"] = str(uuid.uuid4())
+        
+        categories = self.data.get("categories", [])
+        categories.append(category_dict)
+        self.data["categories"] = categories
+        save_data(self.data)
+        logger.info(f"Category added: {category_dict.get('id')}")
+        return category_dict
+
+    def update_category(self, category_id: str, updates: dict):
+        """Update a category by ID."""
+        categories = self.data.get("categories", [])
+        for i, cat in enumerate(categories):
+            if cat.get("id") == category_id:
+                categories[i] = {**cat, **updates}
+                self.data["categories"] = categories
+                save_data(self.data)
+                logger.info(f"Category updated: {category_id}")
+                return categories[i]
+        return None
+
+    def delete_category(self, category_id: str):
+        """Delete a category by ID."""
+        categories = self.data.get("categories", [])
+        original_len = len(categories)
+        self.data["categories"] = [c for c in categories if c.get("id") != category_id]
+        if len(self.data["categories"]) < original_len:
+            save_data(self.data)
+            logger.info(f"Category deleted: {category_id}")
+            return True
+        return False
 
 
 # Instance

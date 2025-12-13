@@ -1,34 +1,86 @@
-import { useState } from "react";
-import { Bell, Plus, X, Clock, Calendar } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, Plus, X, Clock, Calendar, Edit2 } from "lucide-react";
 import { format } from "date-fns";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Reminder } from "@/types/lifeos";
 import { cn } from "@/lib/utils";
 
 interface RemindersSheetProps {
   reminders: Reminder[];
-  onAddReminder: (reminder: Omit<Reminder, "id" | "createdAt">) => void;
-  onDeleteReminder: (id: string) => void;
+  onAddReminder: (reminder: Omit<Reminder, "id" | "createdAt">) => Promise<void>;
+  onUpdateReminder?: (id: string, updates: Partial<Reminder>) => Promise<void>;
+  onDeleteReminder: (id: string) => Promise<void>;
+  onLoadReminders?: () => Promise<void>;
 }
 
-export function RemindersSheet({ reminders, onAddReminder, onDeleteReminder }: RemindersSheetProps) {
+export function RemindersSheet({ reminders, onAddReminder, onUpdateReminder, onDeleteReminder, onLoadReminders }: RemindersSheetProps) {
   const [isAdding, setIsAdding] = useState(false);
+  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [newReminder, setNewReminder] = useState("");
   const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("");
+  const [reminderNote, setReminderNote] = useState("");
 
-  const handleAddReminder = () => {
+  // Load reminders when sheet opens
+  useEffect(() => {
+    if (onLoadReminders) {
+      onLoadReminders();
+    }
+  }, [onLoadReminders]);
+
+  const resetForm = () => {
+    setNewReminder("");
+    setReminderDate("");
+    setReminderTime("");
+    setReminderNote("");
+    setIsAdding(false);
+    setEditingReminder(null);
+  };
+
+  const handleAddReminder = async () => {
     if (newReminder.trim()) {
-      onAddReminder({
+      await onAddReminder({
         title: newReminder.trim(),
         dueDate: reminderDate || undefined,
+        time: reminderTime || undefined,
+        note: reminderNote.trim() || undefined,
         visible: true,
+        urgency: "normal",
+        notificationCount: 1,
       });
-      setNewReminder("");
-      setReminderDate("");
-      setIsAdding(false);
+      resetForm();
+      if (onLoadReminders) await onLoadReminders();
     }
+  };
+
+  const handleUpdateReminder = async () => {
+    if (editingReminder && onUpdateReminder && newReminder.trim()) {
+      await onUpdateReminder(editingReminder.id, {
+        title: newReminder.trim(),
+        dueDate: reminderDate || undefined,
+        time: reminderTime || undefined,
+        note: reminderNote.trim() || undefined,
+      });
+      resetForm();
+      if (onLoadReminders) await onLoadReminders();
+    }
+  };
+
+  const openEditModal = (reminder: Reminder) => {
+    setEditingReminder(reminder);
+    setNewReminder(reminder.title);
+    setReminderDate(reminder.dueDate || "");
+    setReminderTime(reminder.time || "");
+    setReminderNote(reminder.note || "");
+    setIsAdding(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await onDeleteReminder(id);
+    if (onLoadReminders) await onLoadReminders();
   };
 
   const activeReminders = reminders.filter(r => r.visible);
@@ -59,17 +111,8 @@ export function RemindersSheet({ reminders, onAddReminder, onDeleteReminder }: R
         </SheetHeader>
 
         <div className="mt-6 space-y-4">
-          {/* Add Reminder */}
-          {!isAdding ? (
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={() => setIsAdding(true)}
-            >
-              <Plus className="w-4 h-4" />
-              Add reminder
-            </Button>
-          ) : (
+          {/* Add/Edit Reminder Form */}
+          {(isAdding || editingReminder) ? (
             <div className="p-4 rounded-xl bg-muted/50 space-y-3">
               <Input
                 placeholder="What do you want to remember?"
@@ -78,21 +121,50 @@ export function RemindersSheet({ reminders, onAddReminder, onDeleteReminder }: R
                 className="bg-background"
                 autoFocus
               />
-              <Input
-                type="date"
-                value={reminderDate}
-                onChange={(e) => setReminderDate(e.target.value)}
-                className="bg-background"
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  value={reminderDate}
+                  onChange={(e) => setReminderDate(e.target.value)}
+                  className="bg-background"
+                  placeholder="Date"
+                />
+                <Input
+                  type="time"
+                  value={reminderTime}
+                  onChange={(e) => setReminderTime(e.target.value)}
+                  className="bg-background"
+                  placeholder="Time"
+                />
+              </div>
+              <Textarea
+                placeholder="Note (optional)"
+                value={reminderNote}
+                onChange={(e) => setReminderNote(e.target.value)}
+                className="bg-background min-h-[60px]"
               />
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleAddReminder} className="flex-1">
-                  Add
+                <Button 
+                  size="sm" 
+                  onClick={editingReminder ? handleUpdateReminder : handleAddReminder} 
+                  className="flex-1"
+                >
+                  {editingReminder ? "Save" : "Add"}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setIsAdding(false)}>
+                <Button size="sm" variant="ghost" onClick={resetForm}>
                   Cancel
                 </Button>
               </div>
             </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={() => setIsAdding(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Add reminder
+            </Button>
           )}
 
           {/* Active Reminders */}
@@ -113,24 +185,35 @@ export function RemindersSheet({ reminders, onAddReminder, onDeleteReminder }: R
                     <p className="font-sans font-medium text-sm text-foreground">
                       {reminder.title}
                     </p>
-                    {reminder.dueDate && (
+                    {(reminder.dueDate || reminder.time) && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(reminder.dueDate), "MMM d, yyyy")}
+                        {reminder.dueDate && format(new Date(reminder.dueDate), "MMM d, yyyy")}
+                        {reminder.time && ` at ${reminder.time}`}
                       </p>
                     )}
-                    {reminder.description && (
+                    {reminder.note && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        {reminder.description}
+                        {reminder.note}
                       </p>
                     )}
                   </div>
-                  <button
-                    onClick={() => onDeleteReminder(reminder.id)}
-                    className="w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center"
-                  >
-                    <X className="w-3 h-3 text-muted-foreground" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {onUpdateReminder && (
+                      <button
+                        onClick={() => openEditModal(reminder)}
+                        className="w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center"
+                      >
+                        <Edit2 className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(reminder.id)}
+                      className="w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center"
+                    >
+                      <X className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

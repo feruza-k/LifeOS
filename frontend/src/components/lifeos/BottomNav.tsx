@@ -1,4 +1,4 @@
-import { CalendarDays, Compass, Sun, Calendar } from "lucide-react";
+import { CalendarDays, Compass, Sun, Calendar, Bell } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 

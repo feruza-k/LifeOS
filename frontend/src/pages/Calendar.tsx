@@ -20,13 +20,15 @@ type ViewMode = "month" | "week";
 const CalendarPage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedCategories, setSelectedCategories] = useState<ValueType[]>(["health", "growth", "family", "work", "creativity"]);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [showDayModal, setShowDayModal] = useState(false);
   const [loading, setLoading] = useState(false);
   
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
+  const [selectedCategories, setSelectedCategories] = useState<ValueType[]>(
+    (store.categories || []).map(c => c.id as ValueType)
+  );
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [checkIns, setCheckIns] = useState<Record<string, any>>({});
 
@@ -49,12 +51,16 @@ const CalendarPage = () => {
 
   // Load note and check-in when date is selected
   useEffect(() => {
+    if (!selectedDate) return;
+    
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     if (!notes[dateStr]) {
       store.loadNote(dateStr).then(note => {
         if (note) {
           setNotes(prev => ({ ...prev, [dateStr]: note.content || "" }));
         }
+      }).catch(() => {
+        // No note for this date, that's fine
       });
     }
     // Load check-in for this date
@@ -96,19 +102,21 @@ const CalendarPage = () => {
   };
 
   // Get tasks for selected date (use sync getter from cached tasks)
-  const selectedDateTasks = store.getTasksForDateSync(selectedDate).map(t => ({
-    id: t.id,
-    title: t.title,
-    time: t.time,
-    endTime: t.endTime,
-    completed: t.completed,
-    value: t.value
-  }));
+  const selectedDateTasks = selectedDate 
+    ? store.getTasksForDateSync(selectedDate).map(t => ({
+        id: t.id,
+        title: t.title,
+        time: t.time,
+        endTime: t.endTime,
+        completed: t.completed,
+        value: t.value
+      }))
+    : [];
 
-  const dateStr = format(selectedDate, "yyyy-MM-dd");
-  const selectedDateCheckIn = checkIns[dateStr];
+  const dateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : "";
+  const selectedDateCheckIn = dateStr ? checkIns[dateStr] : null;
   // Use saved note (excluding check-in note, which is shown separately)
-  const selectedDateNote = notes[dateStr] || "";
+  const selectedDateNote = dateStr ? (notes[dateStr] || "") : "";
   const completedCount = selectedDateTasks.filter(t => t.completed).length;
   const totalTasksCount = selectedDateTasks.length;
 
@@ -198,7 +206,8 @@ const CalendarPage = () => {
               selectedDate={selectedDate} 
               onSelectDate={handleSelectDate} 
               tasks={allTasks} 
-              selectedCategories={selectedCategories} 
+              selectedCategories={selectedCategories}
+              categories={store.categories || []}
             />
           </div>
         )}
@@ -208,7 +217,8 @@ const CalendarPage = () => {
             <WeekScheduleView 
               selectedDate={selectedDate} 
               tasks={allTasks} 
-              selectedCategories={selectedCategories} 
+              selectedCategories={selectedCategories}
+              categories={store.categories || []}
               onToggleTask={async (id) => {
                 await store.toggleTask(id);
                 // Reload tasks for current month after toggle
@@ -229,7 +239,7 @@ const CalendarPage = () => {
       </div>
 
       {/* Day Modal - Centered */}
-      {showDayModal && viewMode === "month" && (
+      {showDayModal && viewMode === "month" && selectedDate && (
         <DayModal
           date={selectedDate}
           tasks={selectedDateTasks}

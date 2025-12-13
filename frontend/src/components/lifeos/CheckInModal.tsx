@@ -102,7 +102,7 @@ export function CheckInModal({
               )}
             </div>
             <div>
-              <h3 className="font-serif font-semibold text-foreground">
+              <h3 className="font-semibold text-foreground font-sans">
                 {step === "celebration" ? "Amazing work!" : "Daily Check-in"}
               </h3>
               <p className="text-xs font-sans text-muted-foreground">

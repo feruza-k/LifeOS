@@ -250,7 +250,7 @@
             "title": "Work",
             "date": "2025-12-11",
             "time": "09:00",
-            "completed": true,
+            "completed": false,
             "category": "work",
             "duration_minutes": 480,
             "end_datetime": "2025-12-11 17:00",
@@ -353,6 +353,28 @@
             "id": "0cb49e8b-b89b-4663-b54b-d5ff6afc3d3a",
             "created_at": "2025-12-12T21:56:30.478891",
             "moved_from": "2025-12-12"
+        },
+        {
+            "type": "event",
+            "title": "Gym",
+            "date": "2025-12-13",
+            "time": "10:00",
+            "completed": false,
+            "category": "health",
+            "duration_minutes": 90,
+            "end_datetime": "2025-12-13 11:30",
+            "id": "3de95472-c031-42c4-83e1-b3374376589a",
+            "created_at": "2025-12-13T22:38:15.529861"
+        },
+        {
+            "type": "event",
+            "title": "Food Prep",
+            "date": "2025-12-13",
+            "time": null,
+            "completed": false,
+            "category": "health",
+            "id": "f180e0dc-91ea-4e2c-a962-bd6437436bef",
+            "created_at": "2025-12-13T22:38:37.478150"
         }
     ],
     "diary": [
@@ -402,6 +424,63 @@
             "timestamp": "2025-12-12T22:02:03.352515"
         }
     ],
-    "reminders": [],
-    "monthly_focus": []
+    "reminders": [
+        {
+            "title": "Water the flowers",
+            "dueDate": "2025-12-14",
+            "visible": true,
+            "id": "90c832b4-b7a6-4d82-8057-13914a674d6f",
+            "createdAt": "2025-12-13T21:20:32.893729"
+        },
+        {
+            "title": "Book GP appointment",
+            "dueDate": "2025-12-17",
+            "visible": true,
+            "id": "5f8ff7ee-1b12-4118-91b0-6fa6d809d9f7",
+            "createdAt": "2025-12-13T21:57:55.313737"
+        },
+        {
+            "title": "Mom\u2019 birthday \ud83c\udf89",
+            "dueDate": "2025-12-20",
+            "visible": true,
+            "id": "44464558-0d08-48a8-8ab0-f1ce70317f73",
+            "createdAt": "2025-12-13T22:01:37.325283"
+        },
+        {
+            "title": "Test Reminders feature",
+            "dueDate": "2025-12-13",
+            "visible": true,
+            "id": "9dbb02b8-f620-4317-b20a-78f3081b5c18",
+            "createdAt": "2025-12-13T22:02:41.136358",
+            "type": "show"
+        }
+    ],
+    "monthly_focus": [],
+    "categories": [
+        {
+            "id": "health",
+            "label": "Health",
+            "color": "#4CAF50"
+        },
+        {
+            "id": "growth",
+            "label": "Growth",
+            "color": "#0066FF"
+        },
+        {
+            "id": "family",
+            "label": "Family",
+            "color": "#FF66AA"
+        },
+        {
+            "id": "work",
+            "label": "Work",
+            "color": "#00C8FF"
+        },
+        {
+            "id": "creativity",
+            "label": "Creativity",
+            "color": "#FFCC00"
+        }
+    ]
 }

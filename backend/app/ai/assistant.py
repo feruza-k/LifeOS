@@ -13,7 +13,6 @@ import os
 import re
 from datetime import datetime, timedelta
 import pytz
-from openai import OpenAI
 
 from app.logic.task_engine import (
     apply_reschedule,
@@ -35,7 +34,6 @@ from app.ai.parser import parse_intent
 # ------------------------------------------------------------
 # Setup
 # ------------------------------------------------------------
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 tz = pytz.timezone("Europe/London")
 last_referenced_task_id = None
 

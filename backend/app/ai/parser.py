@@ -52,7 +52,16 @@ OUTPUT RULES:
 # SETUP LLM CLIENT
 # ---------------------------------------------------------
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def get_client():
+    """Lazy initialization of OpenAI client."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "OPENAI_API_KEY environment variable is not set. "
+            "Please create a .env file in the backend directory with: OPENAI_API_KEY=your-key-here"
+        )
+    return OpenAI(api_key=api_key)
 
 
 
@@ -204,6 +213,7 @@ def parse_intent(user_input: str) -> Intent:
     messages.extend(examples)
     messages.append({"role": "user", "content": user_input})
 
+    client = get_client()
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=messages,

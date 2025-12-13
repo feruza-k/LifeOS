@@ -105,6 +105,9 @@ class ReminderRequest(BaseModel):
     title: str
     description: str | None = None
     dueDate: str | None = None
+    time: str | None = None
+    type: str | None = None
+    note: str | None = None
     recurring: str | None = None
     visible: bool = True
     id: str | None = None
@@ -323,6 +326,27 @@ def create_reminder(reminder_data: ReminderRequest):
     return result
 
 
+class ReminderUpdateRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    dueDate: str | None = None
+    time: str | None = None
+    type: str | None = None
+    note: str | None = None
+    recurring: str | None = None
+    visible: bool | None = None
+
+
+@app.patch("/reminders/{reminder_id}")
+def update_reminder(reminder_id: str, updates: ReminderUpdateRequest):
+    """Update a reminder."""
+    updates_dict = updates.model_dump(exclude_none=True)
+    result = repo.update_reminder(reminder_id, updates_dict)
+    if result:
+        return result
+    return {"error": "Reminder not found"}
+
+
 @app.delete("/reminders/{reminder_id}")
 def delete_reminder(reminder_id: str):
     """Delete a reminder."""
@@ -350,6 +374,63 @@ def save_monthly_focus(focus_data: MonthlyFocusRequest):
     """Save or update monthly focus."""
     result = repo.save_monthly_focus(focus_data.model_dump(exclude_none=True))
     return result
+
+
+# -----------------------------------------------------
+# Categories Endpoints
+# -----------------------------------------------------
+
+class CategoryRequest(BaseModel):
+    label: str
+    color: str
+    id: str | None = None
+
+
+class CategoryUpdateRequest(BaseModel):
+    label: str | None = None
+    color: str | None = None
+
+
+@app.get("/categories")
+def get_all_categories():
+    """Get all categories."""
+    return repo.get_categories()
+
+
+@app.get("/categories/{category_id}")
+def get_category(category_id: str):
+    """Get a specific category by ID."""
+    category = repo.get_category(category_id)
+    if category:
+        return category
+    return {"error": "Category not found"}
+
+
+@app.post("/categories")
+def create_category(category_data: CategoryRequest):
+    """Create a new category."""
+    category_dict = category_data.model_dump(exclude_none=True)
+    result = repo.add_category(category_dict)
+    return result
+
+
+@app.patch("/categories/{category_id}")
+def update_category(category_id: str, updates: CategoryUpdateRequest):
+    """Update a category."""
+    updates_dict = updates.model_dump(exclude_none=True)
+    result = repo.update_category(category_id, updates_dict)
+    if result:
+        return result
+    return {"error": "Category not found"}
+
+
+@app.delete("/categories/{category_id}")
+def delete_category(category_id: str):
+    """Delete a category."""
+    success = repo.delete_category(category_id)
+    if success:
+        return {"status": "deleted", "id": category_id}
+    return {"error": "Category not found"}
 
 
 # -----------------------------------------------------

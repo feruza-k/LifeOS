@@ -1,5 +1,11 @@
 import { ValueType } from "@/components/lifeos/ValueTag";
 
+export interface Category {
+  id: string;
+  label: string;
+  color: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -36,8 +42,11 @@ export interface Reminder {
   title: string;
   description?: string;
   dueDate?: string;
+  time?: string; // 24h format "14:00"
+  type?: "notify" | "show";
   recurring?: "daily" | "weekly" | "monthly" | "yearly";
   visible: boolean; // If false, only AI knows about it
+  note?: string;
   createdAt: string;
 }
 

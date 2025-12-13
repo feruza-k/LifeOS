@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Task } from "../TaskItem";
 import { ValueType } from "../ValueTag";
+import { Category } from "@/types/lifeos";
 
 interface CalendarTask extends Task {
   date?: string;
@@ -18,21 +19,14 @@ interface CalendarTask extends Task {
 
 interface MonthCalendarProps {
   currentMonth: Date;
-  selectedDate: Date;
+  selectedDate: Date | null;
   onSelectDate: (date: Date) => void;
   tasks: CalendarTask[];
   selectedCategories: ValueType[];
+  categories: Category[];
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const categoryColors: Record<ValueType, string> = {
-  health: "bg-tag-health",
-  growth: "bg-primary",
-  family: "bg-tag-family",
-  work: "bg-tag-work",
-  creativity: "bg-tag-creativity",
-};
 
 export function MonthCalendar({
   currentMonth,
@@ -40,8 +34,23 @@ export function MonthCalendar({
   onSelectDate,
   tasks,
   selectedCategories,
+  categories,
 }: MonthCalendarProps) {
   const today = new Date();
+
+  // Get category color by id
+  const getCategoryColor = (categoryId: string): string => {
+    const category = categories.find(c => c.id === categoryId);
+    return category?.color || "#EBEBEB";
+  };
+
+  // Convert hex color to rgba with opacity
+  const hexToRgba = (hex: string, opacity: number): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  };
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -74,7 +83,7 @@ export function MonthCalendar({
       const currentDay = day;
       const isCurrentMonth = isSameMonth(day, monthStart);
       const isToday = isSameDay(day, today);
-      const isSelected = isSameDay(day, selectedDate);
+      const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
       const dayTasks = getTasksForDate(day);
       // Show scheduled tasks first (up to 3), then show if there are more
       const scheduledTasks = dayTasks.filter(t => t.time);
@@ -93,14 +102,14 @@ export function MonthCalendar({
             "relative flex flex-col items-start p-2 min-h-[100px] rounded-lg transition-all duration-200 text-left",
             !isCurrentMonth && "opacity-30",
             isSelected && "bg-primary",
-            isToday && !isSelected && "ring-2 ring-primary ring-offset-1 ring-offset-background",
             !isSelected && isCurrentMonth && "hover:bg-muted"
           )}
         >
           <span
             className={cn(
-              "text-sm font-sans font-semibold mb-1.5",
-              isSelected ? "text-primary-foreground" : "text-foreground"
+              "text-xs font-sans font-semibold mb-1 flex items-center justify-center",
+              isToday && !isSelected && "w-5 h-5 rounded-full bg-primary text-primary-foreground",
+              isSelected ? "text-primary-foreground" : !isToday && "text-foreground"
             )}
           >
             {format(day, "d")}
@@ -108,20 +117,27 @@ export function MonthCalendar({
           
           {/* Task titles */}
           <div className="w-full space-y-1 overflow-hidden flex-1">
-            {displayTasks.map((task, i) => (
-              <div
-                key={task.id + i}
-                className={cn(
-                  "text-xs leading-snug truncate rounded px-1.5 py-1 font-sans",
-                  task.completed && "line-through opacity-50",
-                  isSelected 
-                    ? "bg-primary-foreground/20 text-primary-foreground" 
-                    : `${categoryColors[task.value]}/20 text-foreground`
-                )}
-              >
-                {task.title}
-              </div>
-            ))}
+            {displayTasks.map((task, i) => {
+              const categoryColor = getCategoryColor(task.value);
+              return (
+                <div
+                  key={task.id + i}
+                  className={cn(
+                    "text-xs leading-snug truncate rounded px-1.5 py-1 font-sans",
+                    task.completed && "line-through opacity-50",
+                    isSelected && "text-primary-foreground"
+                  )}
+                  style={{
+                    backgroundColor: isSelected 
+                      ? "rgba(255, 255, 255, 0.2)" 
+                      : hexToRgba(categoryColor, 0.4),
+                    color: isSelected ? undefined : "inherit"
+                  }}
+                >
+                  {task.title}
+                </div>
+              );
+            })}
             {remainingCount > 0 && (
               <span className={cn(
                 "text-[10px] font-sans font-medium",

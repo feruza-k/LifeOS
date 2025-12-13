@@ -95,6 +95,12 @@ export const api = {
       body: JSON.stringify(reminder),
     }),
 
+  updateReminder: (id: string, updates: any) =>
+    request(`/reminders/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+
   deleteReminder: (id: string) =>
     request(`/reminders/${id}`, { method: "DELETE" }),
 
@@ -119,4 +125,24 @@ export const api = {
     request("/assistant/confirm", {
       method: "POST",
     }),
+
+  // --- Categories ---
+  getAllCategories: () => request("/categories"),
+
+  getCategory: (id: string) => request(`/categories/${id}`),
+
+  createCategory: (category: any) =>
+    request("/categories", {
+      method: "POST",
+      body: JSON.stringify(category),
+    }),
+
+  updateCategory: (id: string, updates: any) =>
+    request(`/categories/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+
+  deleteCategory: (id: string) =>
+    request(`/categories/${id}`, { method: "DELETE" }),
 };
