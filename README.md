@@ -1084,7 +1084,6 @@ LifeOS now feels less like a task app and more like an operating system that und
 
 Today focused on completing two core system layers in LifeOS: **Reminders** and **Settings**, with a strong emphasis on simplicity, consistency, and calm UX.
 
----
 
 #### **What Was Built**
 
@@ -1097,7 +1096,6 @@ Today focused on completing two core system layers in LifeOS: **Reminders** and 
 - Reminders surface directly on the **Today screen**
 - Removed urgency levels and multiple notification counts to reduce complexity
 
----
 
 ##### **Settings**
 - Clean, minimal structure with only essential options:
@@ -1107,7 +1105,6 @@ Today focused on completing two core system layers in LifeOS: **Reminders** and 
   - Data & privacy actions
 - Navigation and spacing aligned with Reminders page
 
----
 
 ##### **Category Colors**
 - Centralized category color system
@@ -1117,7 +1114,6 @@ Today focused on completing two core system layers in LifeOS: **Reminders** and 
   - Today View
 - Removed hardcoded colors; added consistent fallback
 
----
 
 ##### **Backend**
 - Added reminder update endpoint
