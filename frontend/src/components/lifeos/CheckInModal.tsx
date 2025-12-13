@@ -14,7 +14,7 @@ interface CheckInModalProps {
   tasks: Task[];
   onToggleTask: (id: string) => void;
   onMoveTask: (id: string, newDate: Date) => void;
-  onComplete: (completedIds: string[], incompleteIds: string[], movedTasks: { taskId: string; newDate: string }[], note?: string) => void;
+  onComplete: (completedIds: string[], incompleteIds: string[], movedTasks: { taskId: string; newDate: string }[], note?: string, mood?: string) => void;
 }
 
 export function CheckInModal({ 
@@ -72,7 +72,7 @@ export function CheckInModal({
     } else if (step === "reflection") {
       const completedIds = completedTasks.map(t => t.id);
       const incompleteIds = incompleteTasks.filter(t => !movedTasks.find(m => m.taskId === t.id)).map(t => t.id);
-      onComplete(completedIds, incompleteIds, movedTasks, dailyNote);
+      onComplete(completedIds, incompleteIds, movedTasks, dailyNote, selectedMood || undefined);
       setStep("celebration");
       setShowConfetti(true);
     } else {

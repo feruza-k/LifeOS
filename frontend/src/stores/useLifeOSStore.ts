@@ -191,7 +191,8 @@ export const useLifeOSStore = create((set, get) => ({
     completedIds: string[],
     incompleteIds: string[],
     movedTasks: { taskId: string; newDate: string }[],
-    note?: string
+    note?: string,
+    mood?: string
   ) => {
     const dateStr = typeof date === "string" 
       ? date 
@@ -202,6 +203,7 @@ export const useLifeOSStore = create((set, get) => ({
       incompleteTaskIds: incompleteIds,
       movedTasks: movedTasks,
       note,
+      mood,
     });
     await get().loadToday(dateStr);
   },

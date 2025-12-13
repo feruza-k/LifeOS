@@ -82,13 +82,25 @@ const Index = () => {
   const completedCount = legacyTasks.filter(t => t.completed).length;
   const totalCount = legacyTasks.length;
 
-  // Calculate balance status based on load
-  const getBalanceStatus = (): "low" | "optimal" | "heavy" => {
-    if (totalCount === 0) return "low";
-    if (totalCount <= 3) return "low";
-    if (totalCount > 6) return "heavy";
-    return "optimal";
+  // Get energy status from backend (no frontend calculation)
+  // Energy status reflects PLANNED LOAD for the day and remains FIXED regardless of task completion
+  // The status represents how demanding today's schedule is overall - it does not change as tasks are completed
+  // Task completion only affects the progress bar visualization, not the energy classification
+  const mapEnergyStatus = (backendStatus?: string): "low" | "optimal" | "heavy" => {
+    if (!backendStatus) return "optimal";
+    switch (backendStatus) {
+      case "space_available":
+        return "low";
+      case "balanced_pacing":
+        return "optimal";
+      case "prioritize_rest":
+        return "heavy";
+      default:
+        return "optimal";
+    }
   };
+
+  const energyStatus = mapEnergyStatus(store.today?.energy?.status);
 
   const handleAddTask = (task: { title: string; time?: string; endTime?: string; value: any; date: string }) => {
     store.addTask({
@@ -139,7 +151,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-48">
       {/* Top Brand */}
       <p className="text-xs font-sans font-medium text-muted-foreground tracking-widest uppercase text-center pt-4 pb-1">
         LifeOS, powered by SolAI
@@ -168,7 +180,7 @@ const Index = () => {
       
       <div className="mt-4">
         <BalanceScoreCard 
-          status={getBalanceStatus()} 
+          status={energyStatus} 
           tasksCompleted={completedCount}
           totalTasks={totalCount}
         />
@@ -192,7 +204,6 @@ const Index = () => {
         groups={[{ title: "Anytime", tasks: anytimeTasks }]}
         onToggleTask={store.toggleTask}
         onDeleteTask={store.deleteTask}
-        onAddTask={() => setShowAddTask(true)}
       />
 
       
@@ -205,7 +216,6 @@ const Index = () => {
         onSendMessage={coreAI.sendMessage}
         isLoading={coreAI.isLoading}
         aiName={store.settings.coreAIName}
-        notification={totalCount > 0 && completedCount < totalCount ? "Ready for your daily check-in?" : undefined}
       />
       
       <CheckInModal
@@ -215,8 +225,8 @@ const Index = () => {
         tasks={todayTasks}
         onToggleTask={store.toggleTask}
         onMoveTask={store.moveTask}
-        onComplete={(completedIds, incompleteIds, movedTasks, note) => {
-          store.saveCheckIn(selectedDate, completedIds, incompleteIds, movedTasks, note);
+        onComplete={(completedIds, incompleteIds, movedTasks, note, mood) => {
+          store.saveCheckIn(selectedDate, completedIds, incompleteIds, movedTasks, note, mood);
           setShowCheckIn(false);
         }}
       />

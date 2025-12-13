@@ -18,6 +18,7 @@
   - [Day 9: Today View Refinement & UI Foundation](#day-9-today-view-refinement--ui-foundation-dec-9-2025)
   - [Day 10: UI Stability, Bug Fixes & Early Design Planning](#day-10-ui-stability-bug-fixes--early-design-planning-dec-10-2025)
   - [Day 11: Today View UI Alignment & Backend Sync](#day-11-today-view-ui-alignment--backend-sync-dec-11-2025)
+  - [Day 12: Check-In System & Energy Status](#day-12-check-in-system--energy-status-dec-12-2025)
 - [Next Steps](#next-steps)
 
 
@@ -992,7 +993,7 @@ Fixing small issues, improving consistency, and clarifying how the UI should flo
 
 ### **Day 11:** Today View UI Alignment & Backend Sync (Dec 11, 2025)
 
-Today was focused on getting the redesigned LifeOS Today View fully aligned with the backend. After finalising the app’s core layout in Lovable and adding the frontend code, I shifted my attention to rebuilding the logic and data flow needed to support the cleaner UI structure.
+Today was focused on getting the redesigned LifeOS Today View fully aligned with the backend. After making the strategic choice to use React Web for speed and design consistency (instead of the more complex React Native), I finalized the app’s core layout in Lovable. I then shifted my attention to rebuilding the logic and data flow needed to support this cleaner UI structure.
 
 #### **What I Worked On**
 
@@ -1014,14 +1015,72 @@ To support the new frontend architecture, several backend components were rebuil
 
 #### **Reflection (Day 11)**
 
-This was a structural day, but an important one. The frontend and backend finally speak the same language, and the Today View now feels coherent and responsive. There’s still design polishing ahead, but the foundation is now strong enough to build on.
+This was a structural day, but an important one. The frontend and backend finally speak the same language thanks to the new adapter layer, and the Today View now feels coherent and responsive. There’s still design polishing ahead, but the foundation built on the React Web standard is now strong enough to confidently build the more complex calendar views.
+
+---
+
+### **Day 12:** Check-In System & Energy Status (Dec 12, 2025)
+
+Today focused on completing two closely related foundations of LifeOS:  
+the **Daily Check-In flow** and the **Energy Status logic** that reflects daily workload honestly and consistently.
+
+Together, these changes moved LifeOS closer to behaving like a real operating system — one that clearly separates **execution**, **load**, and **reflection**.
+
+#### **What I Worked On**
+
+- **Daily Check-In Flow:** Completed the multi-step check-in modal allowing users to:
+  - Review and toggle completed tasks
+  - Handle incomplete tasks by moving them to future dates
+  - Write a daily reflection note
+- **Real-Time Task Updates:** Ensured task completion and rescheduling happen immediately when the user interacts, not at the end of the check-in.
+- **Reflection as Snapshot:** Designed the check-in to act as a historical record of the day, capturing what happened without mutating task state retroactively.
+- **Energy Status Behaviour:** Finalised how the Today View energy indicator works so it reflects **planned workload**, not momentary progress.
+- **Frontend–Backend Sync:** Fully wired the Lovable UI to backend endpoints so state stays consistent across Today, Calendar, Energy Status, and Check-In flows.
+
+#### **Backend Updates**
+
+Several backend additions and refinements were made to support both check-ins and energy tracking:
+
+- **New Check-In Endpoints:**
+  - `POST /checkins` — create or update a daily check-in
+  - `GET /checkins?date=YYYY-MM-DD` — retrieve a check-in for a specific day
+- **Check-In Persistence:** Check-ins are stored in `data.json` as dated records containing:
+  - completed task IDs
+  - incomplete task IDs
+  - moved tasks (with new dates)
+  - reflection note
+  - timestamp
+- **Energy Status Calculation:**
+  - Calculated fully on the backend
+  - Step 1: Sum **total scheduled minutes** for the day (anytime tasks excluded)
+  - Step 2: Compare against a **daily capacity of 480 minutes (8 hours)**
+  - Step 3: If total scheduled minutes ≥ **624 minutes (130% of capacity)** → `Prioritize Rest`
+  - Step 4: Otherwise, compute a **weighted task load**:
+    - Anytime tasks → weight 0.5  
+    - Scheduled ≤ 30 min → weight 1.0  
+    - Scheduled 30–90 min → weight 1.5  
+    - Scheduled > 90 min → weight 2.0  
+  - Step 5: Map total weight to:
+    - `Space Available`
+    - `Balanced Pacing`
+    - `Prioritize Rest`
+  - Energy labels are **fixed for the day** and do not change as tasks are completed
+- **Task Operations During Check-In:**
+  - Task completion toggles update task state immediately
+  - Task moves update task dates immediately and track original dates
+- **Clear Separation of Concerns:** Task logic is deterministic and immediate; energy reflects planned demand; check-ins are purely reflective and historical.
+
+#### **Reflection (Day 12)**
+
+This was a key architectural day. Energy status, task execution, and daily reflection are now clearly separated, making the system more honest and predictable. Heavy days remain heavy even when handled well, progress is visible without rewriting reality, and check-ins act as trustworthy daily logs rather than hidden control mechanisms.
+
+LifeOS now feels less like a task app and more like an operating system that understands **load, action, and reflection as distinct layers**.
 
 ---
 
 #### **Next Steps**
 
-- Complete backend loading for the horizontal day scroller  
-- Wire up Settings, Reminders, and Check-in flows  
-- Improve task toggling, deletion, and overall state consistency  
-- Begin integrating the conversational assistant  
-
+- Finalise Today View polish and edge cases  
+- Fully align Calendar and Today behaviour  
+- Introduce a minimal Explore v0 (read-only insights)  
+- Begin layering intelligence on top of stable, deterministic foundations  

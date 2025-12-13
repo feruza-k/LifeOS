@@ -117,71 +117,16 @@ def get_insights() -> List[dict]:
         insights.append(_insight("No task conflicts detected."))
 
     # -----------------------------------------------------
-    # 5) TODAY FREE TIME BLOCK (simple version)
-    # -----------------------------------------------------
-    # Look for tasks today sorted by time
-    today_sorted = sorted(
-        today_tasks,
-        key=lambda x: x.get("time") or ""
-    )
-
-    if len(today_sorted) >= 2:
-        # Compare end of first with start of second
-        free_blocks = []
-        for i in range(len(today_sorted) - 1):
-            first = today_sorted[i]
-            second = today_sorted[i + 1]
-
-            if first.get("datetime") and second.get("datetime"):
-                # end of first = first['datetime'] + default duration
-                try:
-                    start_dt = datetime.strptime(
-                        first["datetime"], "%Y-%m-%d %H:%M"
-                    ).replace(tzinfo=tz)
-
-                    # approximate end
-                    if first["type"] == "event":
-                        end_dt = start_dt + timedelta(minutes=60)
-                    else:
-                        end_dt = start_dt + timedelta(minutes=15)
-
-                    next_start = datetime.strptime(
-                        second["datetime"], "%Y-%m-%d %H:%M"
-                    ).replace(tzinfo=tz)
-
-                    if next_start > end_dt:
-                        free_blocks.append(
-                            (end_dt.strftime("%H:%M"), next_start.strftime("%H:%M"))
-                        )
-                except:
-                    pass
-
-        if free_blocks:
-            s = "; ".join([f"{a}–{b}" for a, b in free_blocks])
-            insights.append(
-                _insight(f"You have free time block(s) today: {s}.")
-            )
-
-        # -----------------------------------------------------
-    # 6) TODAY SUMMARY INSIGHT (single gentle observation)
+    # 5) TODAY SUMMARY INSIGHT
     # -----------------------------------------------------
     today = get_today_view()
 
     if today["load"] == "empty":
         insights.append(_insight("Your day is completely free — good moment to reset or plan ahead."))
-    else:
-        # Example: "Your afternoon is completely free."
-        if today["morning_tasks"] and not today["afternoon_tasks"] and not today["evening_tasks"]:
-            insights.append(_insight("Your afternoon and evening are free — plenty of space to focus or rest."))
-
-        elif not today["morning_tasks"] and today["afternoon_tasks"]:
-            insights.append(_insight("Your morning is free, things pick up later in the day."))
-
-        elif today["load"] == "light":
-            insights.append(_insight("Today looks light and manageable."))
-
-        elif today["load"] == "heavy":
-            insights.append(_insight("Today is quite full — try to keep some breathing room where possible."))
+    elif today["load"] == "light":
+        insights.append(_insight("Today looks light and manageable."))
+    elif today["load"] == "heavy":
+        insights.append(_insight("Today is quite full — try to keep some breathing room where possible."))
 
 
     return insights

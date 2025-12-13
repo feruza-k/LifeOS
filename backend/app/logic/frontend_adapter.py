@@ -104,6 +104,7 @@ def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "ev
         backend_task["id"] = frontend_task["id"]
     
     # Calculate duration from time and endTime
+    # This handles both same-day tasks (e.g., 09:00-23:00) and cross-day tasks
     if frontend_task.get("time") and frontend_task.get("endTime"):
         try:
             start_hour, start_min = map(int, frontend_task["time"].split(":"))
@@ -111,11 +112,26 @@ def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "ev
             start_total = start_hour * 60 + start_min
             end_total = end_hour * 60 + end_min
             duration = end_total - start_total
+            
+            # Handle cross-day tasks (e.g., 23:00 to 01:00 = 2 hours, not -22 hours)
+            if duration < 0:
+                duration += 24 * 60  # Add 24 hours
+            
+            # Set duration if valid (positive)
             if duration > 0:
                 backend_task["duration_minutes"] = duration
                 # Create end_datetime
                 if frontend_task.get("date"):
                     backend_task["end_datetime"] = f"{frontend_task['date']} {frontend_task['endTime']}"
+                    # If task spans midnight, adjust end_datetime to next day
+                    if end_total < start_total:
+                        from datetime import datetime, timedelta
+                        try:
+                            date_obj = datetime.strptime(frontend_task['date'], "%Y-%m-%d")
+                            date_obj += timedelta(days=1)
+                            backend_task["end_datetime"] = f"{date_obj.strftime('%Y-%m-%d')} {frontend_task['endTime']}"
+                        except:
+                            pass
         except:
             pass
     

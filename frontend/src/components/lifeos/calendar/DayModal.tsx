@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, isSameDay } from "date-fns";
 import { X, ChevronLeft, ChevronRight, Check, Camera, Image, Edit3 } from "lucide-react";
 import { Task } from "../TaskItem";
@@ -9,6 +9,13 @@ interface DayModalProps {
   date: Date;
   tasks: Task[];
   note: string;
+  checkIn?: {
+    mood?: string;
+    completedTaskIds?: string[];
+    note?: string;
+  };
+  completedCount?: number;
+  totalTasksCount?: number;
   onClose: () => void;
   onToggleTask: (id: string) => void;
   onSaveNote: (content: string) => void;
@@ -20,14 +27,25 @@ export function DayModal({
   date, 
   tasks, 
   note,
+  checkIn,
+  completedCount = 0,
+  totalTasksCount = 0,
   onClose, 
   onToggleTask,
   onSaveNote 
 }: DayModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>("tasks");
+  // Note content (separate from check-in note which is shown in check-in section)
   const [noteContent, setNoteContent] = useState(note);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const isToday = isSameDay(date, new Date());
+
+  // Update note content when note prop changes (but not when editing)
+  useEffect(() => {
+    if (!isEditingNote) {
+      setNoteContent(note);
+    }
+  }, [note, isEditingNote]);
 
   const tabs: TabType[] = ["tasks", "notes", "photo"];
 
@@ -92,6 +110,20 @@ export function DayModal({
           {/* Tasks Tab */}
           {activeTab === "tasks" && (
             <div className="p-4 space-y-2">
+              {/* Completed count header */}
+              {totalTasksCount > 0 && (
+                <div className="mb-3 pb-3 border-b border-border/30">
+                  <p className="text-xs font-sans text-muted-foreground">
+                    {completedCount} of {totalTasksCount} tasks completed
+                  </p>
+                  <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary rounded-full transition-all duration-300"
+                      style={{ width: `${totalTasksCount > 0 ? (completedCount / totalTasksCount * 100) : 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               {tasks.length === 0 ? (
                 <p className="text-center text-muted-foreground font-sans py-8">
                   No tasks scheduled
@@ -139,6 +171,25 @@ export function DayModal({
           {/* Notes Tab */}
           {activeTab === "notes" && (
             <div className="p-4">
+              {/* Check-in info */}
+              {checkIn && (checkIn.mood || checkIn.note) && (
+                <div className="mb-4 pb-4 border-b border-border/30">
+                  {checkIn.mood && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">{checkIn.mood}</span>
+                      <span className="text-xs font-sans text-muted-foreground">Daily check-in</span>
+                    </div>
+                  )}
+                  {checkIn.note && (
+                    <div className="bg-primary/5 rounded-lg p-3 mt-2">
+                      <p className="text-xs font-sans font-medium text-foreground mb-1">Reflection:</p>
+                      <p className="text-sm font-sans text-foreground/80 whitespace-pre-wrap">
+                        {checkIn.note}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               {isEditingNote ? (
                 <div className="space-y-3">
                   <textarea

@@ -27,6 +27,7 @@ export interface CheckIn {
   incompleteTaskIds: string[];
   movedTasks: { taskId: string; newDate: string }[];
   note?: string;
+  mood?: string; // Emoji mood from reflection (e.g., "😊", "😌", "😐", "😴")
   timestamp: string;
 }
 

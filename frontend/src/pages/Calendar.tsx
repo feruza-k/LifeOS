@@ -13,6 +13,7 @@ import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { cn } from "@/lib/utils";
 import { useSwipeable } from "react-swipeable";
+import { api } from "@/lib/api";
 
 type ViewMode = "month" | "week";
 
@@ -27,6 +28,7 @@ const CalendarPage = () => {
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [checkIns, setCheckIns] = useState<Record<string, any>>({});
 
   // Load tasks for current month when month changes
   useEffect(() => {
@@ -45,7 +47,7 @@ const CalendarPage = () => {
     loadMonthTasks();
   }, [currentMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load note when date is selected
+  // Load note and check-in when date is selected
   useEffect(() => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     if (!notes[dateStr]) {
@@ -53,6 +55,16 @@ const CalendarPage = () => {
         if (note) {
           setNotes(prev => ({ ...prev, [dateStr]: note.content || "" }));
         }
+      });
+    }
+    // Load check-in for this date
+    if (!checkIns[dateStr]) {
+      api.getCheckIn(dateStr).then(checkIn => {
+        if (checkIn) {
+          setCheckIns(prev => ({ ...prev, [dateStr]: checkIn }));
+        }
+      }).catch(() => {
+        // No check-in for this date, that's fine
       });
     }
   }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -93,7 +105,12 @@ const CalendarPage = () => {
     value: t.value
   }));
 
-  const selectedDateNote = notes[format(selectedDate, "yyyy-MM-dd")] || "";
+  const dateStr = format(selectedDate, "yyyy-MM-dd");
+  const selectedDateCheckIn = checkIns[dateStr];
+  // Use saved note (excluding check-in note, which is shown separately)
+  const selectedDateNote = notes[dateStr] || "";
+  const completedCount = selectedDateTasks.filter(t => t.completed).length;
+  const totalTasksCount = selectedDateTasks.length;
 
   // Swipe handlers for month navigation
   const monthSwipeHandlers = useSwipeable({
@@ -217,6 +234,9 @@ const CalendarPage = () => {
           date={selectedDate}
           tasks={selectedDateTasks}
           note={selectedDateNote || ""}
+          checkIn={selectedDateCheckIn}
+          completedCount={completedCount}
+          totalTasksCount={totalTasksCount}
           onClose={() => setShowDayModal(false)}
           onToggleTask={async (id) => {
             await store.toggleTask(id);

@@ -27,13 +27,5 @@ def get_suggestions():
             "message": f"{wd} looks heavy — consider spreading tasks across the week."
         })
 
-    # 3) Free block suggestion (today)
-    today = get_today_view()
-    if today["free_blocks"]:
-        block = today["free_blocks"][0]
-        suggestions.append({
-            "reason": "free_time",
-            "message": f"You have a free block from {block['start']} to {block['end']} — ideal for focused work or rest."
-        })
 
     return {"suggestions": suggestions}

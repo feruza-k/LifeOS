@@ -116,21 +116,6 @@
             "context": null
         },
         {
-            "id": "2400c33e-9adb-4dd0-bc73-5fda6bb95dda",
-            "type": "event",
-            "title": "run",
-            "date": "2025-12-13",
-            "time": "18:00",
-            "datetime": "2025-12-13 18:00",
-            "duration_minutes": null,
-            "end_datetime": null,
-            "category": "health",
-            "notes": null,
-            "completed": false,
-            "energy": null,
-            "context": null
-        },
-        {
             "id": "9f6c1b5e-82c2-40a8-aa3b-2d6904cec06a",
             "type": "event",
             "title": "gym",
@@ -176,21 +161,6 @@
             "context": null
         },
         {
-            "id": "a44a444e-39a9-40ff-b1a2-a12ef7868f4f",
-            "type": "event",
-            "title": "study session",
-            "date": "2025-12-12",
-            "time": "18:00",
-            "datetime": "2025-12-12 18:00",
-            "duration_minutes": 60,
-            "end_datetime": "2025-12-12 19:00",
-            "category": "education",
-            "notes": null,
-            "completed": false,
-            "energy": null,
-            "context": null
-        },
-        {
             "id": "47af7c04-d329-4bcb-915c-2f8b85feaeb0",
             "type": "event",
             "title": "study session",
@@ -206,21 +176,6 @@
             "context": null
         },
         {
-            "id": "7a57a027-f8a7-4253-99c4-245ef7c3f1db",
-            "type": "event",
-            "title": "gym",
-            "date": "2025-12-12",
-            "time": "19:00",
-            "datetime": "2025-12-12 19:00",
-            "duration_minutes": 60,
-            "end_datetime": "2025-12-12 20:00",
-            "category": "health",
-            "notes": null,
-            "completed": false,
-            "energy": null,
-            "context": null
-        },
-        {
             "id": "c2cab83b-64fe-4b2f-9076-b5e53364f087",
             "type": "event",
             "title": "gym",
@@ -230,21 +185,6 @@
             "duration_minutes": 60,
             "end_datetime": "2025-12-03 18:00",
             "category": "health",
-            "notes": null,
-            "completed": false,
-            "energy": null,
-            "context": null
-        },
-        {
-            "id": "353e8fdc-cb2b-442a-b67e-7558ebf87e34",
-            "type": "event",
-            "title": "run",
-            "date": "2025-12-12",
-            "time": "20:00",
-            "datetime": "2025-12-12 20:00",
-            "duration_minutes": 60,
-            "end_datetime": "2025-12-12 21:00",
-            "category": null,
             "notes": null,
             "completed": false,
             "energy": null,
@@ -358,6 +298,61 @@
             "end_datetime": "2025-12-11 22:00",
             "id": "b8c17d03-62c6-44b3-980f-b0473ff3889e",
             "created_at": "2025-12-11T21:32:30.912817"
+        },
+        {
+            "type": "event",
+            "title": "Clean room",
+            "date": "2025-12-12",
+            "time": null,
+            "completed": true,
+            "category": "personal",
+            "id": "f2dbebf0-3a00-4ced-9dcd-9e8e70677947",
+            "created_at": "2025-12-12T10:02:58.438521"
+        },
+        {
+            "type": "event",
+            "title": "LifeOS: Today Screen",
+            "date": "2025-12-12",
+            "time": "17:00",
+            "completed": true,
+            "category": "personal",
+            "duration_minutes": 300,
+            "end_datetime": "2025-12-12 22:00",
+            "id": "22aaa07d-b346-41f6-ab80-9487202fda26",
+            "created_at": "2025-12-12T21:31:26.548185"
+        },
+        {
+            "type": "event",
+            "title": "Work",
+            "date": "2025-12-12",
+            "time": "09:00",
+            "completed": true,
+            "category": "work",
+            "duration_minutes": 480,
+            "end_datetime": "2025-12-12 17:00",
+            "id": "e4fc26ac-c479-41b1-80fb-3851fb9b3150",
+            "created_at": "2025-12-12T21:31:56.480191"
+        },
+        {
+            "type": "event",
+            "title": "Food Prep",
+            "date": "2025-12-12",
+            "time": null,
+            "completed": true,
+            "category": "personal",
+            "id": "75fb4e27-eb68-467b-a898-36878d424fe5",
+            "created_at": "2025-12-12T21:33:19.970454"
+        },
+        {
+            "type": "event",
+            "title": "Read a book",
+            "date": "2025-12-13",
+            "time": null,
+            "completed": false,
+            "category": "personal",
+            "id": "0cb49e8b-b89b-4663-b54b-d5ff6afc3d3a",
+            "created_at": "2025-12-12T21:56:30.478891",
+            "moved_from": "2025-12-12"
         }
     ],
     "diary": [
@@ -374,9 +369,39 @@
             "category": "personal"
         }
     ],
-    "pending": {},
+    "pending": {
+        "type": "create",
+        "payload": {
+            "task_fields": {
+                "title": "run",
+                "date": "2025-12-12",
+                "time": null,
+                "datetime": null,
+                "type": "event",
+                "category": "health",
+                "notes": "remove",
+                "duration_minutes": null,
+                "end_datetime": null
+            }
+        }
+    },
     "notes": [],
-    "checkins": [],
+    "checkins": [
+        {
+            "date": "2025-12-12",
+            "completedTaskIds": [
+                "e4fc26ac-c479-41b1-80fb-3851fb9b3150",
+                "22aaa07d-b346-41f6-ab80-9487202fda26",
+                "f2dbebf0-3a00-4ced-9dcd-9e8e70677947",
+                "75fb4e27-eb68-467b-a898-36878d424fe5"
+            ],
+            "incompleteTaskIds": [],
+            "movedTasks": [],
+            "note": "Feeling better today after being sick with a flu the whole week, but still low energy.",
+            "id": "40b0c413-d8fd-4ea0-b993-2af993261d2a",
+            "timestamp": "2025-12-12T22:02:03.352515"
+        }
+    ],
     "reminders": [],
     "monthly_focus": []
 }
