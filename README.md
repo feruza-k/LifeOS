@@ -1130,7 +1130,7 @@ LifeOS now handles **remembering**, **showing**, and **configuring** in a calm, 
 ---
 
 
-### Day 14: Calendar View (Month & Week)
+### **Day 14**: Calendar View Month & Week (Dec 14, 2025)
 
 Day 14 focused on implementing LifeOS’s **Calendar system**, introducing fully functional **Month** and **Week** views backed by efficient date-range loading. This completes the core planning layer and moves LifeOS closer to a true personal operating system.
 
