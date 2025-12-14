@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { format, isSameDay } from "date-fns";
-import { X, ChevronLeft, ChevronRight, Check, Camera, Image, Edit3 } from "lucide-react";
+import { format, isSameDay, addDays, subDays } from "date-fns";
+import { X, Check, Camera, Image, Edit3, Plus } from "lucide-react";
 import { Task } from "../TaskItem";
 import { ValueTag } from "../ValueTag";
 import { cn } from "@/lib/utils";
+import { useSwipeable } from "react-swipeable";
 
 interface DayModalProps {
   date: Date;
@@ -19,6 +20,8 @@ interface DayModalProps {
   onClose: () => void;
   onToggleTask: (id: string) => void;
   onSaveNote: (content: string) => void;
+  onDateChange?: (date: Date) => void;
+  onAddTask?: (date: Date) => void;
 }
 
 type TabType = "tasks" | "notes" | "photo";
@@ -32,7 +35,9 @@ export function DayModal({
   totalTasksCount = 0,
   onClose, 
   onToggleTask,
-  onSaveNote 
+  onSaveNote,
+  onDateChange,
+  onAddTask
 }: DayModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>("tasks");
   // Note content (separate from check-in note which is shown in check-in section)
@@ -54,14 +59,39 @@ export function DayModal({
     setIsEditingNote(false);
   };
 
-  const goToTab = (direction: "prev" | "next") => {
-    const currentIndex = tabs.indexOf(activeTab);
-    if (direction === "prev" && currentIndex > 0) {
-      setActiveTab(tabs[currentIndex - 1]);
-    } else if (direction === "next" && currentIndex < tabs.length - 1) {
-      setActiveTab(tabs[currentIndex + 1]);
-    }
-  };
+  // Swipe handlers for tabs
+  const tabSwipeHandlers = useSwipeable({
+    onSwipedLeft: () => {
+      const currentIndex = tabs.indexOf(activeTab);
+      if (currentIndex < tabs.length - 1) {
+        setActiveTab(tabs[currentIndex + 1]);
+      }
+    },
+    onSwipedRight: () => {
+      const currentIndex = tabs.indexOf(activeTab);
+      if (currentIndex > 0) {
+        setActiveTab(tabs[currentIndex - 1]);
+      }
+    },
+    trackMouse: false,
+    trackTouch: true,
+  });
+
+  // Swipe handlers for day navigation (only on header area)
+  const headerSwipeHandlers = useSwipeable({
+    onSwipedLeft: () => {
+      if (onDateChange) {
+        onDateChange(addDays(date, 1));
+      }
+    },
+    onSwipedRight: () => {
+      if (onDateChange) {
+        onDateChange(subDays(date, 1));
+      }
+    },
+    trackMouse: false,
+    trackTouch: true,
+  });
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 px-6">
@@ -73,8 +103,8 @@ export function DayModal({
       
       {/* Modal */}
       <div className="relative bg-card rounded-3xl shadow-card w-full max-w-sm animate-scale-in overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border/50">
+        {/* Header - Swipeable for day navigation */}
+        <div {...headerSwipeHandlers} className="flex items-center justify-between p-4 border-b border-border/50">
           <div>
             <h3 className="font-sans text-lg font-semibold text-foreground">
               {isToday ? "Today" : format(date, "EEEE")}
@@ -109,7 +139,7 @@ export function DayModal({
         <div className="min-h-[280px] max-h-[320px] overflow-y-auto">
           {/* Tasks Tab */}
           {activeTab === "tasks" && (
-            <div className="p-4 space-y-2">
+            <div {...tabSwipeHandlers} className="p-4 space-y-2">
               {/* Completed count header */}
               {totalTasksCount > 0 && (
                 <div className="mb-3 pb-3 border-b border-border/30">
@@ -125,52 +155,74 @@ export function DayModal({
                 </div>
               )}
               {tasks.length === 0 ? (
-                <p className="text-center text-muted-foreground font-sans py-8">
-                  No tasks scheduled
-                </p>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground font-sans mb-4">
+                    No tasks scheduled
+                  </p>
+                  {onAddTask && (
+                    <button
+                      onClick={() => onAddTask(date)}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-sans text-sm font-medium transition-all hover:opacity-90"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Task
+                    </button>
+                  )}
+                </div>
               ) : (
-                tasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => onToggleTask(task.id)}
-                    className={cn(
-                      "w-full flex items-center gap-3 p-3 rounded-xl bg-muted/50 transition-all text-left",
-                      task.completed && "opacity-50"
-                    )}
-                  >
-                    <div
+                <>
+                  {tasks.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => onToggleTask(task.id)}
                       className={cn(
-                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
-                        task.completed
-                          ? "bg-primary border-primary"
-                          : "border-muted-foreground/40"
+                        "w-full flex items-center gap-3 p-3 rounded-xl bg-muted/50 transition-all text-left",
+                        task.completed && "opacity-50"
                       )}
                     >
-                      {task.completed && (
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "font-sans text-sm font-medium text-foreground truncate",
-                        task.completed && "line-through text-muted-foreground"
-                      )}>
-                        {task.title}
-                      </p>
-                      {task.time && (
-                        <p className="text-xs text-muted-foreground">{task.time}</p>
-                      )}
-                    </div>
-                    <ValueTag value={task.value} size="sm" />
-                  </button>
-                ))
+                      <div
+                        className={cn(
+                          "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                          task.completed
+                            ? "bg-primary border-primary"
+                            : "border-muted-foreground/40"
+                        )}
+                      >
+                        {task.completed && (
+                          <Check className="w-3 h-3 text-primary-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "font-sans text-sm font-medium text-foreground truncate",
+                          task.completed && "line-through text-muted-foreground"
+                        )}>
+                          {task.title}
+                        </p>
+                        {task.time && (
+                          <p className="text-xs text-muted-foreground">{task.time}</p>
+                        )}
+                      </div>
+                      <ValueTag value={task.value} size="sm" />
+                    </button>
+                  ))}
+                  {onAddTask && (
+                    <button
+                      onClick={() => onAddTask(date)}
+                      className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all text-muted-foreground hover:text-foreground font-sans text-sm font-medium border border-dashed border-border/50"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Task
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}
 
           {/* Notes Tab */}
           {activeTab === "notes" && (
-            <div className="p-4">
+            <div {...tabSwipeHandlers} className="p-4">
               {/* Check-in info */}
               {checkIn && (checkIn.mood || checkIn.note) && (
                 <div className="mb-4 pb-4 border-b border-border/30">
@@ -247,7 +299,7 @@ export function DayModal({
 
           {/* Photo Tab */}
           {activeTab === "photo" && (
-            <div className="p-4">
+            <div {...tabSwipeHandlers} className="p-4">
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-3">
                   <Image className="w-8 h-8 text-muted-foreground/50" />
@@ -264,27 +316,6 @@ export function DayModal({
           )}
         </div>
 
-        {/* Navigation Arrows */}
-        <div className="absolute left-2 top-1/2 -translate-y-1/2">
-          {activeTab !== "tasks" && (
-            <button
-              onClick={() => goToTab("prev")}
-              className="w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center"
-            >
-              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          {activeTab !== "photo" && (
-            <button
-              onClick={() => goToTab("next")}
-              className="w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center"
-            >
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );

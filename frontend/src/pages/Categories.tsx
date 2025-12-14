@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { TopBrand } from "@/components/lifeos/TopBrand";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
-import { useLifeOSStore } from "@/hooks/useLifeOSStore";
+import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { cn } from "@/lib/utils";
 import {
@@ -52,30 +52,47 @@ export default function Categories() {
     setEditValue(label);
   };
 
-  const handleEditSave = (id: string) => {
+  const handleEditSave = async (id: string) => {
     if (editValue.trim()) {
-      store.updateCategory(id, { label: editValue.trim() });
-      toast.success("Category updated");
+      try {
+        await store.updateCategory(id, { label: editValue.trim() });
+        toast.success("Category updated");
+      } catch (error) {
+        toast.error("Failed to update category");
+      }
     }
     setEditingId(null);
     setEditValue("");
   };
 
-  const handleColorChange = (id: string, color: string) => {
-    store.updateCategory(id, { color });
-    setOpenColorPicker(null);
+  const handleColorChange = async (id: string, color: string) => {
+    try {
+      await store.updateCategory(id, { color });
+      setOpenColorPicker(null);
+      toast.success("Color updated");
+    } catch (error) {
+      toast.error("Failed to update color");
+    }
   };
 
-  const handleDelete = (id: string) => {
-    store.deleteCategory(id);
-    toast.success("Category deleted");
+  const handleDelete = async (id: string) => {
+    try {
+      await store.deleteCategory(id);
+      toast.success("Category deleted");
+    } catch (error) {
+      toast.error("Failed to delete category");
+    }
   };
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     const usedColors = store.categories.map(c => c.color);
     const availableColor = colorPalette.find(c => !usedColors.includes(c.value))?.value || colorPalette[0].value;
-    store.addCategory("New Category", availableColor);
-    toast.success("Category added");
+    try {
+      await store.addCategory("New Category", availableColor);
+      toast.success("Category added");
+    } catch (error) {
+      toast.error("Failed to add category");
+    }
   };
 
   return (

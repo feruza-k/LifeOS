@@ -1,45 +1,53 @@
 import { cn } from "@/lib/utils";
+import { useLifeOSStore } from "@/stores/useLifeOSStore";
 
-export type ValueType = "health" | "growth" | "family" | "work" | "creativity";
+export type ValueType = "health" | "growth" | "family" | "work" | "creativity" | string;
 
 interface ValueTagProps {
   value: ValueType;
   size?: "sm" | "md";
 }
 
-const valueConfig: Record<ValueType, { label: string; className: string }> = {
-  health: {
-    label: "Health",
-    className: "bg-tag-health/15 text-tag-health",
-  },
-  growth: {
-    label: "Growth",
-    className: "bg-primary/15 text-primary",
-  },
-  family: {
-    label: "Family",
-    className: "bg-tag-family/15 text-tag-family",
-  },
-  work: {
-    label: "Work",
-    className: "bg-tag-work/15 text-tag-work",
-  },
-  creativity: {
-    label: "Creativity",
-    className: "bg-tag-creativity/15 text-tag-creativity",
-  },
+// Fallback config for when category is not found
+const fallbackConfig = {
+  label: "Task",
+  color: "#EBEBEB",
+};
+
+// Helper function to convert hex to rgba
+const hexToRgba = (hex: string, opacity: number): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
 
 export function ValueTag({ value, size = "sm" }: ValueTagProps) {
-  const config = valueConfig[value];
+  const store = useLifeOSStore();
+  
+  // Find the category from the store
+  const category = store.categories.find(c => c.id === value);
+  
+  // Use category data if found, otherwise use fallback
+  const label = category?.label || fallbackConfig.label;
+  const color = category?.color || fallbackConfig.color;
+  
+  // Create styles with the actual category color
+  const backgroundColor = hexToRgba(color, 0.6);
+  const textColor = color;
 
   return (
-    <span className={cn(
-      "inline-flex items-center rounded-full font-sans font-medium",
-      size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm",
-      config.className
-    )}>
-      {config.label}
+    <span 
+      className={cn(
+        "inline-flex items-center rounded-full font-sans font-medium",
+        size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
+      )}
+      style={{
+        backgroundColor,
+        color: textColor,
+      }}
+    >
+      {label}
     </span>
   );
 }

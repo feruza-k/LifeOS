@@ -16,6 +16,7 @@ import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { Task } from "@/components/lifeos/TaskItem";
+import { cn } from "@/lib/utils";
 
 
 
@@ -24,6 +25,8 @@ const Index = () => {
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showSetFocus, setShowSetFocus] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
+  const [showDayStrip, setShowDayStrip] = useState(true);
+  const [animateBell, setAnimateBell] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -160,6 +163,17 @@ const Index = () => {
   console.log("Filtered show reminders:", showReminders);
   console.log("=== END DEBUG ===");
 
+  // Animate bell for first 5 seconds when reminders are present
+  useEffect(() => {
+    if (showReminders.length > 0 && !loading) {
+      setAnimateBell(true);
+      const timer = setTimeout(() => {
+        setAnimateBell(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showReminders.length, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleAddTask = (task: { title: string; time?: string; endTime?: string; value: any; date: string }) => {
     store.addTask({
       title: task.title,
@@ -217,7 +231,7 @@ const Index = () => {
 
       <div className="flex items-center justify-between px-4">
         <div className="flex-1">
-          <Header />
+          <Header onTitleClick={() => setShowDayStrip(!showDayStrip)} />
         </div>
         <div className="flex items-center gap-2">
         <Link to="/reminders" className="relative w-9 h-9 rounded-full bg-muted flex items-center justify-center">
@@ -233,10 +247,15 @@ const Index = () => {
           </Link>
         </div>
       </div>
-      <HorizontalDayStrip 
-        selectedDate={selectedDate} 
-        onDateSelect={setSelectedDate} 
-      />
+      {showDayStrip && (
+        <HorizontalDayStrip 
+          selectedDate={selectedDate} 
+          onDateSelect={(date) => {
+            setSelectedDate(date);
+            setShowDayStrip(false);
+          }} 
+        />
+      )}
       
       {/* Show Reminders - displayed before Energy Status */}
       {showReminders.length > 0 && (
@@ -247,7 +266,13 @@ const Index = () => {
                 key={reminder.id}
                 className="flex items-start gap-3"
               >
-                <Bell className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#E6C86A', fill: '#FFF5E0', strokeWidth: 1.5 }} />
+                <Bell 
+                  className={cn(
+                    "w-5 h-5 flex-shrink-0 mt-0.5 text-primary",
+                    animateBell && "animate-bell-ring"
+                  )} 
+                  style={{ fill: 'currentColor', strokeWidth: 1.5 }} 
+                />
                 <div className="flex-1 min-w-0">
                   <p className="font-sans font-medium text-foreground text-base">{reminder.title}</p>
                   {reminder.note && (

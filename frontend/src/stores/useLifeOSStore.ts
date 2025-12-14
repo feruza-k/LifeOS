@@ -20,6 +20,7 @@ interface LifeOSStore {
   loadBootstrap: () => Promise<void>;
   loadToday: (date: Date | string) => Promise<void>;
   addTask: (task: any) => Promise<void>;
+  updateTask: (id: string, updates: any) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   moveTask: (id: string, newDate: Date | string) => Promise<void>;
@@ -45,6 +46,11 @@ interface LifeOSStore {
   setCurrentMonthFocus: (title: string, description?: string) => Promise<void>;
   addMessage: (role: "user" | "assistant", content: string, actions?: any[]) => any;
   clearConversations: () => void;
+  // Category management
+  loadCategories: () => Promise<void>;
+  addCategory: (label: string, color: string) => Promise<void>;
+  updateCategory: (id: string, updates: Partial<Omit<Category, 'id'>>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 }
 
 export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
@@ -78,6 +84,8 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       });
       // Load reminders separately
       await get().loadReminders();
+      // Load categories
+      await get().loadCategories();
     } catch (error) {
       console.error("Failed to load bootstrap:", error);
       // Set empty state on error
@@ -113,6 +121,13 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
     const created = await api.createTask(task);
     // Reload today to get fresh data from server
     await get().loadToday(task.date);
+  },
+
+  updateTask: async (id: string, updates: any) => {
+    await api.updateTask(id, updates);
+    // Reload tasks for the date
+    const taskDate = updates.date || get().today?.date || new Date().toISOString().slice(0, 10);
+    await get().loadToday(taskDate);
   },
 
   toggleTask: async (id: string) => {
@@ -307,5 +322,55 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   
   clearConversations: () => {
     set({ conversations: [] });
+  },
+
+  // -------- CATEGORIES -------- //
+
+  loadCategories: async () => {
+    try {
+      const categories = await api.getAllCategories();
+      if (categories && Array.isArray(categories)) {
+        set({ categories });
+      }
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+      // Keep existing categories on error
+    }
+  },
+
+  addCategory: async (label: string, color: string) => {
+    try {
+      const newCategory = await api.createCategory({ label, color });
+      set({ categories: [...get().categories, newCategory] });
+    } catch (error) {
+      console.error("Failed to add category:", error);
+      throw error;
+    }
+  },
+
+  updateCategory: async (id: string, updates: Partial<Omit<Category, 'id'>>) => {
+    try {
+      const updated = await api.updateCategory(id, updates);
+      if (updated) {
+        set({
+          categories: get().categories.map((c) => (c.id === id ? updated : c)),
+        });
+      }
+    } catch (error) {
+      console.error("Failed to update category:", error);
+      throw error;
+    }
+  },
+
+  deleteCategory: async (id: string) => {
+    try {
+      await api.deleteCategory(id);
+      set({
+        categories: get().categories.filter((c) => c.id !== id),
+      });
+    } catch (error) {
+      console.error("Failed to delete category:", error);
+      throw error;
+    }
   },
 }));

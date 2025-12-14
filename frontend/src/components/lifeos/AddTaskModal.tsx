@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { Repeat, CalendarDays, Calendar as CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, parseISO, isToday, isTomorrow } from "date-fns";
+import { useLifeOSStore } from "@/stores/useLifeOSStore";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -27,22 +28,26 @@ interface RepeatConfig {
   customDates?: string[];
 }
 
-const categories: { value: ValueType; label: string; className: string }[] = [
-  { value: "health", label: "Health", className: "bg-tag-health" },
-  { value: "growth", label: "Growth", className: "bg-tag-growth" },
-  { value: "family", label: "Family", className: "bg-tag-family" },
-  { value: "work", label: "Work", className: "bg-tag-work" },
-  { value: "creativity", label: "Creative", className: "bg-tag-creativity" },
-];
-
 const weekDayLabels = ["S", "M", "T", "W", "T", "F", "S"];
 
 export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps) {
+  const store = useLifeOSStore();
+  
+  // Get categories from store
+  const categories = store.categories.map(cat => ({
+    value: cat.id as ValueType,
+    label: cat.label,
+    color: cat.color,
+  }));
+  
   const [title, setTitle] = useState("");
   const [isScheduled, setIsScheduled] = useState(false);
+  const [taskDate, setTaskDate] = useState<Date>(parseISO(date));
   const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [category, setCategory] = useState<ValueType>("growth");
+  const [duration, setDuration] = useState<number>(30); // Default 30 minutes
+  const [category, setCategory] = useState<ValueType>(
+    categories.length > 0 ? categories[0].value : "growth"
+  );
   const [repeatType, setRepeatType] = useState<RepeatType>("none");
   const [selectedWeekDays, setSelectedWeekDays] = useState<number[]>([]);
   const [periodStart, setPeriodStart] = useState<Date | undefined>();
@@ -50,16 +55,29 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
   const [customDates, setCustomDates] = useState<Date[]>([]);
   const [showRepeatOptions, setShowRepeatOptions] = useState(false);
 
-  // Calculate end time when start time changes (default to 1 hour later)
-  const handleStartTimeChange = (newStartTime: string) => {
-    setStartTime(newStartTime);
-    if (newStartTime && !endTime) {
-      // Calculate 1 hour later
-      const [hours, minutes] = newStartTime.split(":").map(Number);
-      const endHours = (hours + 1) % 24;
-      const endMinutes = minutes;
-      setEndTime(`${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`);
-    }
+  // Calculate end time from start time + duration
+  const calculateEndTime = (start: string, dur: number): string => {
+    if (!start) return "";
+    const [hours, minutes] = start.split(":").map(Number);
+    const totalMinutes = hours * 60 + minutes + dur;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMins = totalMinutes % 60;
+    return `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`;
+  };
+
+  const endTime = calculateEndTime(startTime, duration);
+
+  const durationOptions = [
+    { label: "15m", minutes: 15 },
+    { label: "30m", minutes: 30 },
+    { label: "1h", minutes: 60 },
+    { label: "2h", minutes: 120 },
+  ];
+
+  const getDateLabel = (date: Date): string => {
+    if (isToday(date)) return "Today";
+    if (isTomorrow(date)) return "Tomorrow";
+    return format(date, "MMM d");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -79,7 +97,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
       time: isScheduled ? startTime : undefined,
       endTime: isScheduled ? endTime : undefined,
       value: category,
-      date,
+      date: format(taskDate, "yyyy-MM-dd"),
       repeat: repeatConfig,
     });
 
@@ -90,9 +108,10 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
   const resetForm = () => {
     setTitle("");
     setIsScheduled(false);
+    setTaskDate(parseISO(date));
     setStartTime("");
-    setEndTime("");
-    setCategory("growth");
+    setDuration(30);
+    setCategory(categories.length > 0 ? categories[0].value : "growth");
     setRepeatType("none");
     setSelectedWeekDays([]);
     setPeriodStart(undefined);
@@ -100,6 +119,11 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
     setCustomDates([]);
     setShowRepeatOptions(false);
   };
+
+  // Reset task date when date prop changes
+  useEffect(() => {
+    setTaskDate(parseISO(date));
+  }, [date]);
 
   const toggleWeekDay = (day: number) => {
     setSelectedWeekDays(prev => 
@@ -121,15 +145,15 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm mx-auto max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-sm mx-auto max-h-[90vh] overflow-y-auto rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="font-serif text-xl">Add New Task</DialogTitle>
+          <DialogTitle className="font-sans text-xl">New Task</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="title" className="text-sm font-sans font-medium">
-              Task Title
+              Title
             </Label>
             <Input
               id="title"
@@ -146,7 +170,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
             <Label className="text-sm font-sans font-medium mb-2 block">
               Schedule
             </Label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-3">
               <button
                 type="button"
                 onClick={() => setIsScheduled(false)}
@@ -172,58 +196,97 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
                 <span className="text-sm font-sans font-medium">Scheduled</span>
               </button>
             </div>
+
+            {/* Date Selection */}
+            <div className="mb-3">
+              <Label className="text-xs font-sans font-medium text-muted-foreground mb-1 block">
+                Date
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-left font-normal text-sm"
+                  >
+                    {getDateLabel(taskDate)} ▾
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={taskDate}
+                    onSelect={(date) => date && setTaskDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Time Fields (only show if Scheduled) */}
+            {isScheduled && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="startTime" className="text-sm font-sans font-medium">
+                    Start Time
+                  </Label>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="mt-1"
+                    required={isScheduled}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-sans font-medium mb-2 block">
+                    Duration
+                  </Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {durationOptions.map((option) => (
+                      <button
+                        key={option.minutes}
+                        type="button"
+                        onClick={() => setDuration(option.minutes)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-sm font-sans font-medium transition-all",
+                          duration === option.minutes
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Time Fields (only show if Scheduled) */}
-          {isScheduled && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="startTime" className="text-sm font-sans font-medium">
-                  Start Time
-                </Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => handleStartTimeChange(e.target.value)}
-                  className="mt-1"
-                  required={isScheduled}
-                />
-              </div>
-              <div>
-                <Label htmlFor="endTime" className="text-sm font-sans font-medium">
-                  End Time
-                </Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="mt-1"
-                  required={isScheduled}
-                />
-              </div>
-            </div>
-          )}
-
+          {/* Category */}
           <div>
             <Label className="text-sm font-sans font-medium">Category</Label>
             <div className="flex flex-wrap gap-2 mt-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat.value}
-                  type="button"
-                  onClick={() => setCategory(cat.value)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-sans font-medium transition-all",
-                    category === cat.value
-                      ? `${cat.className} text-white`
-                      : "bg-muted text-muted-foreground hover:bg-accent"
-                  )}
-                >
-                  {cat.label}
-                </button>
-              ))}
+              {categories.map((cat) => {
+                const isSelected = category === cat.value;
+                return (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => setCategory(cat.value)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-sans font-medium transition-all",
+                      isSelected
+                        ? "text-white"
+                        : "bg-muted text-muted-foreground hover:bg-accent"
+                    )}
+                    style={isSelected ? { backgroundColor: cat.color } : undefined}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -365,11 +428,12 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date }: AddTaskModalProps
             )}
           </div>
 
+
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-xl">
               Cancel
             </Button>
-            <Button type="submit" className="flex-1">
+            <Button type="submit" className="flex-1 rounded-xl">
               Add Task
             </Button>
           </div>

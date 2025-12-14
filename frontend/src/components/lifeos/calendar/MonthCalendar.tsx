@@ -99,17 +99,19 @@ export function MonthCalendar({
           key={day.toISOString()}
           onClick={() => onSelectDate(currentDay)}
           className={cn(
-            "relative flex flex-col items-start p-2 min-h-[100px] rounded-lg transition-all duration-200 text-left",
+            "relative flex flex-col items-start p-2 min-h-[100px] rounded-lg transition-all duration-200 text-left border-l-4",
             !isCurrentMonth && "opacity-30",
-            isSelected && "bg-primary",
-            !isSelected && isCurrentMonth && "hover:bg-muted"
+            isSelected && "bg-primary border-l-primary",
+            !isSelected && isCurrentMonth && isToday && "border-l-primary/40 bg-background",
+            !isSelected && isCurrentMonth && !isToday && "border-l-transparent hover:bg-muted/50",
           )}
         >
           <span
             className={cn(
-              "text-xs font-sans font-semibold mb-1 flex items-center justify-center",
-              isToday && !isSelected && "w-5 h-5 rounded-full bg-primary text-primary-foreground",
-              isSelected ? "text-primary-foreground" : !isToday && "text-foreground"
+              "font-sans font-semibold mb-1",
+              isToday && !isSelected && "text-primary text-base",
+              !isToday && "text-xs",
+              isSelected ? "text-primary-foreground text-xs" : "text-foreground"
             )}
           >
             {format(day, "d")}
@@ -130,7 +132,7 @@ export function MonthCalendar({
                   style={{
                     backgroundColor: isSelected 
                       ? "rgba(255, 255, 255, 0.2)" 
-                      : hexToRgba(categoryColor, 0.4),
+                      : hexToRgba(categoryColor, 0.6),
                     color: isSelected ? undefined : "inherit"
                   }}
                 >

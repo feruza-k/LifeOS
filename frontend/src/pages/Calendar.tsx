@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, addDays, subDays, isSameMonth } from "date-fns";
 import { LayoutGrid, Calendar as CalendarIcon } from "lucide-react";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CalendarFilters } from "@/components/lifeos/calendar/CalendarFilters";
 import { MonthCalendar } from "@/components/lifeos/calendar/MonthCalendar";
 import { WeekScheduleView } from "@/components/lifeos/calendar/WeekScheduleView";
 import { DayModal } from "@/components/lifeos/calendar/DayModal";
+import { AddTaskModal } from "@/components/lifeos/AddTaskModal";
 import { Task } from "@/components/lifeos/TaskItem";
 import { ValueType } from "@/components/lifeos/ValueTag";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
@@ -22,6 +23,7 @@ const CalendarPage = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [showDayModal, setShowDayModal] = useState(false);
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [loading, setLoading] = useState(false);
   
   const store = useLifeOSStore();
@@ -31,6 +33,23 @@ const CalendarPage = () => {
   );
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [checkIns, setCheckIns] = useState<Record<string, any>>({});
+
+  // Load categories on mount
+  useEffect(() => {
+    store.loadCategories();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync selectedCategories when categories change
+  useEffect(() => {
+    if (store.categories && store.categories.length > 0) {
+      const categoryIds = store.categories.map(c => c.id as ValueType);
+      // Only update if the current selection includes categories that no longer exist
+      const validSelected = selectedCategories.filter(id => categoryIds.includes(id));
+      if (validSelected.length !== selectedCategories.length) {
+        setSelectedCategories(categoryIds);
+      }
+    }
+  }, [store.categories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load tasks for current month when month changes
   useEffect(() => {
@@ -138,14 +157,9 @@ const CalendarPage = () => {
       {/* Header with Month */}
       <header className="px-4 pb-2 animate-fade-in">
         <div className="flex items-center justify-between mb-1">
-          <div>
-            <h1 className="text-xl font-sans font-bold text-foreground">
-              {format(currentMonth, "MMM yyyy")}
-            </h1>
-            <p className="text-xs text-muted-foreground font-sans mt-0.5">
-              Plan with intention
-            </p>
-          </div>
+          <h1 className="text-xl font-sans font-bold text-foreground">
+            {format(currentMonth, "MMM yyyy")}
+          </h1>
           
           {/* View Mode Toggle - Compact */}
           <div className="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg">
@@ -233,6 +247,34 @@ const CalendarPage = () => {
                 const weekEnd = endOfMonth(date);
                 await store.loadTasksForDateRange(weekStart, weekEnd);
               }}
+              onUpdateTask={async (id, updates) => {
+                await store.updateTask(id, updates);
+                // Reload tasks for current month
+                const monthStart = startOfMonth(currentMonth);
+                const monthEnd = endOfMonth(currentMonth);
+                await store.loadTasksForDateRange(monthStart, monthEnd);
+              }}
+              onDeleteTask={async (id) => {
+                await store.deleteTask(id);
+                // Reload tasks for current month
+                const monthStart = startOfMonth(currentMonth);
+                const monthEnd = endOfMonth(currentMonth);
+                await store.loadTasksForDateRange(monthStart, monthEnd);
+              }}
+              onAddTask={async (taskData) => {
+                await store.addTask({
+                  title: taskData.title,
+                  time: taskData.time,
+                  endTime: taskData.endTime,
+                  value: taskData.value,
+                  date: taskData.date,
+                  completed: false,
+                });
+                // Reload tasks for current month
+                const monthStart = startOfMonth(currentMonth);
+                const monthEnd = endOfMonth(currentMonth);
+                await store.loadTasksForDateRange(monthStart, monthEnd);
+              }}
             />
           </div>
         )}
@@ -259,6 +301,57 @@ const CalendarPage = () => {
             await store.saveNote(selectedDate, content);
             const dateStr = format(selectedDate, "yyyy-MM-dd");
             setNotes(prev => ({ ...prev, [dateStr]: content }));
+          }}
+          onDateChange={async (newDate) => {
+            setSelectedDate(newDate);
+            // Load note and check-in for new date
+            const dateStr = format(newDate, "yyyy-MM-dd");
+            if (!notes[dateStr]) {
+              store.loadNote(dateStr).then(note => {
+                if (note) {
+                  setNotes(prev => ({ ...prev, [dateStr]: note.content || "" }));
+                }
+              }).catch(() => {});
+            }
+            if (!checkIns[dateStr]) {
+              api.getCheckIn(dateStr).then(checkIn => {
+                if (checkIn) {
+                  setCheckIns(prev => ({ ...prev, [dateStr]: checkIn }));
+                }
+              }).catch(() => {});
+            }
+            // Reload tasks for the month if needed
+            if (!isSameMonth(newDate, currentMonth)) {
+              setCurrentMonth(startOfMonth(newDate));
+            }
+          }}
+          onAddTask={(date) => {
+            setSelectedDate(date);
+            setShowAddTaskModal(true);
+          }}
+        />
+      )}
+
+      {/* Add Task Modal */}
+      {showAddTaskModal && selectedDate && (
+        <AddTaskModal
+          isOpen={showAddTaskModal}
+          onClose={() => setShowAddTaskModal(false)}
+          date={format(selectedDate, "yyyy-MM-dd")}
+          onAdd={async (taskData) => {
+            await store.addTask({
+              title: taskData.title,
+              time: taskData.time,
+              endTime: taskData.endTime,
+              value: taskData.value,
+              date: taskData.date,
+              completed: false,
+            });
+            setShowAddTaskModal(false);
+            // Reload tasks for current month
+            const monthStart = startOfMonth(currentMonth);
+            const monthEnd = endOfMonth(currentMonth);
+            await store.loadTasksForDateRange(monthStart, monthEnd);
           }}
         />
       )}

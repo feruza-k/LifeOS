@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { useMemo } from "react";
+import { cn } from "@/lib/utils";
 
 const morningGreetings = [
   "Good morning. Let's align your actions with your future self.",
@@ -32,13 +33,23 @@ function getGreeting(): string {
   return greetings[randomIndex];
 }
 
-export function Header() {
+interface HeaderProps {
+  onTitleClick?: () => void;
+}
+
+export function Header({ onTitleClick }: HeaderProps) {
   const today = new Date();
   const greeting = useMemo(() => getGreeting(), []);
 
   return (
     <header className="px-2 pt-2 pb-2 animate-fade-in text-left">
-      <h1 className="text-2xl text-foreground mt-1 font-sans font-semibold">
+      <h1 
+        onClick={onTitleClick}
+        className={cn(
+          "text-2xl text-foreground mt-1 font-sans font-semibold",
+          onTitleClick && "cursor-pointer hover:opacity-80 transition-opacity"
+        )}
+      >
         Today, {format(today, "MMM d")}
       </h1>
       <p className="text-sm text-muted-foreground font-sans mt-1 leading-relaxed">

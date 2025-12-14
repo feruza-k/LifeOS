@@ -31,16 +31,6 @@
             "notes": null
         },
         {
-            "id": "1d00813a-2bf3-4f76-b0be-6f41063f3c0a",
-            "type": "event",
-            "title": "gym",
-            "date": "2025-12-14",
-            "time": "10:00",
-            "datetime": "2025-12-14 10:00",
-            "category": "health",
-            "notes": "after work"
-        },
-        {
             "id": "56653fab-ed6d-4d24-8e52-86e253056fa9",
             "type": "event",
             "title": "gym",
@@ -133,7 +123,7 @@
         {
             "id": "da419da2-a088-4564-a3fc-a7dbe74020c9",
             "type": "event",
-            "title": "work",
+            "title": "Work",
             "date": "2025-12-08",
             "time": "09:00",
             "datetime": "2025-12-08 09:00",
@@ -208,7 +198,7 @@
         {
             "id": "e759e927-3e4a-48a1-837b-bf7b496d4733",
             "type": "event",
-            "title": "work from home",
+            "title": "Work",
             "date": "2025-12-09",
             "time": "09:00",
             "datetime": "2025-12-09 09:00",
@@ -229,7 +219,7 @@
             "datetime": "2025-12-09 20:00",
             "duration_minutes": 120,
             "end_datetime": "2025-12-09 22:00",
-            "category": "work",
+            "category": "growth",
             "notes": null,
             "completed": false,
             "energy": null,
@@ -314,7 +304,7 @@
             "title": "LifeOS: Today Screen",
             "date": "2025-12-12",
             "time": "17:00",
-            "completed": true,
+            "completed": false,
             "category": "personal",
             "duration_minutes": 300,
             "end_datetime": "2025-12-12 22:00",
@@ -326,7 +316,7 @@
             "title": "Work",
             "date": "2025-12-12",
             "time": "09:00",
-            "completed": true,
+            "completed": false,
             "category": "work",
             "duration_minutes": 480,
             "end_datetime": "2025-12-12 17:00",
@@ -375,6 +365,100 @@
             "category": "health",
             "id": "f180e0dc-91ea-4e2c-a962-bd6437436bef",
             "created_at": "2025-12-13T22:38:37.478150"
+        },
+        {
+            "type": "event",
+            "title": "Groceries",
+            "date": "2025-12-14",
+            "time": null,
+            "completed": true,
+            "category": "health",
+            "id": "c9e82d4c-d801-42a3-9197-9b557763c813",
+            "created_at": "2025-12-14T14:09:31.694166"
+        },
+        {
+            "type": "event",
+            "title": "Work",
+            "date": "2025-12-10",
+            "time": "09:00",
+            "completed": false,
+            "category": "work",
+            "duration_minutes": 480,
+            "end_datetime": "2025-12-10 17:00",
+            "id": "3593889b-be37-497b-8922-ecf6961c88fe",
+            "created_at": "2025-12-14T19:29:06.454143"
+        },
+        {
+            "type": "event",
+            "title": "LifeOS Development",
+            "date": "2025-12-13",
+            "time": "16:00",
+            "completed": false,
+            "category": "personal",
+            "duration_minutes": 300,
+            "end_datetime": "2025-12-13 21:00",
+            "id": "7fbece6d-790e-4385-be55-80dc5587e946",
+            "created_at": "2025-12-14T19:30:21.274565"
+        },
+        {
+            "type": "event",
+            "title": "Meet Anna",
+            "date": "2025-12-14",
+            "time": "16:00",
+            "completed": false,
+            "category": "creativity",
+            "duration_minutes": 120,
+            "end_datetime": "2025-12-14 18:00",
+            "id": "2cb54ae1-bf15-481f-9f97-66ad89c2312b",
+            "created_at": "2025-12-14T19:31:19.463694"
+        },
+        {
+            "type": "event",
+            "title": "Learn LLM",
+            "date": "2025-12-13",
+            "time": "14:00",
+            "completed": false,
+            "category": "growth",
+            "duration_minutes": 90,
+            "end_datetime": "2025-12-13 15:30",
+            "id": "e9a5e9e2-8b74-4d89-96bc-abd76cc20d3c",
+            "created_at": "2025-12-14T19:32:44.923709"
+        },
+        {
+            "type": "event",
+            "title": "Gym",
+            "date": "2025-12-08",
+            "time": "17:10",
+            "completed": false,
+            "category": "health",
+            "duration_minutes": 79,
+            "end_datetime": "2025-12-08 18:29",
+            "id": "9cd1e3ef-af96-4de8-b1ea-28e6c1f9e7e3",
+            "created_at": "2025-12-14T19:33:22.885650"
+        },
+        {
+            "type": "event",
+            "title": "LifeOS Development",
+            "date": "2025-12-14",
+            "time": "11:00",
+            "completed": false,
+            "category": "health",
+            "duration_minutes": 120,
+            "end_datetime": "2025-12-14 13:00",
+            "id": "c9e80af3-3543-4b90-9575-3894e8609fe7",
+            "created_at": "2025-12-14T19:34:53.689598"
+        },
+        {
+            "type": "event",
+            "title": "Family Call",
+            "date": "2025-12-14",
+            "time": "09:00",
+            "completed": false,
+            "category": "family",
+            "duration_minutes": 60,
+            "end_datetime": "2025-12-14 10:00",
+            "id": "84f1bed1-9d7a-467a-a963-827926c19b9f",
+            "created_at": "2025-12-14T19:35:37.827010"
         }
     ],
     "diary": [
@@ -422,6 +506,19 @@
             "note": "Feeling better today after being sick with a flu the whole week, but still low energy.",
             "id": "40b0c413-d8fd-4ea0-b993-2af993261d2a",
             "timestamp": "2025-12-12T22:02:03.352515"
+        },
+        {
+            "date": "2025-12-14",
+            "completedTaskIds": [
+                "c9e82d4c-d801-42a3-9197-9b557763c813"
+            ],
+            "incompleteTaskIds": [
+                "43a74429-4736-4587-8e00-317524feb82d"
+            ],
+            "movedTasks": [],
+            "note": "",
+            "id": "1e5a1ef1-052d-4275-bd77-29595eea6fec",
+            "timestamp": "2025-12-14T14:29:25.753475"
         }
     ],
     "reminders": [
@@ -430,7 +527,8 @@
             "dueDate": "2025-12-14",
             "visible": true,
             "id": "90c832b4-b7a6-4d82-8057-13914a674d6f",
-            "createdAt": "2025-12-13T21:20:32.893729"
+            "createdAt": "2025-12-13T21:20:32.893729",
+            "type": "show"
         },
         {
             "title": "Book GP appointment",
@@ -460,27 +558,32 @@
         {
             "id": "health",
             "label": "Health",
-            "color": "#4CAF50"
+            "color": "#C7DED5"
         },
         {
             "id": "growth",
             "label": "Growth",
-            "color": "#0066FF"
+            "color": "#C9DCEB"
         },
         {
             "id": "family",
             "label": "Family",
-            "color": "#FF66AA"
+            "color": "#FFF5E0"
         },
         {
             "id": "work",
             "label": "Work",
-            "color": "#00C8FF"
+            "color": "#F0E0D6"
         },
         {
             "id": "creativity",
-            "label": "Creativity",
-            "color": "#FFCC00"
+            "label": "Social",
+            "color": "#F4D6E4"
+        },
+        {
+            "label": "Chores",
+            "color": "#F0E0D6",
+            "id": "3b68dce9-93e9-484c-92dd-2347cb82be38"
         }
     ]
 }

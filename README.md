@@ -20,6 +20,7 @@
   - [Day 11: Today View UI Alignment & Backend Sync](#day-11-today-view-ui-alignment--backend-sync-dec-11-2025)
   - [Day 12: Check-In System & Energy Status](#day-12-check-in-system--energy-status-dec-12-2025)
   - [Day 13: Reminders & Settings](#day-13-reminders--settings-dec-13-2025)
+  - [Day 14: Calendar View (Month & Week)](#day-14-calendar-view-month--week-dec-14-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1128,7 +1129,83 @@ LifeOS now handles **remembering**, **showing**, and **configuring** in a calm, 
 
 ---
 
-## **Next**
-- Final Today & Calendar polish  
-- Explore v0 (read-only insights)  
-- Start layering assistant intelligence  
+
+### Day 14: Calendar View (Month & Week)
+
+Day 14 focused on implementing LifeOS’s **Calendar system**, introducing fully functional **Month** and **Week** views backed by efficient date-range loading. This completes the core planning layer and moves LifeOS closer to a true personal operating system.
+
+---
+
+#### What Was Built
+
+##### Calendar Views
+- **Month View** — high-level overview and pattern recognition
+- **Week View** — time-based execution and scheduling (scheduled tasks only)
+
+
+#### Backend
+
+##### New Endpoint
+**GET `/tasks/calendar?start={start}&end={end}`**
+- Returns all tasks within a date range
+- Optimised for month/week calendar loading
+- Reduces per-day API calls
+
+Existing endpoints reused for categories, notes, and check-ins.
+
+
+#### Frontend
+
+##### Core Page
+**`Calendar.tsx`**
+- Month / Week toggle
+- Date navigation (buttons + swipe)
+- Date-range task loading
+- Category filtering
+
+##### Month View
+**`MonthCalendar.tsx`**
+- Grid-based monthly layout
+- Colored task blocks with truncation (`+N more`)
+- Today highlighted with subtle border
+- Category filtering
+- Swipe to change month
+
+##### Week View
+**`WeekScheduleView.tsx`**
+- Time grid (6:00–21:00)
+- **Scheduled tasks only**
+- Tasks positioned and sized by duration
+- Today column emphasis
+- Swipe to change week
+
+##### Category Filters
+**`CalendarFilters.tsx`**
+- Collapsible filter UI (default collapsed)
+- Multi-select category pills
+- Filter state persisted in localStorage
+
+
+#### State & Data Flow
+
+- Added `loadTasksForDateRange()` to Zustand store
+- Cached task merging to avoid duplicates
+- Single API call per month/week for performance
+
+
+---
+
+#### Reflection
+
+LifeOS now has a **scalable, performant calendar** that supports both long-term planning and daily execution, built on deterministic logic and ready for future intelligence layers.
+
+---
+
+## Next Steps
+
+- Enable **task interactions** directly from the calendar:
+  - View task details
+  - Edit tasks
+  - Delete tasks
+  - Add new tasks from both Month and Week views
+- Prepare calendar UI for Assistant integration

@@ -5,6 +5,7 @@ import { ValueType } from "@/components/lifeos/ValueTag";
 import { Category } from "@/types/lifeos";
 import { cn } from "@/lib/utils";
 import { useSwipeable } from "react-swipeable";
+import { QuickTaskModal } from "./QuickTaskModal";
 
 interface CalendarTask extends Task {
   date?: string;
@@ -17,6 +18,9 @@ interface WeekScheduleViewProps {
   onToggleTask: (id: string) => void;
   onWeekChange: (date: Date) => void;
   categories: Category[];
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void;
+  onDeleteTask?: (id: string) => void;
+  onAddTask?: (task: { title: string; time?: string; endTime?: string; value: ValueType; date: string }) => void;
 }
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
@@ -29,8 +33,13 @@ export function WeekScheduleView({
   onToggleTask,
   onWeekChange,
   categories,
+  onUpdateTask,
+  onDeleteTask,
+  onAddTask,
 }: WeekScheduleViewProps) {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [quickAddTime, setQuickAddTime] = useState<{ date: string; time: string } | null>(null);
 
   // Get category color by id
   const getCategoryColor = (categoryId: string): string => {
@@ -69,23 +78,44 @@ export function WeekScheduleView({
     };
   };
 
-  // Get tasks for a specific date
+  // Calculate time from click position in hour block
+  const getTimeFromClick = (hour: number, clickY: number, blockHeight: number): string => {
+    const hourStart = hour - 6;
+    const percentInHour = (clickY / blockHeight);
+    const minutes = Math.round(percentInHour * 60);
+    const totalMinutes = hourStart * 60 + minutes;
+    const finalHour = Math.floor(totalMinutes / 60) + 6;
+    const finalMins = totalMinutes % 60;
+    return `${finalHour.toString().padStart(2, "0")}:${finalMins.toString().padStart(2, "0")}`;
+  };
+
+  // Calculate end time (1 hour after start)
+  const calculateEndTime = (startTime: string): string => {
+    const [hours, minutes] = startTime.split(":").map(Number);
+    const totalMinutes = hours * 60 + minutes + 60;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMins = totalMinutes % 60;
+    return `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`;
+  };
+
+  // Get tasks for a specific date (Week View = Scheduled Tasks Only)
   const getTasksForDate = (dateStr: string) => {
     const allTasks = tasks.filter(
       (task) =>
         task.date === dateStr &&
         task.value &&
-        selectedCategories.includes(task.value as ValueType)
+        selectedCategories.includes(task.value as ValueType) &&
+        task.time && // Only scheduled tasks in Week view
+        task.endTime // Must have both time and endTime (duration)
     );
     
-    // Separate scheduled and anytime tasks
-    const scheduled = allTasks.filter(t => t.time).sort((a, b) => {
+    // Only scheduled tasks - sorted by time
+    const scheduled = allTasks.sort((a, b) => {
       if (!a.time || !b.time) return 0;
       return a.time.localeCompare(b.time);
     });
-    const anytime = allTasks.filter(t => !t.time);
     
-    return { scheduled, anytime };
+    return { scheduled, anytime: [] }; // No anytime tasks in Week view
   };
 
   // Legacy function - keeping for reference but not using
@@ -128,7 +158,7 @@ export function WeekScheduleView({
   return (
     <div {...handlers} className="px-2 animate-slide-up">
       {/* Week Header */}
-      <div className="grid grid-cols-8 gap-0.5 mb-1">
+      <div className="grid grid-cols-[3rem_repeat(7,1fr)] gap-0.5 mb-1">
         <div className="text-[10px] text-muted-foreground font-sans text-center py-1"></div>
         {weekDays.map((day, i) => (
           <div
@@ -155,14 +185,14 @@ export function WeekScheduleView({
       </div>
 
       {/* Schedule Grid */}
-      <div className="relative bg-card rounded-xl border border-border/50 overflow-hidden">
-        <div className="grid grid-cols-8 gap-0.5">
+      <div className="relative bg-card border border-border/50 overflow-hidden">
+        <div className="grid grid-cols-[3rem_repeat(7,1fr)] gap-0.5">
           {/* Time Column */}
           <div className="border-r border-border/30">
             {HOURS.map((hour) => (
               <div
                 key={hour}
-                className="h-10 flex items-start justify-end pr-1 pt-0.5"
+                className="h-10 flex items-start justify-end pr-0.5 pt-0.5"
               >
                 <span className="text-[9px] text-muted-foreground font-sans">
                   {hour}:00
@@ -190,19 +220,53 @@ export function WeekScheduleView({
                 key={day.fullDate}
                 className={cn(
                   "relative border-r border-border/20 last:border-r-0",
-                  day.isToday && "bg-primary/5"
+                  day.isToday && "border-l-2 border-l-primary/30"
                 )}
               >
                 {/* Hour lines */}
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
-                    className="h-10 border-b border-border/10"
+                    className="h-10 border-b border-border/10 pointer-events-none"
                   />
                 ))}
 
+                {/* Clickable backdrop for adding tasks on empty blocks */}
+                {onAddTask && (
+                  <div
+                    className="absolute inset-0 z-0 cursor-pointer"
+                    onClick={(e) => {
+                      // Don't trigger if clicking on a task
+                      const target = e.target as HTMLElement;
+                      if (target.closest('[data-task-block]')) {
+                        return;
+                      }
+                      
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const clickY = e.clientY - rect.top;
+                      const clickPercent = (clickY / rect.height) * 100;
+                      const totalMinutes = (clickPercent / 100) * (16 * 60);
+                      const hour = Math.floor(totalMinutes / 60) + 6;
+                      const minutes = Math.round(totalMinutes % 60);
+                      
+                      // Snap to nearest 15-minute interval for better UX
+                      const snappedMinutes = Math.round(minutes / 15) * 15;
+                      const finalHour = hour + Math.floor(snappedMinutes / 60);
+                      const finalMins = snappedMinutes % 60;
+                      
+                      const time = `${finalHour.toString().padStart(2, "0")}:${finalMins.toString().padStart(2, "0")}`;
+                      
+                      setQuickAddTime({ date: day.fullDate, time });
+                    }}
+                    onMouseEnter={(e) => {
+                      const target = e.currentTarget;
+                      target.classList.add('hover:bg-primary/5');
+                    }}
+                  />
+                )}
+
                 {/* Scheduled Tasks */}
-                <div className="absolute inset-0">
+                <div className="absolute inset-0 z-10 pointer-events-none">
                   {scheduled.map((task) => {
                     const duration = getDuration(task);
                     const style = getTaskStyle(task.time!, duration);
@@ -210,20 +274,26 @@ export function WeekScheduleView({
                     return (
                       <button
                         key={task.id}
-                        onClick={() => onToggleTask(task.id)}
+                        data-task-block
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTask(task);
+                        }}
                         style={{ 
                           top: style.top, 
                           height: style.height,
-                          backgroundColor: hexToRgba(categoryColor, 0.6),
+                          backgroundColor: hexToRgba(categoryColor, 0.9),
                           opacity: task.completed ? 0.5 : 1
                         }}
                         className={cn(
-                          "absolute left-0.5 right-0.5 rounded px-0.5 py-0.5 overflow-hidden transition-all"
+                          "absolute left-0.5 right-0.5 rounded px-1 py-1 overflow-hidden transition-all flex items-start text-left",
+                          "hover:opacity-90 active:scale-[0.98] pointer-events-auto"
                         )}
                       >
                         <p className={cn(
-                          "text-[8px] font-sans font-medium text-foreground truncate leading-tight",
-                          task.completed && "line-through"
+                          "text-[9px] font-sans font-medium text-foreground leading-tight break-words",
+                          task.completed && "line-through opacity-70",
+                          "line-clamp-3"
                         )}>
                           {task.title}
                         </p>
@@ -241,48 +311,57 @@ export function WeekScheduleView({
         Swipe left/right to change week
       </p>
 
-      {/* Anytime Tasks Section */}
-      {weekDays.some(day => {
-        const { anytime } = getTasksForDate(day.fullDate);
-        return anytime.length > 0;
-      }) && (
-        <div className="mt-4 space-y-3">
-          <h3 className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide px-2">
-            Anytime
-          </h3>
-          <div className="grid grid-cols-7 gap-2">
-            {weekDays.map((day) => {
-              const { anytime } = getTasksForDate(day.fullDate);
-              return (
-                <div key={day.fullDate} className="space-y-1">
-                  {anytime.map((task) => {
-                    const categoryColor = getCategoryColor(task.value);
-                    return (
-                      <button
-                        key={task.id}
-                        onClick={() => onToggleTask(task.id)}
-                        style={{
-                          backgroundColor: hexToRgba(categoryColor, 0.6),
-                          opacity: task.completed ? 0.5 : 1
-                        }}
-                        className={cn(
-                          "w-full p-2 rounded-lg text-left transition-all"
-                        )}
-                      >
-                        <p className={cn(
-                          "text-[9px] font-sans font-medium text-foreground truncate",
-                          task.completed && "line-through"
-                        )}>
-                          {task.title}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* Quick Task Modal for editing */}
+      {editingTask && onUpdateTask && (
+        <QuickTaskModal
+          isOpen={!!editingTask}
+          onClose={() => setEditingTask(null)}
+          task={editingTask}
+          date={editingTask.date || format(selectedDate, "yyyy-MM-dd")}
+          categories={categories.map(cat => ({
+            value: cat.id as ValueType,
+            label: cat.label,
+            color: cat.color,
+          }))}
+          onSave={(updates) => {
+            if (editingTask) {
+              onUpdateTask(editingTask.id, updates);
+              setEditingTask(null);
+            }
+          }}
+          onDelete={onDeleteTask && editingTask ? () => {
+            onDeleteTask(editingTask.id);
+            setEditingTask(null);
+          } : undefined}
+        />
+      )}
+
+      {/* Quick Task Modal for adding */}
+      {quickAddTime && onAddTask && (
+        <QuickTaskModal
+          isOpen={!!quickAddTime}
+          onClose={() => setQuickAddTime(null)}
+          task={null}
+          date={quickAddTime.date}
+          initialTime={quickAddTime.time}
+          categories={categories.map(cat => ({
+            value: cat.id as ValueType,
+            label: cat.label,
+            color: cat.color,
+          }))}
+          onSave={(updates) => {
+            if (updates.title) {
+              onAddTask({
+                title: updates.title,
+                time: updates.time || quickAddTime.time,
+                endTime: updates.endTime || calculateEndTime(updates.time || quickAddTime.time),
+                value: updates.value || categories[0]?.id as ValueType,
+                date: quickAddTime.date,
+              });
+              setQuickAddTime(null);
+            }
+          }}
+        />
       )}
     </div>
   );
