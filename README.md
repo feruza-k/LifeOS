@@ -21,7 +21,7 @@
   - [Day 12: Check-In System & Energy Status](#day-12-check-in-system--energy-status-dec-12-2025)
   - [Day 13: Reminders & Settings](#day-13-reminders--settings-dec-13-2025)
   - [Day 14: Calendar View (Month & Week)](#day-14-calendar-view-month--week-dec-14-2025)
-  - [Day 15: Calendar Quick Views & Task Interaction Layer](#day-15-calendar-quick-views--task-interaction-layer-dec-15-2025)
+  - [Day 15: Calendar Quick Views & Task Interaction Layer](#day-15--calendar-quick-views--task-interaction-layer-dec-15-2025)
 - [Next Steps](#next-steps)
 
 
