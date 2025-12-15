@@ -1269,7 +1269,6 @@ Most importantly, the system remains deterministic and predictable, which is cri
 ---
 
 ## **Next Steps**
-- Refine calendar interaction edge cases and polish UX
 - Introduce authentication and user identity
 - Prepare calendar and task flows for Assistant integration
 
