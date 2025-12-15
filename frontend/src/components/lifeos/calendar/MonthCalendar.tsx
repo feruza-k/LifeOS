@@ -132,7 +132,7 @@ export function MonthCalendar({
                   style={{
                     backgroundColor: isSelected 
                       ? "rgba(255, 255, 255, 0.2)" 
-                      : hexToRgba(categoryColor, 0.6),
+                      : hexToRgba(categoryColor, 0.4),
                     color: isSelected ? undefined : "inherit"
                   }}
                 >

@@ -459,6 +459,136 @@
             "end_datetime": "2025-12-14 10:00",
             "id": "84f1bed1-9d7a-467a-a963-827926c19b9f",
             "created_at": "2025-12-14T19:35:37.827010"
+        },
+        {
+            "type": "event",
+            "title": "Work",
+            "date": "2025-12-15",
+            "time": "09:00",
+            "completed": true,
+            "category": "work",
+            "duration_minutes": 480,
+            "end_datetime": "2025-12-15 17:00",
+            "id": "fb6c3a7a-f465-49c6-b396-7908faaab0cb",
+            "created_at": "2025-12-15T18:30:08.251495"
+        },
+        {
+            "type": "event",
+            "title": "Work",
+            "date": "2025-12-16",
+            "time": "09:00",
+            "completed": false,
+            "category": "work",
+            "duration_minutes": 480,
+            "end_datetime": "2025-12-16 17:00",
+            "id": "b83774a5-1932-481c-b336-d894b2906ecc",
+            "created_at": "2025-12-15T18:30:08.255043"
+        },
+        {
+            "type": "event",
+            "title": "Work",
+            "date": "2025-12-17",
+            "time": "09:00",
+            "completed": false,
+            "category": "work",
+            "duration_minutes": 480,
+            "end_datetime": "2025-12-17 17:00",
+            "id": "683fe765-dd36-48ae-8d04-8660e1316d39",
+            "created_at": "2025-12-15T18:30:08.257215"
+        },
+        {
+            "type": "event",
+            "title": "Work",
+            "date": "2025-12-18",
+            "time": "09:00",
+            "completed": false,
+            "category": "work",
+            "duration_minutes": 480,
+            "end_datetime": "2025-12-18 17:00",
+            "id": "68f29ec1-17d9-4333-b8b3-f152eb3de8f8",
+            "created_at": "2025-12-15T18:30:08.259193"
+        },
+        {
+            "type": "event",
+            "title": "Work",
+            "date": "2025-12-19",
+            "time": "09:00",
+            "completed": false,
+            "category": "work",
+            "duration_minutes": 480,
+            "end_datetime": "2025-12-19 17:00",
+            "id": "b5939ada-391e-47fa-b0d0-bff5f23a8350",
+            "created_at": "2025-12-15T18:30:08.261182"
+        },
+        {
+            "type": "event",
+            "title": "Gym",
+            "date": "2025-12-15",
+            "time": "17:15",
+            "completed": true,
+            "category": "health",
+            "duration_minutes": 45,
+            "end_datetime": "2025-12-15 18:00",
+            "id": "90d5a61f-6564-452b-b66f-5bac2ced86e2",
+            "created_at": "2025-12-15T18:33:16.795891"
+        },
+        {
+            "type": "event",
+            "title": "Gym",
+            "date": "2025-12-17",
+            "time": "17:15",
+            "completed": false,
+            "category": "health",
+            "duration_minutes": 45,
+            "end_datetime": "2025-12-17 18:00",
+            "id": "05ac45c6-1806-454f-97e7-c6f6d1bb9f3a",
+            "created_at": "2025-12-15T18:33:16.800976"
+        },
+        {
+            "type": "event",
+            "title": "Gym",
+            "date": "2025-12-19",
+            "time": "17:15",
+            "completed": false,
+            "category": "health",
+            "duration_minutes": 45,
+            "end_datetime": "2025-12-19 18:00",
+            "id": "cab16c32-a91a-4091-bc46-e6ba59190333",
+            "created_at": "2025-12-15T18:33:16.804655"
+        },
+        {
+            "type": "event",
+            "title": "Gym",
+            "date": "2025-12-20",
+            "time": "17:15",
+            "completed": false,
+            "category": "health",
+            "duration_minutes": 45,
+            "end_datetime": "2025-12-20 18:00",
+            "id": "e7dbca19-4e4d-41c5-bed2-26aa6a2075fb",
+            "created_at": "2025-12-15T18:33:16.812664"
+        },
+        {
+            "type": "event",
+            "title": "LifeOS Development",
+            "date": "2025-12-15",
+            "time": "19:00",
+            "completed": false,
+            "category": "personal",
+            "duration_minutes": 180,
+            "end_datetime": "2025-12-15 22:00",
+            "id": "0638aca1-d138-44ac-b0f5-9c809c0a5e9b",
+            "created_at": "2025-12-15T18:38:00.261836"
+        },
+        {
+            "type": "event",
+            "title": "Read a book",
+            "date": "2025-12-15",
+            "time": null,
+            "completed": true,
+            "category": "personal",
+            "id": "350a51c4-00cc-49f1-bf95-113cafe6c543",
+            "created_at": "2025-12-15T18:38:40.412276"
         }
     ],
     "diary": [
@@ -491,7 +621,23 @@
             }
         }
     },
-    "notes": [],
+    "notes": [
+        {
+            "date": "2025-12-16",
+            "content": "Hey, it was very productive",
+            "createdAt": "2025-12-15T11:53:11.826Z",
+            "updatedAt": "2025-12-15T11:53:11.826Z",
+            "id": "ac269b38-2587-4356-833b-56d5ed3078c8"
+        },
+        {
+            "date": "2025-12-15",
+            "content": "Feel tired a bit and out of energy.",
+            "photo": null,
+            "createdAt": "2025-12-15T18:40:21.919Z",
+            "updatedAt": "2025-12-15T18:40:21.919Z",
+            "id": "f4c65eba-0c50-45cf-afe0-0190849b8672"
+        }
+    ],
     "checkins": [
         {
             "date": "2025-12-12",
@@ -551,6 +697,14 @@
             "id": "9dbb02b8-f620-4317-b20a-78f3081b5c18",
             "createdAt": "2025-12-13T22:02:41.136358",
             "type": "show"
+        },
+        {
+            "title": "Julia\u2019 BD \ud83c\udf89",
+            "dueDate": "2025-12-17",
+            "type": "show",
+            "visible": true,
+            "id": "dfe0dbd6-748c-4378-894d-a8bf103315e0",
+            "createdAt": "2025-12-15T15:18:32.578253"
         }
     ],
     "monthly_focus": [],
@@ -558,27 +712,27 @@
         {
             "id": "health",
             "label": "Health",
-            "color": "#C7DED5"
+            "color": "#A2C1A8"
         },
         {
             "id": "growth",
             "label": "Growth",
-            "color": "#C9DCEB"
+            "color": "#A5BBC6"
         },
         {
             "id": "family",
             "label": "Family",
-            "color": "#FFF5E0"
+            "color": "#BF9CA6"
         },
         {
             "id": "work",
             "label": "Work",
-            "color": "#F0E0D6"
+            "color": "#D4C2B4"
         },
         {
             "id": "creativity",
             "label": "Social",
-            "color": "#F4D6E4"
+            "color": "#B6A8C7"
         },
         {
             "label": "Chores",

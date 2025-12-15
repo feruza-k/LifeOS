@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 14, 2025
+**Current Date:** December 15, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -21,6 +21,7 @@
   - [Day 12: Check-In System & Energy Status](#day-12-check-in-system--energy-status-dec-12-2025)
   - [Day 13: Reminders & Settings](#day-13-reminders--settings-dec-13-2025)
   - [Day 14: Calendar View (Month & Week)](#day-14-calendar-view-month--week-dec-14-2025)
+  - [Day 15: Calendar Quick Views & Task Interaction Layer](#day-15-calendar-quick-views--task-interaction-layer-dec-15-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1193,19 +1194,84 @@ Existing endpoints reused for categories, notes, and check-ins.
 - Single API call per month/week for performance
 
 
----
-
 #### Reflection
 
 LifeOS now has a **scalable, performant calendar** that supports both long-term planning and daily execution, built on deterministic logic and ready for future intelligence layers.
 
 ---
 
-## Next Steps
 
-- Enable **task interactions** directly from the calendar:
-  - View task details
-  - Edit tasks
-  - Delete tasks
-  - Add new tasks from both Month and Week views
-- Prepare calendar UI for Assistant integration
+
+### **Day 15** : Calendar Quick Views & Task Interaction Layer (Dec 15, 2025)
+
+Day 15 focused on turning the calendar from a read-only planning surface into an **interactive execution layer**.  
+The goal was to make Month and Week views usable in real workflows while keeping the system deterministic, calm, and performant.
+
+This work intentionally prioritised **interaction patterns, state flow, and consistency** over visual novelty.
+
+
+#### **Month View — Day Quick View**
+A dedicated **Day Modal** was introduced for Month view to support fast inspection and edits without navigating away.
+
+**Key behaviour**
+- Tasks ordered by priority: scheduled → anytime
+- Completion progress indicator (completed / total)
+- Quick task creation from the modal
+- Category colours reduced to subtle left accents to avoid visual overload
+- Swipeable tabs: **Tasks** and **Photo & Notes**
+
+**Context-aware rendering**
+- Past days: notes + friendly photo placeholder (no uploads)
+- Today: full functionality (tasks, notes, photo upload)
+- Future days: tasks only (progressive disclosure)
+
+This keeps the modal lightweight while still functional.
+
+
+#### **Week View — Direct Task Interaction**
+The Week view now supports **direct task manipulation**, aligned with execution-focused use.
+
+- Tap empty time slot → open task modal (scheduled by default)
+- Single tap task → edit
+- Double tap task → toggle completion
+- Only scheduled tasks rendered (Anytime tasks intentionally excluded)
+
+This keeps the timetable readable and avoids mixing intent-based tasks with time-bound execution.
+
+
+#### **Unified Task Modal**
+A single `AddTaskModal` now handles both **creation and editing**, reused across Month, Week, and Today views.
+
+**Features**
+- Anytime / Scheduled toggle
+- Start time + duration with quick presets
+- Automatic end-time calculation
+- Recurring configuration (weekly, period, custom)
+- Reactive category selection from global store
+
+Repeat logic is handled server-side to keep frontend state predictable.
+
+
+#### **Backend & Data Layer**
+- Added repeat configuration support to task creation flow
+- Deterministic task instance generation for recurring rules
+- Photo uploads stored on filesystem with JSON references
+- Notes model simplified to support a single photo attachment
+- Validation and graceful fallbacks for dates and files
+
+
+#### **Reflection**
+This layer makes the calendar **practically usable**, not just visually complete.  
+There are still areas to refine — especially around edge cases, interaction polish, and minor UX inconsistencies — but the core interaction model now feels solid enough for daily use.
+
+Most importantly, the system remains deterministic and predictable, which is critical if LifeOS is going to scale beyond a personal project.
+
+---
+
+## **Next Steps**
+- Refine calendar interaction edge cases and polish UX
+- Introduce authentication and user identity
+- Prepare calendar and task flows for Assistant integration
+
+LifeOS is gradually shifting from a planning tool to something I can realistically operate my day from.
+

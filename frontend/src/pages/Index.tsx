@@ -174,7 +174,7 @@ const Index = () => {
     }
   }, [showReminders.length, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddTask = (task: { title: string; time?: string; endTime?: string; value: any; date: string }) => {
+  const handleAddTask = (task: { title: string; time?: string; endTime?: string; value: any; date: string; repeat?: any }) => {
     store.addTask({
       title: task.title,
       time: task.time,
@@ -182,6 +182,7 @@ const Index = () => {
       value: task.value,
       date: task.date,
       completed: false,
+      repeat: task.repeat,
     });
   };
 

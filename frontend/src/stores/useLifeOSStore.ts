@@ -33,7 +33,7 @@ interface LifeOSStore {
   deleteReminder: (id: string) => Promise<void>;
   loadNote: (date: string) => Promise<any>;
   getNoteForDate: (date: Date | string) => any;
-  saveNote: (date: Date | string, content: string) => Promise<any>;
+  saveNote: (noteData: { date: string; content: string; photo?: { filename: string; uploadedAt: string } | null } | Date | string, content?: string) => Promise<any>;
   loadCheckIn: (date: string) => Promise<void>;
   saveCheckIn: (
     date: Date | string,
@@ -244,16 +244,26 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
     return get().note;
   },
 
-  saveNote: async (date: Date | string, content: string) => {
+  saveNote: async (noteDataOrDate: { date: string; content: string; photo?: { filename: string; uploadedAt: string } | null } | Date | string, content?: string) => {
     try {
-      const dateStr = typeof date === "string" ? date : date.toISOString().slice(0, 10);
-      const noteData = {
-        date: dateStr,
-        content,
+      let noteData: { date: string; content: string; photo?: { filename: string; uploadedAt: string } | null };
+      
+      // Handle both old signature (date, content) and new signature (noteData object)
+      if (typeof noteDataOrDate === "object" && "date" in noteDataOrDate) {
+        noteData = noteDataOrDate;
+      } else {
+        const dateStr = typeof noteDataOrDate === "string" ? noteDataOrDate : noteDataOrDate.toISOString().slice(0, 10);
+        noteData = {
+          date: dateStr,
+          content: content || "",
+        };
+      }
+      
+      const saved = await api.saveNote({
+        ...noteData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      };
-      const saved = await api.saveNote(noteData);
+      });
       set({ note: saved });
       return saved;
     } catch (error) {

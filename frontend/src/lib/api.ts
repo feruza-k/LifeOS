@@ -76,6 +76,43 @@ export const api = {
       body: JSON.stringify(note),
     }),
 
+  // --- Photos ---
+  uploadPhoto: async (file: File, date: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const url = `${BASE_URL}/photos/upload?date=${date}`;
+    console.log(`🌐 API Request: POST ${url}`);
+    
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        body: formData,
+      });
+      
+      console.log(`✅ API Response: ${res.status} /photos/upload`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ API ERROR:", res.status, "/photos/upload", errorText);
+        throw new Error(`API error ${res.status}: ${errorText}`);
+      }
+      return res.json();
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        console.error("❌ Network error - is the backend running?", error);
+        throw new Error(`Cannot connect to backend at ${BASE_URL}. Make sure it's running.`);
+      }
+      throw error;
+    }
+  },
+
+  getPhotoUrl: (filename: string) => `${BASE_URL}/photos/${filename}`,
+
+  deletePhoto: (filename: string, date: string) =>
+    request(`/photos/${filename}?date=${date}`, {
+      method: "DELETE",
+    }),
+
   // --- Check-ins ---
   getCheckIn: (date: string) =>
     request(`/checkins?date=${date}`),

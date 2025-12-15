@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { Task } from "@/components/lifeos/TaskItem";
 import { ValueType } from "@/components/lifeos/ValueTag";
 import { Category } from "@/types/lifeos";
 import { cn } from "@/lib/utils";
 import { useSwipeable } from "react-swipeable";
-import { QuickTaskModal } from "./QuickTaskModal";
+import { AddTaskModal } from "../AddTaskModal";
 
 interface CalendarTask extends Task {
   date?: string;
@@ -40,6 +40,17 @@ export function WeekScheduleView({
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [quickAddTime, setQuickAddTime] = useState<{ date: string; time: string } | null>(null);
+  const [lastTap, setLastTap] = useState<{ taskId: string; time: number } | null>(null);
+  const [tapTimeout, setTapTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tapTimeout) {
+        clearTimeout(tapTimeout);
+      }
+    };
+  }, [tapTimeout]);
 
   // Get category color by id
   const getCategoryColor = (categoryId: string): string => {
@@ -277,17 +288,46 @@ export function WeekScheduleView({
                         data-task-block
                         onClick={(e) => {
                           e.stopPropagation();
-                          setEditingTask(task);
+                          const now = Date.now();
+                          
+                          // Clear any existing timeout
+                          if (tapTimeout) {
+                            clearTimeout(tapTimeout);
+                            setTapTimeout(null);
+                          }
+                          
+                          // Check for double tap (within 250ms)
+                          if (lastTap && lastTap.taskId === task.id && now - lastTap.time < 250) {
+                            // Double tap - toggle completion
+                            onToggleTask(task.id);
+                            setLastTap(null);
+                            setTapTimeout(null);
+                          } else {
+                            // Single tap - set timer to open edit modal
+                            setLastTap({ taskId: task.id, time: now });
+                            const timeout = setTimeout(() => {
+                              // Only open if this is still the last tap
+                              setLastTap((prev) => {
+                                if (prev && prev.taskId === task.id) {
+                                  setEditingTask(task);
+                                  return null;
+                                }
+                                return prev;
+                              });
+                              setTapTimeout(null);
+                            }, 250);
+                            setTapTimeout(timeout);
+                          }
                         }}
                         style={{ 
                           top: style.top, 
                           height: style.height,
-                          backgroundColor: hexToRgba(categoryColor, 0.9),
-                          opacity: task.completed ? 0.5 : 1
+                          backgroundColor: hexToRgba(categoryColor, 0.6),
                         }}
                         className={cn(
-                          "absolute left-0.5 right-0.5 rounded px-1 py-1 overflow-hidden transition-all flex items-start text-left",
-                          "hover:opacity-90 active:scale-[0.98] pointer-events-auto"
+                          "absolute left-0.5 right-0.5 rounded px-1 py-1 overflow-hidden transition-all duration-300 flex items-start text-left",
+                          "hover:opacity-90 active:scale-[0.98] pointer-events-auto",
+                          task.completed ? "opacity-35" : "opacity-85"
                         )}
                       >
                         <p className={cn(
@@ -311,55 +351,45 @@ export function WeekScheduleView({
         Swipe left/right to change week
       </p>
 
-      {/* Quick Task Modal for editing */}
+      {/* AddTaskModal for editing */}
       {editingTask && onUpdateTask && (
-        <QuickTaskModal
+        <AddTaskModal
           isOpen={!!editingTask}
-          onClose={() => setEditingTask(null)}
+          onClose={() => {
+            setEditingTask(null);
+            // Clear any pending tap timeout when closing
+            if (tapTimeout) {
+              clearTimeout(tapTimeout);
+              setTapTimeout(null);
+            }
+            setLastTap(null);
+          }}
           task={editingTask}
           date={editingTask.date || format(selectedDate, "yyyy-MM-dd")}
-          categories={categories.map(cat => ({
-            value: cat.id as ValueType,
-            label: cat.label,
-            color: cat.color,
-          }))}
-          onSave={(updates) => {
-            if (editingTask) {
-              onUpdateTask(editingTask.id, updates);
-              setEditingTask(null);
-            }
-          }}
-          onDelete={onDeleteTask && editingTask ? () => {
-            onDeleteTask(editingTask.id);
-            setEditingTask(null);
-          } : undefined}
+          onUpdate={onUpdateTask}
+          onDelete={onDeleteTask}
+          onAdd={() => {}} // Not used when editing
         />
       )}
 
-      {/* Quick Task Modal for adding */}
+      {/* AddTaskModal for adding */}
       {quickAddTime && onAddTask && (
-        <QuickTaskModal
+        <AddTaskModal
           isOpen={!!quickAddTime}
-          onClose={() => setQuickAddTime(null)}
-          task={null}
+          onClose={() => {
+            setQuickAddTime(null);
+          }}
           date={quickAddTime.date}
           initialTime={quickAddTime.time}
-          categories={categories.map(cat => ({
-            value: cat.id as ValueType,
-            label: cat.label,
-            color: cat.color,
-          }))}
-          onSave={(updates) => {
-            if (updates.title) {
-              onAddTask({
-                title: updates.title,
-                time: updates.time || quickAddTime.time,
-                endTime: updates.endTime || calculateEndTime(updates.time || quickAddTime.time),
-                value: updates.value || categories[0]?.id as ValueType,
-                date: quickAddTime.date,
-              });
-              setQuickAddTime(null);
-            }
+          onAdd={(newTask) => {
+            onAddTask({
+              title: newTask.title,
+              time: newTask.time,
+              endTime: newTask.endTime,
+              value: newTask.value,
+              date: newTask.date,
+            });
+            setQuickAddTime(null);
           }}
         />
       )}

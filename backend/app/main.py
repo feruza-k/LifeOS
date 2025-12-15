@@ -1,11 +1,13 @@
 # main.py
 
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -15,6 +17,7 @@ from app.ai.assistant import generate_assistant_response
 
 # Storage
 from app.storage.repo import repo, load_data, save_data
+from app.storage.photo_storage import save_photo, delete_photo, get_photo_path, photo_exists
 
 # Logic
 from app.logic.intent_handler import handle_intent
@@ -61,6 +64,13 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class RepeatConfig(BaseModel):
+    type: str  # "weekly", "period", "custom"
+    weekDays: Optional[List[int]] = None  # 0-6 for Sun-Sat
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+    customDates: Optional[List[str]] = None
+
 class TaskCreateRequest(BaseModel):
     title: str
     time: str | None = None
@@ -70,6 +80,7 @@ class TaskCreateRequest(BaseModel):
     date: str
     createdAt: str | None = None
     movedFrom: str | None = None
+    repeat: Optional[RepeatConfig] = None
 
 
 class TaskUpdateRequest(BaseModel):
@@ -201,11 +212,63 @@ def get_tasks_by_date(date: str = Query(..., description="Date in YYYY-MM-DD for
 
 @app.post("/tasks")
 def create_task(task_data: TaskCreateRequest):
-    """Create a new task from frontend format."""
+    """Create a new task from frontend format. Handles recurring tasks."""
     task_dict = task_data.model_dump(exclude_none=True)
-    backend_task = frontend_task_to_backend(task_dict)
-    result = repo.add_task_dict(backend_task)
-    return backend_task_to_frontend(result)
+    repeat_config = task_dict.pop("repeat", None)
+    
+    # If no repeat config, create single task
+    if not repeat_config:
+        backend_task = frontend_task_to_backend(task_dict)
+        result = repo.add_task_dict(backend_task)
+        return backend_task_to_frontend(result)
+    
+    # Handle recurring tasks - create all instances
+    created_tasks = []
+    base_date = datetime.strptime(task_data.date, "%Y-%m-%d")
+    
+    if repeat_config["type"] == "weekly":
+        # Create tasks for selected weekdays (next 52 weeks)
+        if repeat_config.get("weekDays"):
+            current_date = base_date
+            weeks_created = 0
+            while weeks_created < 52:  # Limit to 1 year
+                if current_date.weekday() in repeat_config["weekDays"]:
+                    task_dict["date"] = current_date.strftime("%Y-%m-%d")
+                    backend_task = frontend_task_to_backend(task_dict)
+                    result = repo.add_task_dict(backend_task)
+                    created_tasks.append(backend_task_to_frontend(result))
+                    # Check if we've completed a full week cycle
+                    if current_date.weekday() == max(repeat_config["weekDays"]):
+                        weeks_created += 1
+                current_date += timedelta(days=1)
+                # Safety limit
+                if (current_date - base_date).days > 365:
+                    break
+    
+    elif repeat_config["type"] == "period":
+        # Create tasks for date range
+        if repeat_config.get("startDate") and repeat_config.get("endDate"):
+            start = datetime.strptime(repeat_config["startDate"], "%Y-%m-%d")
+            end = datetime.strptime(repeat_config["endDate"], "%Y-%m-%d")
+            current_date = start
+            while current_date <= end:
+                task_dict["date"] = current_date.strftime("%Y-%m-%d")
+                backend_task = frontend_task_to_backend(task_dict)
+                result = repo.add_task_dict(backend_task)
+                created_tasks.append(backend_task_to_frontend(result))
+                current_date += timedelta(days=1)
+    
+    elif repeat_config["type"] == "custom":
+        # Create tasks for custom dates
+        if repeat_config.get("customDates"):
+            for date_str in repeat_config["customDates"]:
+                task_dict["date"] = date_str
+                backend_task = frontend_task_to_backend(task_dict)
+                result = repo.add_task_dict(backend_task)
+                created_tasks.append(backend_task_to_frontend(result))
+    
+    # Return the first created task (for compatibility)
+    return created_tasks[0] if created_tasks else backend_task_to_frontend(result)
 
 
 @app.patch("/tasks/{task_id}")
@@ -287,6 +350,87 @@ def save_note(note_data: dict):
     """Save or update a note."""
     result = repo.save_note(note_data)
     return result
+
+
+# -----------------------------------------------------
+# Photo Endpoints
+# -----------------------------------------------------
+
+@app.post("/photos/upload")
+async def upload_photo(
+    file: UploadFile = File(...),
+    date: str = Query(..., description="Date in YYYY-MM-DD format")
+):
+    """Upload or replace a photo for a specific date (only one photo per date)."""
+    try:
+        # Get existing note
+        note = repo.get_note(date)
+        if not note:
+            note = {"date": date, "content": "", "photo": None}
+        
+        # Delete old photo if exists (handle both new format and old photos array format)
+        if note.get("photo") and note["photo"] is not None and isinstance(note["photo"], dict) and note["photo"].get("filename"):
+            old_filename = note["photo"]["filename"]
+            delete_photo(old_filename)
+        # Also handle old photos array format for backward compatibility
+        elif note.get("photos") and isinstance(note["photos"], list) and len(note["photos"]) > 0:
+            # Delete all old photos from array
+            for old_photo in note["photos"]:
+                if old_photo and isinstance(old_photo, dict) and old_photo.get("filename"):
+                    delete_photo(old_photo["filename"])
+        
+        # Save new photo
+        filename = save_photo(file, date)
+        
+        # Update note with single photo
+        note["photo"] = {
+            "filename": filename,
+            "uploadedAt": datetime.now().isoformat()
+        }
+        repo.save_note(note)
+        
+        return {"filename": filename, "uploadedAt": note["photo"]["uploadedAt"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
+
+
+@app.get("/photos/{filename}")
+def get_photo(filename: str):
+    """Get a photo file by filename."""
+    if not photo_exists(filename):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    photo_path = get_photo_path(filename)
+    return FileResponse(
+        photo_path,
+        media_type="image/jpeg"  # Default, could be improved with proper MIME type detection
+    )
+
+
+@app.delete("/photos/{filename}")
+def delete_photo_endpoint(
+    filename: str,
+    date: str = Query(..., description="Date in YYYY-MM-DD format")
+):
+    """Delete a photo file and remove its reference from the note."""
+    if not photo_exists(filename):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # Delete the file
+    delete_photo(filename)
+    
+    # Remove photo reference from note
+    note = repo.get_note(date)
+    if note:
+        if "photo" in note and note["photo"] and note["photo"].get("filename") == filename:
+            note["photo"] = None
+            repo.save_note(note)
+        # Also handle old "photos" array format for backward compatibility
+        elif "photos" in note:
+            note["photos"] = [p for p in note["photos"] if p.get("filename") != filename]
+            repo.save_note(note)
+    
+    return {"success": True, "message": "Photo deleted"}
 
 
 # -----------------------------------------------------

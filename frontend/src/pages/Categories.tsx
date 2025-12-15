@@ -29,14 +29,18 @@ import { toast } from "sonner";
 
 // Aesthetic planner/calendar color palette
 const colorPalette = [
-  { name: "Dusty Rose", value: "#F4D6E4" },
-  { name: "Muted Sage", value: "#C7DED5" },
-  { name: "Pale Sky", value: "#C9DCEB" },
-  { name: "Creamy Yellow", value: "#FFF5E0" },
-  { name: "Soft Peach", value: "#F0E0D6" },
-  { name: "Lavender Mist", value: "#DCD0E6" },
-  { name: "Seafoam Green", value: "#D4E9E2" },
-  { name: "Cloud Grey", value: "#EBEBEB" },
+  { name: "Dusty Rose", value: "#EAA4A6" },
+  { name: "Muted Sage", value: "#A2C1A8" },
+  { name: "Pale Sky", value: "#A5BBC6" },
+  { name: "Creamy Yellow", value: "#E8D8BF" },
+  { name: "Soft Peach", value: "#D4C2B4" },
+  { name: "Lavender Mist", value: "#B6A8C7" },
+  { name: "Hint of Mint", value: "#9BC5BB" },
+  { name: "Mauve", value: "#BF9CA6" },
+  { name: "Goldenrod", value: "#DBC599" },
+  { name: "Deep Teal", value: "#A4B5B0" },
+  { name: "Taupe Stone", value: "#B7B0A8" },
+  { name: "Soft Slate", value: "#A9B3C1" },
 ];
 
 export default function Categories() {

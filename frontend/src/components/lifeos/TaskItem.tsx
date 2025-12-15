@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ValueTag, ValueType } from "./ValueTag";
+import { ValueType } from "./ValueTag";
+import { useLifeOSStore } from "@/stores/useLifeOSStore";
 
 export interface Task {
   id: string;
@@ -42,37 +43,49 @@ export function TaskItem({ task, onToggle, onDelete }: TaskItemProps) {
         {task.completed && <Check className="w-3.5 h-3.5 text-primary-foreground" />}
       </button>
       
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className={cn(
-            "font-sans font-medium text-foreground truncate",
-            task.completed && "line-through text-muted-foreground"
-          )}>
-            {task.title}
-          </p>
+      <div className="flex-1 min-w-0 relative">
+        {/* Subtle category accent bar */}
+        {(() => {
+          const store = useLifeOSStore();
+          const category = store.categories.find(c => c.id === task.value);
+          const categoryColor = category?.color;
+          return categoryColor ? (
+            <div 
+              className="absolute left-0 top-0 bottom-0 w-0.5 rounded-full"
+              style={{ backgroundColor: categoryColor }}
+            />
+          ) : null;
+        })()}
+        <div className="pl-2">
+          <div className="flex items-center gap-2">
+            <p className={cn(
+              "font-sans font-medium text-foreground truncate",
+              task.completed && "line-through text-muted-foreground"
+            )}>
+              {task.title}
+            </p>
+          </div>
+          {task.time && (
+            <p className="text-sm text-muted-foreground font-sans mt-0.5">
+              {task.time}{task.endTime && ` - ${task.endTime}`}
+              {task.endTime && (() => {
+                // Calculate duration
+                const [startH, startM] = task.time!.split(":").map(Number);
+                const [endH, endM] = task.endTime.split(":").map(Number);
+                const startMinutes = startH * 60 + startM;
+                const endMinutes = endH * 60 + endM;
+                const duration = endMinutes - startMinutes;
+                const hours = Math.floor(duration / 60);
+                const minutes = duration % 60;
+                const durationStr = hours > 0 
+                  ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`
+                  : `${minutes}m`;
+                return ` (${durationStr})`;
+              })()}
+            </p>
+          )}
         </div>
-        {task.time && (
-          <p className="text-sm text-muted-foreground font-sans mt-0.5">
-            {task.time}{task.endTime && ` - ${task.endTime}`}
-            {task.endTime && (() => {
-              // Calculate duration
-              const [startH, startM] = task.time!.split(":").map(Number);
-              const [endH, endM] = task.endTime.split(":").map(Number);
-              const startMinutes = startH * 60 + startM;
-              const endMinutes = endH * 60 + endM;
-              const duration = endMinutes - startMinutes;
-              const hours = Math.floor(duration / 60);
-              const minutes = duration % 60;
-              const durationStr = hours > 0 
-                ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`
-                : `${minutes}m`;
-              return ` (${durationStr})`;
-            })()}
-          </p>
-        )}
       </div>
-      
-      <ValueTag value={task.value} />
       
       {onDelete && (
         <button

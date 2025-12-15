@@ -32,6 +32,7 @@ const CalendarPage = () => {
     (store.categories || []).map(c => c.id as ValueType)
   );
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [photos, setPhotos] = useState<Record<string, { filename: string; uploadedAt: string } | null>>({});
   const [checkIns, setCheckIns] = useState<Record<string, any>>({});
 
   // Load categories on mount
@@ -68,7 +69,7 @@ const CalendarPage = () => {
     loadMonthTasks();
   }, [currentMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load note and check-in when date is selected
+  // Load note, photos, and check-in when date is selected
   useEffect(() => {
     if (!selectedDate) return;
     
@@ -76,11 +77,33 @@ const CalendarPage = () => {
     if (!notes[dateStr]) {
       store.loadNote(dateStr).then(note => {
         if (note) {
-          setNotes(prev => ({ ...prev, [dateStr]: note.content || "" }));
+          setNotes(prev => ({ ...prev, [dateStr]: note?.content || "" }));
+          // Also load photo from note (single photo, not array)
+          // Handle both new format (photo) and old format (photos array) for backward compatibility
+          try {
+            if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
+              setPhotos(prev => ({ ...prev, [dateStr]: note.photo }));
+            } else if (note && note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+              // Migrate from old photos array to single photo (take first photo)
+              setPhotos(prev => ({ ...prev, [dateStr]: note.photos[0] }));
+            } else {
+              // Initialize null if note exists but has no photo
+              setPhotos(prev => ({ ...prev, [dateStr]: null }));
+            }
+          } catch (error) {
+            console.error("Error loading photo:", error);
+            setPhotos(prev => ({ ...prev, [dateStr]: null }));
+          }
         }
-      }).catch(() => {
+      }).catch((error) => {
+        console.error("Error loading note:", error);
         // No note for this date, that's fine
       });
+    } else {
+      // If note exists but photo doesn't, initialize photo
+      if (!(dateStr in photos)) {
+        setPhotos(prev => ({ ...prev, [dateStr]: null }));
+      }
     }
     // Load check-in for this date
     if (!checkIns[dateStr]) {
@@ -155,7 +178,7 @@ const CalendarPage = () => {
       </p>
 
       {/* Header with Month */}
-      <header className="px-4 pb-2 animate-fade-in">
+      <header className="px-4 pb-2 pt-4 animate-fade-in">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-xl font-sans font-bold text-foreground">
             {format(currentMonth, "MMM yyyy")}
@@ -297,9 +320,28 @@ const CalendarPage = () => {
             const monthEnd = endOfMonth(currentMonth);
             await store.loadTasksForDateRange(monthStart, monthEnd);
           }}
-          onSaveNote={async (content) => {
-            await store.saveNote(selectedDate, content);
+          photo={selectedDate ? (photos[format(selectedDate, "yyyy-MM-dd")] ?? null) : null}
+          onPhotoChange={async (updatedPhoto) => {
+            if (!selectedDate) return;
             const dateStr = format(selectedDate, "yyyy-MM-dd");
+            setPhotos(prev => ({ ...prev, [dateStr]: updatedPhoto }));
+            
+            // Update note with photo
+            const currentNote = notes[dateStr] || "";
+            await store.saveNote({
+              date: dateStr,
+              content: currentNote,
+              photo: updatedPhoto,
+            });
+          }}
+          onSaveNote={async (content) => {
+            const dateStr = format(selectedDate, "yyyy-MM-dd");
+            const currentPhoto = photos[dateStr] || null;
+            await store.saveNote({
+              date: dateStr,
+              content: content,
+              photo: currentPhoto,
+            });
             setNotes(prev => ({ ...prev, [dateStr]: content }));
           }}
           onDateChange={async (newDate) => {
@@ -309,9 +351,32 @@ const CalendarPage = () => {
             if (!notes[dateStr]) {
               store.loadNote(dateStr).then(note => {
                 if (note) {
-                  setNotes(prev => ({ ...prev, [dateStr]: note.content || "" }));
+                  setNotes(prev => ({ ...prev, [dateStr]: note?.content || "" }));
+                  // Also load photo from note (single photo, not array)
+                  // Handle both new format (photo) and old format (photos array) for backward compatibility
+                  try {
+                    if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
+                      setPhotos(prev => ({ ...prev, [dateStr]: note.photo }));
+                    } else if (note && note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+                      // Migrate from old photos array to single photo (take first photo)
+                      setPhotos(prev => ({ ...prev, [dateStr]: note.photos[0] }));
+                    } else {
+                      // Initialize null if note exists but has no photo
+                      setPhotos(prev => ({ ...prev, [dateStr]: null }));
+                    }
+                  } catch (error) {
+                    console.error("Error loading photo:", error);
+                    setPhotos(prev => ({ ...prev, [dateStr]: null }));
+                  }
                 }
-              }).catch(() => {});
+              }).catch((error) => {
+                console.error("Error loading note:", error);
+              });
+            } else {
+              // If note exists but photo doesn't, initialize photo
+              if (!(dateStr in photos)) {
+                setPhotos(prev => ({ ...prev, [dateStr]: null }));
+              }
             }
             if (!checkIns[dateStr]) {
               api.getCheckIn(dateStr).then(checkIn => {
@@ -346,6 +411,7 @@ const CalendarPage = () => {
               value: taskData.value,
               date: taskData.date,
               completed: false,
+              repeat: taskData.repeat,
             });
             setShowAddTaskModal(false);
             // Reload tasks for current month
