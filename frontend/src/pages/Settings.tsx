@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { 
   User, 
   Globe, 
@@ -102,6 +102,7 @@ function SettingsRow({
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
   
@@ -159,20 +160,7 @@ export default function Settings() {
 
         {/* Profile */}
         <SettingsGroup title="Profile" icon={User}>
-          <div className="p-4 flex items-center gap-4">
-            <div className="relative shrink-0">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-                <User className="w-7 h-7 text-primary" />
-              </div>
-              <button className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                <Camera className="w-2.5 h-2.5" />
-              </button>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-sans font-medium text-foreground truncate">{name}</p>
-              <p className="text-xs text-muted-foreground truncate">user@example.com</p>
-            </div>
-          </div>
+          <SettingsRow label="User Profile" description="Manage your account settings" onClick={() => navigate("/profile")} />
           
           <SettingsRow label="Timezone">
             <Select value={timezone} onValueChange={setTimezone}>

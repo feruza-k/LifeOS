@@ -1,18 +1,43 @@
 import { BASE_URL } from "@/constants/config";
 
+let authToken: string | null = null;
+
 async function request(path: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${path}`;
   console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
   
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  // Add auth token if available
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
   try {
+    console.log(`🌐 Making request to: ${url}`);
+    console.log(`📋 Request options:`, { method: options.method || 'GET', headers });
+    
     const res = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-      },
       ...options,
+      headers,
     });
     
     console.log(`✅ API Response: ${res.status} ${path}`);
+    console.log(`📋 Response headers:`, Object.fromEntries(res.headers.entries()));
+    
+    // Handle 401 Unauthorized - token expired or invalid
+    if (res.status === 401) {
+      localStorage.removeItem("lifeos-token");
+      authToken = null;
+      // Redirect to auth page
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth";
+      }
+      throw new Error("Unauthorized - please log in again");
+    }
     
     if (!res.ok) {
       const errorText = await res.text();
@@ -20,17 +45,161 @@ async function request(path: string, options: RequestInit = {}) {
       throw new Error(`API error ${res.status}: ${errorText}`);
     }
     return res.json();
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      console.error("❌ Network error - is the backend running?", error);
-      console.error(`Backend URL: ${BASE_URL}`);
-      throw new Error(`Cannot connect to backend at ${BASE_URL}. Make sure it's running.`);
+  } catch (error: any) {
+    // Check if it's a network/fetch error
+    if (error instanceof TypeError) {
+      const isNetworkError = 
+        error.message.includes("fetch") ||
+        error.message.includes("Failed to fetch") ||
+        error.message.includes("NetworkError") ||
+        error.message === "Network request failed";
+      
+      if (isNetworkError) {
+        console.error("❌ Network error:", error);
+        console.error(`Backend URL: ${BASE_URL}`);
+        console.error("Error details:", error.message);
+        console.error("Full error object:", error);
+        
+        // More helpful error message
+        throw new Error(
+          `Cannot connect to backend at ${BASE_URL}.\n\n` +
+          `Possible causes:\n` +
+          `- CORS is blocking the request (check browser console for CORS errors)\n` +
+          `- Backend URL is incorrect (check console for "🔗 API Base URL")\n` +
+          `- Network/firewall blocking the connection\n\n` +
+          `Check the browser console (F12) for more details.`
+        );
+      }
     }
-    throw error;
+    
+    // If error is already an Error with a message, re-throw it as-is
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    // For any other error type, convert to Error
+    throw new Error(error?.message || String(error));
   }
 }
 
 export const api = {
+  setAuthToken: (token: string | null) => {
+    authToken = token;
+  },
+
+  // --- Auth ---
+  login: async (email: string, password: string) => {
+    const formData = new FormData();
+    formData.append("username", email);
+    formData.append("password", password);
+    
+    const res = await fetch(`${BASE_URL}/auth/login`, {
+      method: "POST",
+      body: formData,
+    });
+    
+    if (!res.ok) {
+      let errorMessage = "Login failed";
+      try {
+        const errorData = await res.json();
+        errorMessage = errorData.detail || errorMessage;
+      } catch {
+        // If response is not JSON, try text
+        const errorText = await res.text();
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+    return res.json();
+  },
+
+  signup: async (email: string, password: string, confirmPassword: string, username?: string) => {
+    return request("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password, confirm_password: confirmPassword, username }),
+    });
+  },
+
+  getCurrentUser: () => request("/auth/me"),
+
+  verifyEmail: (token: string) =>
+    request("/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+
+  resendVerification: (email: string) =>
+    request("/auth/resend-verification", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  forgotPassword: (email: string) =>
+    request("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, newPassword: string, confirmPassword: string) =>
+    request("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password: newPassword, confirm_password: confirmPassword }),
+    }),
+
+  changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) =>
+    request("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword, confirm_password: confirmPassword }),
+    }),
+
+  updateProfile: (updates: { username?: string }) =>
+    request("/auth/profile", {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+
+  deleteAccount: () =>
+    request("/auth/account", {
+      method: "DELETE",
+    }),
+
+  uploadAvatar: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const url = `${BASE_URL}/auth/avatar`;
+    console.log(`🌐 API Request: POST ${url}`);
+    
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("lifeos-token")}`,
+        },
+      });
+      
+      console.log(`✅ API Response: ${res.status} /auth/avatar`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ API ERROR:", res.status, "/auth/avatar", errorText);
+        throw new Error(`API error ${res.status}: ${errorText}`);
+      }
+      return res.json();
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        console.error("❌ Network error - is the backend running?", error);
+        throw new Error(`Cannot connect to backend at ${BASE_URL}. Make sure it's running.`);
+      }
+      throw error;
+    }
+  },
+
+  deleteAvatar: () =>
+    request("/auth/avatar", {
+      method: "DELETE",
+    }),
+
   // --- Bootstrap / Today ---
   getBootstrap: () => request("/assistant/bootstrap"),
   getToday: (date?: string) =>

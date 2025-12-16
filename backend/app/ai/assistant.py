@@ -21,7 +21,7 @@ from app.logic.task_engine import (
     find_next_free_slot,  
 )
 
-from app.storage.repo import load_data
+from app.storage.repo import load_data, repo
 from app.ai.utils import try_extract_task_from_message
 from app.logic.pending_actions import (
     get_current_pending,
@@ -99,13 +99,18 @@ def resolve_schedule_date(cleaned, now):
 # =====================================================================
 # MAIN ASSISTANT LOGIC
 # =====================================================================
-def generate_assistant_response(user_message: str):
+def generate_assistant_response(user_message: str, user_id: str = None):
     global last_referenced_task_id
 
     cleaned = user_message.lower().strip()
     now     = datetime.now(tz)
-    all_tasks = load_data().get("tasks", [])
-    pending   = get_current_pending()
+    all_tasks_raw = load_data().get("tasks", [])
+    # Filter by user_id if provided
+    if user_id:
+        all_tasks = [t for t in all_tasks_raw if t.get("user_id") == user_id]
+    else:
+        all_tasks = all_tasks_raw
+    pending   = get_current_pending(user_id) if user_id else get_current_pending()
 
     # --------------------------------------------------------
     # Time ranges (e.g., "9am to 11am")
@@ -124,14 +129,17 @@ def generate_assistant_response(user_message: str):
 
         if action == "reschedule":
             task = apply_reschedule(payload["task_id"], payload["new_datetime"])
-            clear_current_pending()
+            clear_current_pending(user_id)
             last_referenced_task_id = task["id"]
             return {"assistant_response": f"Okay, I moved '{task['title']}'.",
                     "ui": {"action": "update_task", "task_id": task["id"]}}
 
         if action == "create":
-            task = create_task(payload["task_fields"])
-            clear_current_pending()
+            task_fields = payload["task_fields"]
+            if user_id and "user_id" not in task_fields:
+                task_fields["user_id"] = user_id
+            task = create_task(task_fields)
+            clear_current_pending(user_id)
             last_referenced_task_id = task["id"]
             return {"assistant_response": f"Added '{task['title']}'.",
                     "ui": {"action": "add_task", "task": task}}
@@ -140,9 +148,11 @@ def generate_assistant_response(user_message: str):
             fields = payload["original_fields"]
             fields["time"] = payload["suggested_time"]
             fields["datetime"] = f"{fields['date']} {fields['time']}"
+            if user_id and "user_id" not in fields:
+                fields["user_id"] = user_id
 
             task = create_task(fields)
-            clear_current_pending()
+            clear_current_pending(user_id)
             last_referenced_task_id = task["id"]
 
             return {
@@ -151,7 +161,7 @@ def generate_assistant_response(user_message: str):
             }
 
     if pending and cleaned in NO_WORDS:
-        clear_current_pending()
+        clear_current_pending(user_id)
         return {"assistant_response": "Okay, no changes made.", "ui": None}
 
     # --------------------------------------------------------
@@ -218,6 +228,10 @@ def generate_assistant_response(user_message: str):
             "end_datetime": parsed.get("end_datetime"),
         }
 
+        # Add user_id to fields if provided
+        if user_id and "user_id" not in fields:
+            fields["user_id"] = user_id
+
         # NO OVERLAPS ALLOWED
         new_date = fields.get("date")
         new_time = fields.get("time")
@@ -234,7 +248,7 @@ def generate_assistant_response(user_message: str):
                     create_pending_action("suggest-slot", {
                         "original_fields": fields,
                         "suggested_time": suggested
-                    })
+                    }, user_id)
 
                     return {
                         "assistant_response": (
@@ -254,7 +268,7 @@ def generate_assistant_response(user_message: str):
 
 
         readable = f"{fields['title']} on {fields['date']} at {fields['time']}"
-        create_pending_action("create", {"task_fields": fields})
+        create_pending_action("create", {"task_fields": fields}, user_id)
 
         return {
             "assistant_response": f"Should I add '{readable}'?",
@@ -323,7 +337,7 @@ def generate_assistant_response(user_message: str):
                         "time": target_time,
                     },
                     "suggested_time": suggested
-                })
+                }, user_id)
 
                 return {
                     "assistant_response": (
@@ -351,7 +365,7 @@ def generate_assistant_response(user_message: str):
         create_pending_action("reschedule", {
             "task_id": task["id"],
             "new_datetime": new_dt
-        })
+        }, user_id)
         return {
             "assistant_response": f"Should I move '{task['title']}' to {target_time} on {target_date}?",
             "ui": {"action": "apply_reschedule", "task_id": task["id"], "new_time": target_time},

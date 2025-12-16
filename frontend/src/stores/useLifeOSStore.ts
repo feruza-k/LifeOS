@@ -118,9 +118,15 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   // -------- TASK ACTIONS -------- //
 
   addTask: async (task) => {
-    const created = await api.createTask(task);
-    // Reload today to get fresh data from server
-    await get().loadToday(task.date);
+    try {
+      const created = await api.createTask(task);
+      // Reload today to get fresh data from server
+      await get().loadToday(task.date);
+      return created;
+    } catch (error) {
+      console.error("Failed to create task:", error);
+      throw error; // Re-throw so caller can handle it
+    }
   },
 
   updateTask: async (id: string, updates: any) => {

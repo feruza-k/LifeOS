@@ -177,6 +177,9 @@ def create_task(fields: dict):
         "energy": None,
         "context": None
     }
+    # Include user_id if provided
+    if "user_id" in fields:
+        task["user_id"] = fields["user_id"]
 
     # ---------------------------------------------------------
     # 1) Auto-fill datetime if missing

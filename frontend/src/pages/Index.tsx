@@ -17,6 +17,7 @@ import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { Task } from "@/components/lifeos/TaskItem";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 
 
@@ -174,16 +175,21 @@ const Index = () => {
     }
   }, [showReminders.length, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddTask = (task: { title: string; time?: string; endTime?: string; value: any; date: string; repeat?: any }) => {
-    store.addTask({
-      title: task.title,
-      time: task.time,
-      endTime: task.endTime,
-      value: task.value,
-      date: task.date,
-      completed: false,
-      repeat: task.repeat,
-    });
+  const handleAddTask = async (task: { title: string; time?: string; endTime?: string; value: any; date: string; repeat?: any }) => {
+    try {
+      await store.addTask({
+        title: task.title,
+        time: task.time,
+        endTime: task.endTime,
+        value: task.value,
+        date: task.date,
+        completed: false,
+        repeat: task.repeat,
+      });
+    } catch (error: any) {
+      console.error("Failed to add task:", error);
+      toast.error(error?.message || "Failed to add task. Please try again.");
+    }
   };
 
   // Divider between Scheduled & Anytime

@@ -103,6 +103,10 @@ def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "ev
     if frontend_task.get("id"):
         backend_task["id"] = frontend_task["id"]
     
+    # Preserve user_id if provided (required for user-scoped tasks)
+    if "user_id" in frontend_task:
+        backend_task["user_id"] = frontend_task["user_id"]
+    
     # Calculate duration from time and endTime
     # This handles both same-day tasks (e.g., 09:00-23:00) and cross-day tasks
     if frontend_task.get("time") and frontend_task.get("endTime"):
