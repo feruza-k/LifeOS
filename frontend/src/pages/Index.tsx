@@ -46,7 +46,6 @@ const Index = () => {
             store.loadReminders(),
           ]);
         } catch (err) {
-          console.error("Failed to load data:", err);
           setError(err instanceof Error ? err.message : "Failed to load data");
         } finally {
           setLoading(false);
@@ -88,10 +87,6 @@ const Index = () => {
   const completedCount = legacyTasks.filter(t => t.completed).length;
   const totalCount = legacyTasks.length;
 
-  // Get energy status from backend (no frontend calculation)
-  // Energy status reflects PLANNED LOAD for the day and remains FIXED regardless of task completion
-  // The status represents how demanding today's schedule is overall - it does not change as tasks are completed
-  // Task completion only affects the progress bar visualization, not the energy classification
   const mapEnergyStatus = (backendStatus?: string): "low" | "optimal" | "heavy" => {
     if (!backendStatus) return "optimal";
     switch (backendStatus) {
@@ -108,61 +103,20 @@ const Index = () => {
 
   const energyStatus = mapEnergyStatus(store.today?.energy?.status);
 
-  // Get "show" type reminders for the selected date
-  // Only show reminders that match the selected date exactly
   const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
   
-  // Debug: log all reminders first
-  console.log("=== SHOW REMINDERS DEBUG ===");
-  console.log("All reminders from store:", store.reminders);
-  console.log("Selected date:", selectedDateStr);
-  console.log("Selected date object:", selectedDate);
-  
   const showReminders = (store.reminders || []).filter(r => {
-    // Debug each reminder
-    console.log("Checking reminder:", {
-      id: r.id,
-      title: r.title,
-      type: r.type,
-      dueDate: r.dueDate,
-      visible: r.visible
-    });
+    if (r.type !== "show") return false;
+    if (r.visible === false) return false;
+    if (!r.dueDate) return false;
     
-    // Check type first
-    if (r.type !== "show") {
-      console.log("  -> Not 'show' type, skipping");
-      return false;
-    }
-    if (r.visible === false) {
-      console.log("  -> Not visible, skipping");
-      return false;
-    }
-    // Must have a dueDate and it must match the selected date
-    if (!r.dueDate) {
-      console.log("  -> No dueDate, skipping");
-      return false;
-    }
     try {
-      // Extract just the date part (YYYY-MM-DD) from the reminder's dueDate
-      // Handle both ISO format (with time) and date-only format (YYYY-MM-DD)
-      const reminderDateOnly = r.dueDate.split('T')[0]; // Get just the date part
-      const matches = reminderDateOnly === selectedDateStr;
-      
-      console.log("  -> Date comparison:", {
-        reminderDateOnly,
-        selectedDateStr,
-        matches
-      });
-      
-      return matches;
+      const reminderDateOnly = r.dueDate.split('T')[0];
+      return reminderDateOnly === selectedDateStr;
     } catch (error) {
-      console.error("  -> Error parsing reminder date:", r.dueDate, error);
       return false;
     }
   });
-  
-  console.log("Filtered show reminders:", showReminders);
-  console.log("=== END DEBUG ===");
 
   // Animate bell for first 5 seconds when reminders are present
   useEffect(() => {
@@ -187,7 +141,6 @@ const Index = () => {
         repeat: task.repeat,
       });
     } catch (error: any) {
-      console.error("Failed to add task:", error);
       toast.error(error?.message || "Failed to add task. Please try again.");
     }
   };

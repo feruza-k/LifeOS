@@ -7,8 +7,15 @@ __pycache__/
 # Environment variables (API keys)
 .env
 
-# SQLite databases
+# Database files (contains sensitive user data)
+backend/app/db/data.json
+*.db
 *.sqlite
+*.sqlite3
+
+# Uploaded files
+backend/app/db/uploads/
+backend/app/db/photos/
 
 # Node modules (when frontend created)
 node_modules/
@@ -19,3 +26,14 @@ node_modules/
 
 # macOS system files
 .DS_Store
+
+# Build outputs
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

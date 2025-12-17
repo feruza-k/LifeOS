@@ -239,7 +239,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       set({ note: n });
       return n;
     } catch (error) {
-      console.error("Failed to load note:", error);
       return null;
     }
   },
@@ -273,7 +272,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       set({ note: saved });
       return saved;
     } catch (error) {
-      console.error("Failed to save note:", error);
       throw error;
     }
   },

@@ -126,14 +126,6 @@ export default function Reminders() {
       setShowRepeatPicker(false);
     }
     
-    // Debug logging
-    console.log("Editing reminder:", {
-      id: reminder.id,
-      title: reminder.title,
-      type: reminder.type,
-      savedType: reminderType,
-      dueDate: reminder.dueDate
-    });
   };
   const handleSave = async () => {
     if (!title.trim()) return;
@@ -159,8 +151,6 @@ export default function Reminders() {
       repeat: repeatConfig,
       visible: true
     };
-    // Debug logging
-    console.log("💾 Saving reminder:", reminderData);
     if (editingReminder) {
       await store.updateReminder(editingReminder.id, reminderData);
       setEditingReminder(null);

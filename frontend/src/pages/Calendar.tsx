@@ -95,9 +95,7 @@ const CalendarPage = () => {
             setPhotos(prev => ({ ...prev, [dateStr]: null }));
           }
         }
-      }).catch((error) => {
-        console.error("Error loading note:", error);
-        // No note for this date, that's fine
+      }).catch(() => {
       });
     } else {
       // If note exists but photo doesn't, initialize photo
@@ -369,8 +367,7 @@ const CalendarPage = () => {
                     setPhotos(prev => ({ ...prev, [dateStr]: null }));
                   }
                 }
-              }).catch((error) => {
-                console.error("Error loading note:", error);
+              }).catch(() => {
               });
             } else {
               // If note exists but photo doesn't, initialize photo

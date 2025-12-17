@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Mail, Calendar, Camera, Trash2, Lock, Save, X } from "lucide-react";
+import { ArrowLeft, User, Mail, Calendar, Camera, Trash2, Save, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { BASE_URL } from "@/constants/config";
 import { toast } from "sonner";
-import { validatePassword, getPasswordRequirements } from "@/lib/passwordValidator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,16 +29,8 @@ export default function Profile() {
   const [username, setUsername] = useState(user?.username || "");
   const [isSavingUsername, setIsSavingUsername] = useState(false);
   
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  
-  const passwordValidation = validatePassword(newPassword);
   
   const handleSaveUsername = async () => {
     if (!username.trim()) {
@@ -57,38 +48,6 @@ export default function Profile() {
       toast.error(error?.message || "Failed to update username");
     } finally {
       setIsSavingUsername(false);
-    }
-  };
-  
-  const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-    
-    if (!passwordValidation.isValid) {
-      toast.error(passwordValidation.errors[0]);
-      return;
-    }
-    
-    setIsChangingPassword(true);
-    try {
-      await api.changePassword(currentPassword, newPassword, confirmPassword);
-      toast.success("Password changed successfully");
-      setShowChangePassword(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (error: any) {
-      const errorMessage = error?.message || "Failed to change password";
-      toast.error(errorMessage);
-    } finally {
-      setIsChangingPassword(false);
     }
   };
   
@@ -286,95 +245,30 @@ export default function Profile() {
           </div>
         </div>
         
-        {/* Change Password */}
-        <div className="bg-card rounded-2xl border border-border/50 mb-6">
+        {/* Account Actions */}
+        <div className="bg-card rounded-2xl border border-border/50 divide-y divide-border/50">
           <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-primary" />
-                <h2 className="text-sm font-sans font-medium text-foreground">Password</h2>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowChangePassword(!showChangePassword)}
-              >
-                {showChangePassword ? "Cancel" : "Change Password"}
-              </Button>
-            </div>
-            
-            {showChangePassword && (
-              <div className="space-y-4 pt-4 border-t border-border/50">
-                <div className="space-y-2">
-                  <Label>Current Password</Label>
-                  <Input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>New Password</Label>
-                  <Input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className={newPassword && !passwordValidation.isValid ? "border-destructive" : ""}
-                  />
-                  {newPassword && !passwordValidation.isValid && (
-                    <div className="text-xs text-destructive space-y-1">
-                      {passwordValidation.errors.map((err, i) => (
-                        <div key={i}>• {err}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Confirm New Password</Label>
-                  <Input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                    className={confirmPassword && newPassword !== confirmPassword ? "border-destructive" : ""}
-                  />
-                  {confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs text-destructive">Passwords do not match</p>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p className="font-medium">Password requirements:</p>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    {getPasswordRequirements().map((req, i) => (
-                      <li key={i}>{req}</li>
-                    ))}
-                  </ul>
-                </div>
-                <Button
-                  onClick={handleChangePassword}
-                  disabled={isChangingPassword}
-                  className="w-full"
-                >
-                  {isChangingPassword ? "Changing..." : "Change Password"}
-                </Button>
-              </div>
-            )}
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={() => {
+                logout();
+                navigate("/auth");
+              }}
+            >
+              <LogOut className="w-4 h-4" />
+              Log Out
+            </Button>
           </div>
-        </div>
-        
-        {/* Danger Zone */}
-        <div className="bg-card rounded-2xl border border-destructive/50 divide-y divide-border/50">
+          
           <div className="p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Trash2 className="w-4 h-4 text-destructive" />
-              <h2 className="text-sm font-sans font-medium text-destructive">Danger Zone</h2>
-            </div>
-            
             <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:border-destructive/50"
+                >
+                  <Trash2 className="w-4 h-4" />
                   Delete Account
                 </Button>
               </AlertDialogTrigger>
@@ -406,19 +300,6 @@ export default function Profile() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>
-          
-          <div className="p-4">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                logout();
-                navigate("/auth");
-              }}
-            >
-              Log Out
-            </Button>
           </div>
         </div>
       </div>

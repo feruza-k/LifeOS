@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 16, 2025
+**Current Date:** December 17, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -23,6 +23,7 @@
   - [Day 14: Calendar View (Month & Week)](#day-14-calendar-view-month--week-dec-14-2025)
   - [Day 15: Calendar Quick Views & Task Interaction Layer](#day-15--calendar-quick-views--task-interaction-layer-dec-15-2025)
   - [Day 16: Authentication & User Identity Foundation](#day-16-authentication--user-identity-foundation-dec-16-2025)
+  - [Day 17: Authentication Emails & Verification Flow](#day-17-authentication-emails--verification-flow-dec-17-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1270,70 +1271,99 @@ Most importantly, the system remains deterministic and predictable, which is cri
 ---
 
 
-### **Day 16**: Authentication & User Identity Foundation (Dec 16, 2025)
+### **Day 17**: Authentication Emails & Verification Flow (Dec 17, 2025)
 
-Day 16 was focused on building a **proper authentication and user identity layer** for LifeOS.  
-Rather than just adding login and signup, the goal was to design authentication as a **foundational system** — something secure, predictable, and extensible enough to support real users later on.
+Today focused on completing the **authentication lifecycle** by adding a real transactional email system.  
+This was a critical step to move LifeOS from “works locally” to a system that supports real users, secure flows, and production-grade UX.
 
-This work establishes ownership, trust, and isolation across the entire app, which is essential before moving further with intelligence or deployment.
+The goal was reliability, clarity, and graceful failure — not just “sending emails”.
+
+
+#### What Was Built
+
+##### Email Service (Backend)
+- Implemented a dedicated email service (`email_service.py`) using **Resend**
+- Reads configuration from environment variables:
+  - `RESEND_API_KEY`
+  - `EMAIL_FROM`
+  - `EMAIL_ENABLED`
+- Supports development and production modes
+- Gracefully falls back to console logging when email delivery fails
+- Explicit error handling for domain verification and delivery issues
+
+##### Email Templates
+- HTML + plain-text templates for:
+  - Email verification
+  - Password reset
+- Clickable links with secure expiration:
+  - Verification: **24 hours**
+  - Password reset: **15 minutes**
+- Personalized with username (e.g. *“Hi Feruza,”*)
+
+
+#### Authentication Flow Integration
+
+##### Signup & Email Verification
+- Verification token generated on signup
+- Verification email sent immediately via Resend
+- Existing unverified users can re-trigger verification
+- Verified emails are enforced before sensitive actions
+- Frontend automatically verifies when user clicks email link
+
+##### Password Reset
+- Secure token-based reset flow
+- Reset email sent only if email is verified
+- Frontend detects reset mode via URL
+- Simplified UI: only new password + confirmation shown
+
+
+#### Frontend UX Improvements
+- **Verify Email page**
+  - Reads token from URL
+  - Auto-verifies on load
+  - Clear success / error states
+  - Manual resend option if needed
+
+- **Auth page**
+  - Automatically switches to reset-password mode
+  - Cleaner forms, fewer steps
+  - Inline validation and feedback
+
+
+#### Configuration & Environment
+- `EMAIL_ENABLED` flag allows disabling emails in dev
+- `FRONTEND_URL` used to generate correct verification/reset links
+- Default sender works without a custom domain during development
+
+
+#### Current Status
+
+The authentication system now supports:
+
+- Real transactional emails
+- Secure, time-limited verification and reset links
+- Personalized communication
+- Graceful fallbacks for development
+- End-to-end flows that mirror production systems
+
+The only remaining limitation is Resend’s free tier, which restricts delivery without a verified domain — a known and acceptable constraint at this stage.
 
 ---
 
-#### **What I Built**
+#### Reflection
 
-##### **Backend – Authentication Core**
-- JWT-based authentication with secure token validation
-- Password hashing using bcrypt
-- Token expiration handling and authenticated middleware
-- User-scoped data access enforced across all endpoints
-- Migration support for existing single-user data
+This wasn’t about adding “email support” — it was about **closing the loop** on identity, trust, and recovery.  
+With email verification and password reset in place, LifeOS now has a complete, realistic authentication lifecycle.
 
-##### **User Lifecycle & Security**
-- User signup and login
-- Email verification flow (token-based, dev mode)
-- Forgot password and secure password reset
-- Change password (requires current password)
-- Account deletion
-- Strong password rules enforced server-side
-
-##### **User Model**
-The user model was extended to support:
-- Email verification state
-- Password reset tokens with expiry
-- Profile data (username, avatar)
-- Account creation timestamp
-- Full ownership across tasks, notes, reminders, check-ins, and photos
-
-##### **Frontend – Auth & Identity**
-- Login / Signup flow with validation and clear error feedback
-- Email verification screen
-- Password reset flow
-- Protected routes with authentication and verification checks
-- Auth context provider with token management
-- Profile page with:
-  - Username editing
-  - Avatar upload and removal
-  - Change password
-  - Log out
-  - Account deletion with double confirmation
-
-All user-facing flows are now consistent and scoped to the authenticated user.
+The foundation is solid. From here, the system can scale — technically and conceptually.
 
 ---
 
-#### **Reflection**
+## Next Steps
+- Verify a custom domain for email delivery
+- Final security hardening (rate limiting, refresh tokens)
+- Database migration
+- Move into Assistant intelligence 
 
-This was one of the most infrastructure-heavy days so far.  
-Authentication is easy to make *work*, but much harder to make *correct*. I focused on building something explicit and reliable rather than rushing into advanced features.
-
-LifeOS now has a solid identity layer that clearly separates users, protects data, and provides a stable base for everything that comes next.
-
----
-
-## **Next Steps**
-- Set up production email delivery for verification and password reset
-- Add rate limiting to authentication endpoints
-- Migrate storage to a real database
-- Resume work on assistant intelligence, now backed by real user identity
 
 

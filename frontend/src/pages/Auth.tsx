@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,10 +20,24 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const { login, signup, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const passwordValidation = mode === "signup" || mode === "reset-password" 
     ? validatePassword(password) 
     : { isValid: true, errors: [] };
+
+  // Pick up reset-password mode and token from URL query params
+  useEffect(() => {
+    const urlMode = searchParams.get("mode");
+    const urlToken = searchParams.get("token");
+
+    if (urlMode === "reset-password") {
+      setMode("reset-password");
+      if (urlToken) {
+        setResetToken(urlToken);
+      }
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +61,12 @@ export default function Auth() {
     }
 
     if (mode === "reset-password") {
-      if (!resetToken.trim() || !password.trim() || !confirmPassword.trim()) {
+      // Token should come from URL - validate it's present
+      if (!resetToken.trim()) {
+        toast.error("Invalid reset link. Please request a new password reset.");
+        return;
+      }
+      if (!password.trim() || !confirmPassword.trim()) {
         toast.error("Please fill in all fields");
         return;
       }
@@ -67,9 +86,16 @@ export default function Auth() {
         setPassword("");
         setConfirmPassword("");
         setResetToken("");
+        // Clear URL params
+        navigate("/auth", { replace: true });
       } catch (error: any) {
         const errorMessage = error?.message || "Password reset failed";
         toast.error(errorMessage);
+        // If token is invalid, clear it and reset mode
+        if (errorMessage.includes("Invalid") || errorMessage.includes("expired")) {
+          setResetToken("");
+          navigate("/auth", { replace: true });
+        }
       } finally {
         setIsLoading(false);
       }
@@ -166,7 +192,7 @@ export default function Auth() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {(mode === "signup" || mode === "forgot-password" || mode === "reset-password") && (
+          {(mode === "signup" || mode === "forgot-password") && (
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-sans text-foreground">
                 Email
@@ -182,11 +208,27 @@ export default function Auth() {
               />
             </div>
           )}
+          
+          {mode === "reset-password" && !resetToken && (
+            <div className="mb-6 p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+              <p className="text-sm text-destructive font-sans">
+                Invalid or missing reset link. Please request a new password reset.
+              </p>
+            </div>
+          )}
+          
+          {mode === "reset-password" && resetToken && (
+            <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border/50">
+              <p className="text-sm text-muted-foreground font-sans">
+                Enter your new password below.
+              </p>
+            </div>
+          )}
 
           {mode === "signup" && (
             <div className="space-y-2">
               <Label htmlFor="username" className="text-sm font-sans text-foreground">
-                Username <span className="text-muted-foreground">(optional)</span>
+                Username
               </Label>
               <Input
                 id="username"
@@ -196,6 +238,7 @@ export default function Auth() {
                 placeholder="username"
                 className="h-12 bg-card border-border/50 focus:border-primary/50"
                 disabled={isLoading}
+                required
               />
             </div>
           )}
@@ -204,7 +247,7 @@ export default function Auth() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-sans text-foreground">
-                  Password
+                  {mode === "reset-password" ? "New Password" : "Password"}
                 </Label>
                 <Input
                   id="password"
@@ -228,7 +271,7 @@ export default function Auth() {
 
               <div className="space-y-2">
                 <Label htmlFor="confirm-password" className="text-sm font-sans text-foreground">
-                  Confirm Password
+                  {mode === "reset-password" ? "Confirm New Password" : "Confirm Password"}
                 </Label>
                 <Input
                   id="confirm-password"
@@ -258,25 +301,6 @@ export default function Auth() {
             </>
           )}
 
-          {mode === "reset-password" && (
-            <div className="space-y-2">
-              <Label htmlFor="reset-token" className="text-sm font-sans text-foreground">
-                Reset Token
-              </Label>
-              <Input
-                id="reset-token"
-                type="text"
-                value={resetToken}
-                onChange={(e) => setResetToken(e.target.value)}
-                placeholder="Enter reset token from email"
-                className="h-12 bg-card border-border/50 focus:border-primary/50 font-mono"
-                disabled={isLoading}
-              />
-              <p className="text-xs text-muted-foreground">
-                Check server logs for the reset token
-              </p>
-            </div>
-          )}
 
           {mode === "login" && (
             <>
@@ -315,12 +339,12 @@ export default function Auth() {
           <Button
             type="submit"
             className="w-full h-12 text-base font-sans font-medium"
-            disabled={isLoading}
+            disabled={isLoading || (mode === "reset-password" && !resetToken)}
           >
             {isLoading
               ? "Please wait..."
               : mode === "forgot-password"
-              ? "Send Reset Token"
+              ? "Send Reset Link"
               : mode === "reset-password"
               ? "Reset Password"
               : mode === "signup"

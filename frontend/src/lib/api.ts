@@ -4,35 +4,25 @@ let authToken: string | null = null;
 
 async function request(path: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${path}`;
-  console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
   
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...(options.headers || {}),
   };
 
-  // Add auth token if available
   if (authToken) {
     headers["Authorization"] = `Bearer ${authToken}`;
   }
 
   try {
-    console.log(`🌐 Making request to: ${url}`);
-    console.log(`📋 Request options:`, { method: options.method || 'GET', headers });
-    
     const res = await fetch(url, {
       ...options,
       headers,
     });
     
-    console.log(`✅ API Response: ${res.status} ${path}`);
-    console.log(`📋 Response headers:`, Object.fromEntries(res.headers.entries()));
-    
-    // Handle 401 Unauthorized - token expired or invalid
     if (res.status === 401) {
       localStorage.removeItem("lifeos-token");
       authToken = null;
-      // Redirect to auth page
       if (typeof window !== "undefined") {
         window.location.href = "/auth";
       }
@@ -41,12 +31,10 @@ async function request(path: string, options: RequestInit = {}) {
     
     if (!res.ok) {
       const errorText = await res.text();
-      console.error("❌ API ERROR:", res.status, path, errorText);
       throw new Error(`API error ${res.status}: ${errorText}`);
     }
     return res.json();
   } catch (error: any) {
-    // Check if it's a network/fetch error
     if (error instanceof TypeError) {
       const isNetworkError = 
         error.message.includes("fetch") ||
@@ -55,29 +43,14 @@ async function request(path: string, options: RequestInit = {}) {
         error.message === "Network request failed";
       
       if (isNetworkError) {
-        console.error("❌ Network error:", error);
-        console.error(`Backend URL: ${BASE_URL}`);
-        console.error("Error details:", error.message);
-        console.error("Full error object:", error);
-        
-        // More helpful error message
-        throw new Error(
-          `Cannot connect to backend at ${BASE_URL}.\n\n` +
-          `Possible causes:\n` +
-          `- CORS is blocking the request (check browser console for CORS errors)\n` +
-          `- Backend URL is incorrect (check console for "🔗 API Base URL")\n` +
-          `- Network/firewall blocking the connection\n\n` +
-          `Check the browser console (F12) for more details.`
-        );
+        throw new Error(`Cannot connect to backend at ${BASE_URL}. Make sure it's running.`);
       }
     }
     
-    // If error is already an Error with a message, re-throw it as-is
     if (error instanceof Error) {
       throw error;
     }
     
-    // For any other error type, convert to Error
     throw new Error(error?.message || String(error));
   }
 }
@@ -123,7 +96,7 @@ export const api = {
   getCurrentUser: () => request("/auth/me"),
 
   verifyEmail: (token: string) =>
-    request("/auth/verify-email", {
+    request("/auth/verify-email-by-token", {
       method: "POST",
       body: JSON.stringify({ token }),
     }),
@@ -167,7 +140,6 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
     const url = `${BASE_URL}/auth/avatar`;
-    console.log(`🌐 API Request: POST ${url}`);
     
     try {
       const res = await fetch(url, {
@@ -178,17 +150,13 @@ export const api = {
         },
       });
       
-      console.log(`✅ API Response: ${res.status} /auth/avatar`);
-      
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("❌ API ERROR:", res.status, "/auth/avatar", errorText);
         throw new Error(`API error ${res.status}: ${errorText}`);
       }
       return res.json();
     } catch (error) {
       if (error instanceof TypeError && error.message.includes("fetch")) {
-        console.error("❌ Network error - is the backend running?", error);
         throw new Error(`Cannot connect to backend at ${BASE_URL}. Make sure it's running.`);
       }
       throw error;

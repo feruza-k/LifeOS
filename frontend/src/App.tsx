@@ -53,24 +53,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
 };
 
 const VerifyEmailRoute = () => {
-  const { isAuthenticated, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // VerifyEmail requires authentication (user must be logged in to verify)
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
-  
+  // Allow verification without authentication (users might click email link before logging in)
+  // The verify-email-by-token endpoint doesn't require authentication
   return <VerifyEmail />;
 };
 
