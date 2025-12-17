@@ -27,7 +27,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
     # Truncate to 72 bytes if necessary (bcrypt limitation)
@@ -35,7 +34,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     if len(password_bytes) > 72:
         password_bytes = password_bytes[:72]
     return bcrypt.checkpw(password_bytes, hashed_password.encode('utf-8'))
-
 
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt. Bcrypt has a 72 byte limit."""
@@ -47,7 +45,6 @@ def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
-
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
@@ -78,16 +75,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-
 def generate_verification_token() -> str:
     """Generate a random verification token."""
     return secrets.token_urlsafe(32)
 
-
 def generate_reset_token() -> str:
     """Generate a random password reset token."""
     return secrets.token_urlsafe(32)
-
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     """

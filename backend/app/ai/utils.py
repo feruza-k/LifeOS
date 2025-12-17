@@ -1,9 +1,7 @@
 # app/ai/utils.py
-# ------------------------------------------------------------
 # Task extraction helper (improved)
 # - Date-aware + time-aware task matching
 # - Avoids picking the wrong instance when multiple tasks share a title
-# ------------------------------------------------------------
 
 import re
 from datetime import datetime, timedelta
@@ -11,10 +9,7 @@ import pytz
 
 tz = pytz.timezone("Europe/London")
 
-
-# ------------------------------------------------------------
 # STRICTER SIMILARITY RULE
-# ------------------------------------------------------------
 def _similar(a: str, b: str) -> bool:
     """
     Conservative similarity check:
@@ -35,10 +30,7 @@ def _similar(a: str, b: str) -> bool:
 
     return False
 
-
-# ------------------------------------------------------------
 # Extract a time like "8am", "8 am", "08:00", "7pm" → "HH:MM"
-# ------------------------------------------------------------
 def _extract_time_hint(text: str) -> str | None:
     t = text.lower()
 
@@ -64,7 +56,6 @@ def _extract_time_hint(text: str) -> str | None:
 
     # e.g. plain "8" (very ambiguous; we skip this to avoid over-matching)
     return None
-
 
 def try_extract_task_from_message(message: str, tasks: list):
     """

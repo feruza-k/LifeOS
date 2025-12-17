@@ -1,10 +1,8 @@
 # app/date_engine/semantic_date.py
-# ------------------------------------------------------------
 # Handles ambiguous expressions using the LLM:
 # - “early next month”
 # - “when I get home”
 # - “towards the evening”
-# ------------------------------------------------------------
 
 import os
 from datetime import datetime
@@ -22,7 +20,6 @@ def get_client():
             "Please create a .env file in the backend directory with: OPENAI_API_KEY=your-key-here"
         )
     return OpenAI(api_key=api_key)
-
 
 def semantic_interpret(message: str):
     prompt = f"""

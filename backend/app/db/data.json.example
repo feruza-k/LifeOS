@@ -1,0 +1,17 @@
+{
+    "tasks": [],
+    "notes": [],
+    "checkins": [],
+    "reminders": [],
+    "monthly_focus": [],
+    "users": [],
+    "pending": {},
+    "categories": [
+        {"id": "health", "label": "Health", "color": "#C7DED5"},
+        {"id": "growth", "label": "Growth", "color": "#C9DCEB"},
+        {"id": "family", "label": "Family", "color": "#F4D6E4"},
+        {"id": "work", "label": "Work", "color": "#DCD0E6"},
+        {"id": "creativity", "label": "Creativity", "color": "#FFF5E0"}
+    ]
+}
+

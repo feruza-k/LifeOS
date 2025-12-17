@@ -5,7 +5,6 @@ import pytz
 from app.logic.task_engine import get_all_tasks 
 tz = pytz.timezone("Europe/London")
 
-
 def get_current_week_boundaries():
     """
     Return (week_start_date, week_end_date) as date objects.
@@ -16,7 +15,6 @@ def get_current_week_boundaries():
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     return week_start, week_end
-
 
 def get_week_view():
     """
@@ -61,8 +59,6 @@ def get_week_view():
         "week_end": week_end.strftime("%Y-%m-%d"),
         "days": days,
     }
-
-
 
 def get_tasks_in_range(start_date_str: str, end_date_str: str):
     """
@@ -112,10 +108,7 @@ def get_tasks_in_range(start_date_str: str, end_date_str: str):
         "days": days,
     }
 
-
-# ---------------------------------------------------------
 # Week statistics
-# ---------------------------------------------------------
 
 def get_week_stats():
     """
@@ -186,10 +179,7 @@ def get_week_stats():
         "free_days": free_days,
     }
 
-
-# ---------------------------------------------------------
 # Human-readable week overview
-# ---------------------------------------------------------
 
 def get_week_summary_text() -> str:
     """

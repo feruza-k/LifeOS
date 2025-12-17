@@ -16,12 +16,10 @@ def ensure_uploads_dir():
     """Ensure uploads directory exists."""
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-
 def get_photo_path(filename: str) -> Path:
     """Get the full path to a photo file."""
     ensure_uploads_dir()
     return UPLOADS_DIR / filename
-
 
 def save_photo(file: UploadFile, date: str) -> str:
     """
@@ -45,7 +43,6 @@ def save_photo(file: UploadFile, date: str) -> str:
     logger.info(f"Photo saved: {filename}")
     return filename
 
-
 def delete_photo(filename: str) -> bool:
     """
     Delete a photo file.
@@ -57,7 +54,6 @@ def delete_photo(filename: str) -> bool:
         logger.info(f"Photo deleted: {filename}")
         return True
     return False
-
 
 def photo_exists(filename: str) -> bool:
     """Check if a photo file exists."""

@@ -1,13 +1,10 @@
 # app/date_engine/interpret.py
-# ------------------------------------------------------------
 # LifeOS Natural-Language Date/Time Interpreter
-# ------------------------------------------------------------
 # Handles:
 # - Explicit times ("5pm", "17:00", "6:30 pm")
 # - Explicit dates ("on Tuesday", "next Wednesday")
 # - Relative phrases ("tomorrow", "today")
 # - Falls back to the task's existing date ONLY when user gives NO date
-# ------------------------------------------------------------
 
 import re
 from datetime import datetime, timedelta
@@ -23,17 +20,13 @@ WEEKDAYS = {
     "sunday": 6,
 }
 
-
 def _next_weekday(base_dt: datetime, target_weekday: int) -> datetime:
     offset = (target_weekday - base_dt.weekday()) % 7
     if offset == 0:
         offset = 7
     return base_dt + timedelta(days=offset)
 
-
-# ------------------------------------------------------------
 # Extract time  — we always choose the *last* time in the message.
-# ------------------------------------------------------------
 def _extract_time(text: str) -> str | None:
     t = text.lower()
 
@@ -69,10 +62,7 @@ def _extract_time(text: str) -> str | None:
 
     return None
 
-
-# ------------------------------------------------------------
 # Extract date — explicit date words NEVER overridden
-# ------------------------------------------------------------
 def _extract_date(text: str, base_dt: datetime, existing_date: str | None) -> str | None:
     t = text.lower()
 
@@ -98,10 +88,7 @@ def _extract_date(text: str, base_dt: datetime, existing_date: str | None) -> st
     # 3) Fallback: only use task's existing date if user gave NO date
     return existing_date
 
-
-# ------------------------------------------------------------
 # Main public interpreter
-# ------------------------------------------------------------
 def interpret_datetime(
     text: str,
     base_dt: datetime,

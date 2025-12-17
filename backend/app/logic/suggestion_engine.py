@@ -27,5 +27,4 @@ def get_suggestions():
             "message": f"{wd} looks heavy — consider spreading tasks across the week."
         })
 
-
     return {"suggestions": suggestions}

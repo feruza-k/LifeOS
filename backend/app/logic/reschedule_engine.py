@@ -10,14 +10,11 @@ from app.logic.conflict_engine import find_conflicts
 
 tz = pytz.timezone("Europe/London")
 
-
 def _format_block(start: datetime, end: datetime) -> str:
     return f"{start.strftime('%H:%M')}–{end.strftime('%H:%M')}"
 
-
 def _block_to_suggestion(block: dict, task_title: str) -> str:
     return f"Move '{task_title}' to {block['start']}–{block['end']}"
-
 
 def _find_lighter_days_for_week():
     """Find days in the week with fewer tasks."""
@@ -29,10 +26,7 @@ def _find_lighter_days_for_week():
     ]
     return sorted(lighter_days, key=lambda x: x["count"])[:3]  # Top 3 lightest days
 
-
-# ---------------------------------------------------------
 # ORIGINAL API — used by /assistant/reschedule-options endpoint
-# ---------------------------------------------------------
 def generate_reschedule_suggestions(task_id: str) -> Dict:
     tasks = get_all_tasks()
     task = next((t for t in tasks if t["id"] == task_id), None)
@@ -54,10 +48,7 @@ def generate_reschedule_suggestions(task_id: str) -> Dict:
         "suggestions": lighter_suggestions[:3]  # Top 3 lighter day suggestions
     }
 
-
-# ---------------------------------------------------------
 # NEW WRAPPER — used by assistant.py (accepts full task dict)
-# ---------------------------------------------------------
 def generate_reschedule_suggestions_for_task(task: dict) -> List[str]:
     """
     Accepts a task dict directly (used by LLM assistant),

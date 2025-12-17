@@ -1,8 +1,6 @@
-# main.py
-
-
 from datetime import datetime, timedelta
 import os
+import sys
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Depends, status
@@ -11,35 +9,28 @@ from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr
-from datetime import timedelta
 
-# AI
 from app.ai.parser import test_ai_connection, parse_intent
 from app.ai.assistant import generate_assistant_response
-
-# Storage
 from app.storage.repo import repo, load_data, save_data
 from app.storage.photo_storage import save_photo, delete_photo, get_photo_path, photo_exists
-
-# Logic
 from app.logic.intent_handler import handle_intent
 from app.logic.today_engine import get_today_view
 from app.logic.suggestion_engine import get_suggestions
 from app.logic.categories import get_category_colors
-from app.logic.week_engine import (
-    get_tasks_in_range,
-    get_week_stats,
-)
+from app.logic.week_engine import get_tasks_in_range, get_week_stats
 from app.logic.reschedule_engine import generate_reschedule_suggestions
 from app.logic.conflict_engine import find_conflicts
 from app.logic.task_engine import get_all_tasks
 from app.logic.frontend_adapter import backend_task_to_frontend, frontend_task_to_backend
 from app.models.ui import AssistantReply
+from app.services.email_service import send_email
+from app.templates.email.auth import render_password_reset_email, render_verification_email
+from app.logging import logger
 
-# Load environment variables
 load_dotenv()
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
-# Auth imports (after load_dotenv to ensure env vars are loaded)
 try:
     from app.auth.auth import (
         create_access_token,
@@ -49,14 +40,8 @@ try:
         ACCESS_TOKEN_EXPIRE_MINUTES
     )
 except ValueError as e:
-    # If SECRET_KEY is missing, we'll get a clear error message
-    import sys
     print(f"\n❌ Authentication setup error: {e}\n", file=sys.stderr)
     sys.exit(1)
-
-# -----------------------------------------------------
-# FastAPI App
-# -----------------------------------------------------
 
 app = FastAPI(
     title="LifeOS Backend",
@@ -64,22 +49,16 @@ app = FastAPI(
     version="0.1"
 )
 
-# Allow backend ↔ mobile app communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: restrict in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -----------------------------------------------------
-# Models
-# -----------------------------------------------------
-
 class ChatRequest(BaseModel):
     message: str
-
 
 class RepeatConfig(BaseModel):
     type: str  # "weekly", "period", "custom"
@@ -99,7 +78,6 @@ class TaskCreateRequest(BaseModel):
     movedFrom: str | None = None
     repeat: Optional[RepeatConfig] = None
 
-
 class TaskUpdateRequest(BaseModel):
     title: str | None = None
     time: str | None = None
@@ -109,14 +87,12 @@ class TaskUpdateRequest(BaseModel):
     date: str | None = None
     movedFrom: str | None = None
 
-
 class NoteRequest(BaseModel):
     date: str
     content: str
     id: str | None = None
     createdAt: str | None = None
     updatedAt: str | None = None
-
 
 class CheckInRequest(BaseModel):
     date: str
@@ -126,19 +102,16 @@ class CheckInRequest(BaseModel):
     note: str | None = None
     mood: str | None = None
 
-
 # Auth models
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     confirm_password: str
-    username: str | None = None
-
+    username: str  # Required field
 
 class Token(BaseModel):
     access_token: str
     token_type: str
-
 
 class UserResponse(BaseModel):
     id: str
@@ -147,7 +120,6 @@ class UserResponse(BaseModel):
     username: str | None = None
     email_verified: bool = False
     avatar_path: str | None = None
-
 
 class ReminderRequest(BaseModel):
     title: str
@@ -161,7 +133,6 @@ class ReminderRequest(BaseModel):
     id: str | None = None
     createdAt: str | None = None
 
-
 class MonthlyFocusRequest(BaseModel):
     month: str
     title: str
@@ -170,78 +141,49 @@ class MonthlyFocusRequest(BaseModel):
     id: str | None = None
     createdAt: str | None = None
 
-
-# -----------------------------------------------------
-# ROOT
-# -----------------------------------------------------
-
 @app.get("/")
 def home():
     """Basic API health check."""
     return {"message": "LifeOS API is running 🚀"}
 
-
-# -----------------------------------------------------
-# Development & Debug Endpoints
-# -----------------------------------------------------
-
 @app.get("/ai-test")
 def ai_test():
-    """Verify OpenAI API connectivity (dev only)."""
     return {"response": test_ai_connection()}
-
 
 @app.post("/parse")
 def parse_endpoint(user_input: str):
-    """Parse natural language to intent (dev/debug)."""
     return parse_intent(user_input)
-
 
 @app.get("/process")
 def process(text: str):
-    """Full loop: natural language → intent → storage/action (dev/debug)."""
     intent = parse_intent(text)
     result = handle_intent(intent)
     return {"intent": intent, "result": result}
 
-
 @app.get("/tasks")
 def get_tasks():
-    """Get all tasks (backend format, for debugging)."""
     return get_all_tasks()
-
 
 @app.get("/all")
 def get_all():
-    """Get all data (dev/debug endpoint)."""
     return load_data()
-
 
 @app.post("/clear")
 def clear_data():
-    """Clear all stored data (dev only)."""
     empty = {"tasks": [], "diary": [], "memories": [], "pending": {}, "notes": [], "checkins": [], "reminders": [], "monthly_focus": []}
     save_data(empty)
     repo.data = empty
     return {"status": "cleared"}
 
-
 @app.post("/tasks/{task_id}/complete")
 def complete_task(task_id: str, current_user: dict = Depends(get_current_user)):
-    """Toggle task completion status (user-scoped)."""
     result = repo.toggle_task_complete(task_id, current_user["id"])
     if result:
         return {"status": "completed" if result.get("completed") else "incomplete", "task": result}
     return {"error": "Task not found"}
 
-
-# -----------------------------------------------------
-# Authentication Endpoints
-# -----------------------------------------------------
-
 @app.post("/auth/signup", response_model=Token)
 def signup(user_data: UserCreate):
-    """Register a new user with email verification."""
     from app.auth.password_validator import validate_password_strength
     
     # Validate passwords match
@@ -259,36 +201,100 @@ def signup(user_data: UserCreate):
             detail=error_msg
         )
     
-    # Check if user exists
-    existing_user = repo.get_user_by_email(user_data.email)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
+    email_normalized = user_data.email.lower().strip()
+    existing_user = repo.get_user_by_email(email_normalized)
     
-    # Generate verification token
+    if existing_user:
+        existing_user = repo.get_user_by_id(existing_user["id"])
+        email_verified = existing_user.get("email_verified", False) if existing_user else False
+        
+        if email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered and verified. Please log in instead."
+            )
+    
     from app.auth.auth import generate_verification_token
     verification_token = generate_verification_token()
     verification_expires = (datetime.utcnow() + timedelta(hours=24)).isoformat()
     
-    # Create user (not verified yet)
-    hashed_password = get_password_hash(user_data.password)
-    user = repo.create_user(
-        email=user_data.email,
-        hashed_password=hashed_password,
-        username=user_data.username,
-        verification_token=verification_token
-    )
+    if existing_user:
+        final_check_user = repo.get_user_by_id(existing_user["id"])
+        if final_check_user and not final_check_user.get("email_verified", False):
+            hashed_password = get_password_hash(user_data.password)
+            repo.update_user(existing_user["id"], {
+                "password": hashed_password,
+                "username": user_data.username or existing_user.get("username"),
+                "verification_token": verification_token,
+                "verification_token_expires": verification_expires
+            })
+            user = repo.get_user_by_id(existing_user["id"])
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update user"
+                )
+        elif final_check_user and final_check_user.get("email_verified", False):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered and verified. Please log in instead."
+            )
+        else:
+            existing_user = None
     
-    # Set verification token expiration
-    repo.update_user(user["id"], {
-        "verification_token_expires": verification_expires
-    })
+    if not existing_user:
+        hashed_password = get_password_hash(user_data.password)
+        user = repo.create_user(
+            email=email_normalized,
+            hashed_password=hashed_password,
+            username=user_data.username,
+            verification_token=verification_token
+        )
+        repo.update_user(user["id"], {
+            "verification_token_expires": verification_expires
+        })
     
-    # Send verification email
-    from app.email.service import send_verification_email
-    send_verification_email(user_data.email, verification_token)
+    verification_url = f"{FRONTEND_URL.rstrip('/')}/verify-email?token={verification_token}"
+    
+    try:
+        username = user.get("username") if user else user_data.username
+        subject, html, text = render_verification_email(
+            user_data.email,
+            verification_token,
+            FRONTEND_URL,
+            username=username
+        )
+        logger.info(f"Calling send_email for {user_data.email}...")
+        send_email(user_data.email, subject, html, text)
+        logger.info(f"✅ Verification email sent successfully to {user_data.email}")
+    except ValueError as e:
+        # Configuration error - log and fail loudly
+        logger.error(f"❌ Email configuration error: {e}", exc_info=True)
+        logger.error(f"   Verification URL for manual use: {verification_url}")
+    except Exception as e:
+        # Other email errors - log but don't fail signup
+        from app.services.email_service import EmailDeliveryError
+        error_type = type(e).__name__
+        logger.error(f"❌ Failed to send verification email to {user_data.email}: {error_type}: {e}", exc_info=True)
+        
+        # For development: log the verification link to console
+        logger.error("=" * 70)
+        logger.error("⚠️  EMAIL NOT SENT - DEVELOPMENT MODE")
+        logger.error(f"   Email: {user_data.email}")
+        logger.error(f"   Verification URL: {verification_url}")
+        logger.error(f"   Token: {verification_token}")
+        logger.error("")
+        logger.error("   To verify manually, use:")
+        logger.error(f"   curl -X POST http://localhost:8000/auth/verify-email-by-token \\")
+        logger.error(f"        -H 'Content-Type: application/json' \\")
+        logger.error(f"        -d '{{\"token\": \"{verification_token}\"}}'")
+        logger.error("=" * 70)
+        
+        if isinstance(e, EmailDeliveryError):
+            logger.error("   This is likely due to Resend domain verification requirements.")
+            logger.error("   See backend logs above for details.")
+        
+        # User account is still created, they can use resend-verification endpoint
     
     # Create access token (user can log in but will be redirected to verification)
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -298,11 +304,10 @@ def signup(user_data: UserCreate):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-
 @app.post("/auth/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Authenticate user and return JWT token."""
-    user = repo.get_user_by_email(form_data.username)
+    email_normalized = form_data.username.lower().strip()
+    user = repo.get_user_by_email(email_normalized)
     if not user or not verify_password(form_data.password, user["password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -316,10 +321,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-
 @app.get("/auth/me", response_model=UserResponse)
 def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    """Get current authenticated user info."""
     return {
         "id": current_user["id"],
         "email": current_user["email"],
@@ -329,18 +332,14 @@ def get_current_user_info(current_user: dict = Depends(get_current_user)):
         "avatar_path": current_user.get("avatar_path")
     }
 
-
 class VerifyEmailRequest(BaseModel):
     token: str
-
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
 
-
 @app.post("/auth/verify-email")
 def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Depends(get_current_user)):
-    """Verify user's email with token."""
     user = repo.get_user_by_id(current_user["id"])
     
     if not user:
@@ -367,20 +366,50 @@ def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Depends(g
     
     return {"message": "Email verified successfully", "verified": True}
 
+@app.post("/auth/verify-email-by-token")
+def verify_email_by_token(verify_data: VerifyEmailRequest):
+    """Verify user's email with token directly (DEVELOPMENT ONLY).
+    
+    ⚠️  WARNING: This endpoint bypasses email verification and should only be used
+    for development/testing when emails cannot be sent (e.g., Resend domain not verified).
+    
+    In production, users should verify via the email link, not this endpoint.
+    
+    This endpoint doesn't require authentication and can be used when:
+    - Email sending fails due to Resend restrictions (domain not verified)
+    - Testing verification flow in development
+    """
+    # Find user by verification token
+    user = repo.get_user_by_verification_token(verify_data.token)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token"
+        )
+    
+    if user.get("email_verified"):
+        return {"message": "Email already verified", "verified": True}
+    
+    repo.update_user(user["id"], {
+        "email_verified": True,
+        "verification_token": None,
+        "verification_token_expires": None
+    })
+    
+    return {"message": "Email verified successfully", "verified": True}
 
 @app.post("/auth/resend-verification")
 def resend_verification(req: ResendVerificationRequest):
-    """Resend verification token (logs to console for now)."""
-    user = repo.get_user_by_email(req.email)
+    email_normalized = req.email.lower().strip()
+    user = repo.get_user_by_email(email_normalized)
     
     if not user:
-        # Don't reveal if email exists or not (security)
         return {"message": "If the email exists, a verification token has been sent"}
     
     if user.get("email_verified"):
         return {"message": "Email already verified"}
     
-    # Generate new verification token
     from app.auth.auth import generate_verification_token
     verification_token = generate_verification_token()
     verification_expires = (datetime.utcnow() + timedelta(hours=24)).isoformat()
@@ -390,39 +419,49 @@ def resend_verification(req: ResendVerificationRequest):
         "verification_token_expires": verification_expires
     })
     
-    # Send verification email
-    from app.email.service import send_verification_email
-    send_verification_email(req.email, verification_token)
+    try:
+        username = user.get("username")
+        subject, html, text = render_verification_email(
+            req.email,
+            verification_token,
+            FRONTEND_URL,
+            username=username
+        )
+        send_email(req.email, subject, html, text)
+        logger.info(f"Verification email sent to {req.email}")
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {req.email}: {e}", exc_info=True)
+        # Still return success message for security (don't reveal if email exists)
     
     return {"message": "If the email exists, a verification token has been sent"}
 
-
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
-
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
     confirm_password: str
 
-
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
     confirm_password: str
 
-
 @app.post("/auth/forgot-password")
 def forgot_password(req: ForgotPasswordRequest):
-    """Generate password reset token and send email."""
-    user = repo.get_user_by_email(req.email)
+    email_normalized = req.email.lower().strip()
+    user = repo.get_user_by_email(email_normalized)
     
     if not user:
-        # Don't reveal if email exists (security)
         return {"message": "If the email exists, a password reset token has been sent"}
     
-    # Generate reset token
+    if not user.get("email_verified", False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This email is registered but not yet verified. Please verify your email first, then you can reset your password."
+        )
+    
     from app.auth.auth import generate_reset_token
     reset_token = generate_reset_token()
     reset_expires = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
@@ -432,12 +471,20 @@ def forgot_password(req: ForgotPasswordRequest):
         "reset_token_expires": reset_expires
     })
     
-    # Send password reset email
-    from app.email.service import send_password_reset_email
-    send_password_reset_email(req.email, reset_token)
+    try:
+        username = user.get("username")
+        subject, html, text = render_password_reset_email(
+            req.email,
+            reset_token,
+            FRONTEND_URL,
+            username=username
+        )
+        send_email(req.email, subject, html, text)
+        logger.info(f"Password reset email sent to {req.email}")
+    except Exception as e:
+        logger.error(f"Failed to send password reset email to {req.email}: {e}", exc_info=True)
     
     return {"message": "If the email exists, a password reset token has been sent"}
-
 
 @app.post("/auth/reset-password")
 def reset_password(req: ResetPasswordRequest):
@@ -476,7 +523,6 @@ def reset_password(req: ResetPasswordRequest):
     })
     
     return {"message": "Password reset successfully"}
-
 
 @app.post("/auth/change-password")
 def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
@@ -520,10 +566,8 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
     
     return {"message": "Password changed successfully"}
 
-
 class UpdateProfileRequest(BaseModel):
     username: str | None = None
-
 
 @app.patch("/auth/profile")
 def update_profile(updates: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
@@ -560,7 +604,6 @@ def update_profile(updates: UpdateProfileRequest, current_user: dict = Depends(g
         "created_at": updated_user["created_at"]
     }
 
-
 @app.delete("/auth/account")
 def delete_account(current_user: dict = Depends(get_current_user)):
     """Delete user account and all associated data."""
@@ -594,7 +637,6 @@ def delete_account(current_user: dict = Depends(get_current_user)):
     save_data(data)
     
     return {"message": "Account deleted successfully"}
-
 
 @app.post("/auth/avatar")
 async def upload_avatar(
@@ -637,7 +679,6 @@ async def upload_avatar(
     
     return {"avatar_path": avatar_url, "message": "Avatar uploaded successfully"}
 
-
 @app.delete("/auth/avatar")
 def delete_avatar(current_user: dict = Depends(get_current_user)):
     """Delete user avatar."""
@@ -664,10 +705,7 @@ def delete_avatar(current_user: dict = Depends(get_current_user)):
     
     return {"message": "Avatar deleted successfully"}
 
-
-# -----------------------------------------------------
 # Frontend-Compatible Task Endpoints (Protected)
-# -----------------------------------------------------
 
 @app.get("/tasks/by-date")
 def get_tasks_by_date(
@@ -677,7 +715,6 @@ def get_tasks_by_date(
     """Get tasks for a specific date in frontend format (user-scoped)."""
     tasks = repo.get_tasks_by_date_and_user(date, current_user["id"])
     return [backend_task_to_frontend(t) for t in tasks]
-
 
 @app.post("/tasks")
 def create_task(
@@ -748,7 +785,6 @@ def create_task(
     # Return the first created task (for compatibility)
     return created_tasks[0] if created_tasks else backend_task_to_frontend(result)
 
-
 @app.patch("/tasks/{task_id}")
 def update_task(
     task_id: str,
@@ -785,7 +821,6 @@ def update_task(
         return backend_task_to_frontend(result)
     return {"error": "Task not found"}
 
-
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a task (user-scoped)."""
@@ -793,7 +828,6 @@ def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
     if success:
         return {"status": "deleted", "id": task_id}
     return {"error": "Task not found"}
-
 
 @app.post("/tasks/{task_id}/move")
 def move_task(
@@ -816,10 +850,7 @@ def move_task(
         return backend_task_to_frontend(result)
     return {"error": "Failed to move task"}
 
-
-# -----------------------------------------------------
 # Notes Endpoints
-# -----------------------------------------------------
 
 @app.get("/notes")
 def get_note(
@@ -832,7 +863,6 @@ def get_note(
         return note
     return None
 
-
 @app.post("/notes")
 @app.put("/notes")
 def save_note(
@@ -843,10 +873,7 @@ def save_note(
     result = repo.save_note(note_data, current_user["id"])
     return result
 
-
-# -----------------------------------------------------
 # Photo Endpoints
-# -----------------------------------------------------
 
 @app.post("/photos/upload")
 async def upload_photo(
@@ -886,7 +913,6 @@ async def upload_photo(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
 
-
 @app.get("/photos/{filename}")
 def get_photo(filename: str):
     """Get a photo file by filename."""
@@ -898,7 +924,6 @@ def get_photo(filename: str):
         photo_path,
         media_type="image/jpeg"  # Default, could be improved with proper MIME type detection
     )
-
 
 @app.delete("/photos/{filename}")
 def delete_photo_endpoint(
@@ -939,10 +964,7 @@ def delete_photo_endpoint(
     
     return {"success": True, "message": "Photo deleted"}
 
-
-# -----------------------------------------------------
 # Check-ins Endpoints
-# -----------------------------------------------------
 
 @app.get("/checkins")
 def get_checkin(
@@ -955,7 +977,6 @@ def get_checkin(
         return checkin
     return None
 
-
 @app.post("/checkins")
 def save_checkin(
     checkin_data: CheckInRequest,
@@ -965,23 +986,18 @@ def save_checkin(
     result = repo.save_checkin(checkin_data.model_dump(exclude_none=True), current_user["id"])
     return result
 
-
-# -----------------------------------------------------
 # Reminders Endpoints (separate from task reminders)
-# -----------------------------------------------------
 
 @app.get("/reminders")
 def get_all_reminders(current_user: dict = Depends(get_current_user)):
     """Get all reminders for the current user (separate from task reminders)."""
     return repo.get_reminders(current_user["id"])
 
-
 @app.post("/reminders")
 def create_reminder(reminder_data: ReminderRequest, current_user: dict = Depends(get_current_user)):
     """Create a new reminder (user-scoped)."""
     result = repo.add_reminder(reminder_data.model_dump(exclude_none=True), current_user["id"])
     return result
-
 
 class ReminderUpdateRequest(BaseModel):
     title: str | None = None
@@ -993,7 +1009,6 @@ class ReminderUpdateRequest(BaseModel):
     recurring: str | None = None
     visible: bool | None = None
 
-
 @app.patch("/reminders/{reminder_id}")
 def update_reminder(reminder_id: str, updates: ReminderUpdateRequest, current_user: dict = Depends(get_current_user)):
     """Update a reminder (user-scoped)."""
@@ -1003,7 +1018,6 @@ def update_reminder(reminder_id: str, updates: ReminderUpdateRequest, current_us
         return result
     return {"error": "Reminder not found"}
 
-
 @app.delete("/reminders/{reminder_id}")
 def delete_reminder(reminder_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a reminder (user-scoped)."""
@@ -1012,10 +1026,7 @@ def delete_reminder(reminder_id: str, current_user: dict = Depends(get_current_u
         return {"status": "deleted", "id": reminder_id}
     return {"error": "Reminder not found"}
 
-
-# -----------------------------------------------------
 # Monthly Focus Endpoints
-# -----------------------------------------------------
 
 @app.get("/monthly-focus")
 def get_monthly_focus(
@@ -1028,34 +1039,27 @@ def get_monthly_focus(
         return focus
     return None
 
-
 @app.post("/monthly-focus")
 def save_monthly_focus(focus_data: MonthlyFocusRequest, current_user: dict = Depends(get_current_user)):
     """Save or update monthly focus (user-scoped)."""
     result = repo.save_monthly_focus(focus_data.model_dump(exclude_none=True), current_user["id"])
     return result
 
-
-# -----------------------------------------------------
 # Categories Endpoints
-# -----------------------------------------------------
 
 class CategoryRequest(BaseModel):
     label: str
     color: str
     id: str | None = None
 
-
 class CategoryUpdateRequest(BaseModel):
     label: str | None = None
     color: str | None = None
-
 
 @app.get("/categories")
 def get_all_categories():
     """Get all categories."""
     return repo.get_categories()
-
 
 @app.get("/categories/{category_id}")
 def get_category(category_id: str):
@@ -1065,14 +1069,12 @@ def get_category(category_id: str):
         return category
     return {"error": "Category not found"}
 
-
 @app.post("/categories")
 def create_category(category_data: CategoryRequest):
     """Create a new category."""
     category_dict = category_data.model_dump(exclude_none=True)
     result = repo.add_category(category_dict)
     return result
-
 
 @app.patch("/categories/{category_id}")
 def update_category(category_id: str, updates: CategoryUpdateRequest):
@@ -1083,7 +1085,6 @@ def update_category(category_id: str, updates: CategoryUpdateRequest):
         return result
     return {"error": "Category not found"}
 
-
 @app.delete("/categories/{category_id}")
 def delete_category(category_id: str):
     """Delete a category."""
@@ -1092,10 +1093,7 @@ def delete_category(category_id: str):
         return {"status": "deleted", "id": category_id}
     return {"error": "Category not found"}
 
-
-# -----------------------------------------------------
 # Weekly & Calendar Views (Used by Frontend)
-# -----------------------------------------------------
 
 @app.get("/tasks/calendar")
 def tasks_calendar(
@@ -1117,7 +1115,6 @@ def tasks_calendar(
     except ValueError as e:
         return {"error": str(e)}
 
-
 @app.get("/tasks/conflicts")
 def tasks_conflicts(
     start: str | None = Query(None),
@@ -1125,10 +1122,7 @@ def tasks_conflicts(
 ):
     return find_conflicts(start, end)
 
-
-# -----------------------------------------------------
 # Assistant Endpoints (SolAI)
-# -----------------------------------------------------
 
 @app.post("/assistant/chat", response_model=AssistantReply)
 def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)):
@@ -1139,12 +1133,10 @@ def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_curren
         "ui": reply.get("ui")
     }
 
-
 @app.post("/assistant/confirm")
 def assistant_confirm(current_user: dict = Depends(get_current_user)):
     """Confirm pending action (equivalent to user saying 'yes', user-scoped)."""
     return generate_assistant_response("yes", current_user["id"])
-
 
 @app.get("/assistant/bootstrap")
 def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
@@ -1180,7 +1172,6 @@ def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
         "categories": get_category_colors(),
         "pending": load_data().get("pending", {}).get(current_user["id"], {})
     }
-
 
 @app.get("/assistant/today")
 def assistant_today(
@@ -1235,14 +1226,12 @@ def assistant_today(
         "energy": energy
     }
 
-
 @app.get("/assistant/suggestions")
 def assistant_suggestions(current_user: dict = Depends(get_current_user)):
     """Get suggestions for the user (user-scoped)."""
     # Filter suggestions to user's tasks only
     user_tasks = repo.get_tasks_by_user(current_user["id"])
     return get_suggestions()
-
 
 @app.get("/assistant/reschedule-options")
 def assistant_reschedule_options(task_id: str, current_user: dict = Depends(get_current_user)):
@@ -1255,10 +1244,7 @@ def assistant_reschedule_options(task_id: str, current_user: dict = Depends(get_
     suggestions = generate_reschedule_suggestions(task_id)
     return {"task": task, "suggestions": suggestions.get("suggestions", [])}
 
-
-# -----------------------------------------------------
 # Meta Endpoints
-# -----------------------------------------------------
 
 @app.get("/meta/categories")
 def meta_categories():

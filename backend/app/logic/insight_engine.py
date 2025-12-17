@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 import pytz
 from app.logic.today_engine import get_today_view
 
-
 # Import your real existing functions
 from app.logic.week_engine import (
     get_week_stats,
@@ -21,11 +20,9 @@ from app.logic.conflict_engine import find_conflicts
 
 tz = pytz.timezone("Europe/London")
 
-
 def _insight(text: str) -> dict:
     """Wrap insights in a clean structure."""
     return {"message": text}
-
 
 def get_insights() -> List[dict]:
     """
@@ -127,6 +124,5 @@ def get_insights() -> List[dict]:
         insights.append(_insight("Today looks light and manageable."))
     elif today["load"] == "heavy":
         insights.append(_insight("Today is quite full — try to keep some breathing room where possible."))
-
 
     return insights

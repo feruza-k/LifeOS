@@ -8,7 +8,6 @@ from app.logic.task_engine import parse_datetime, get_all_tasks
 
 tz = pytz.timezone("Europe/London")
 
-
 def _parse_end_datetime(task, start_dt: datetime) -> datetime:
     """
     Determine the end datetime for a task.
@@ -36,7 +35,6 @@ def _parse_end_datetime(task, start_dt: datetime) -> datetime:
         return start_dt + timedelta(minutes=60)
     else:
         return start_dt + timedelta(minutes=15)
-
 
 def get_scheduled_blocks(
     start_date_str: Optional[str] = None,
@@ -80,7 +78,6 @@ def get_scheduled_blocks(
 
     blocks.sort(key=lambda b: b["start"])
     return blocks
-
 
 def find_conflicts(
     start: Optional[str] = None,

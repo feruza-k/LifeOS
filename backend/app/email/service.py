@@ -23,14 +23,12 @@ EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "LifeOS")
 # Use development mode if SMTP credentials are not set
 USE_DEVELOPMENT_MODE = not (SMTP_USER and SMTP_PASSWORD)
 
-
 class EmailService:
     """Base email service interface."""
     
     def send_email(self, to: str, subject: str, html_body: str, text_body: Optional[str] = None) -> bool:
         """Send an email. Returns True if successful."""
         raise NotImplementedError
-
 
 class DevelopmentEmailService(EmailService):
     """Development email service - logs emails to console."""
@@ -53,7 +51,6 @@ class DevelopmentEmailService(EmailService):
             print(f"\n{text}")
         print(f"{'='*70}\n")
         return True
-
 
 class SMTPEmailService(EmailService):
     """Production email service using SMTP."""
@@ -85,7 +82,6 @@ class SMTPEmailService(EmailService):
             print(f"❌ Failed to send email: {e}")
             return False
 
-
 # Create email service instance based on configuration
 if USE_DEVELOPMENT_MODE:
     email_service = DevelopmentEmailService()
@@ -93,7 +89,6 @@ if USE_DEVELOPMENT_MODE:
 else:
     email_service = SMTPEmailService()
     print(f"📧 Email service: Production mode (SMTP: {SMTP_HOST})")
-
 
 def send_verification_email(email: str, token: str) -> bool:
     """Send email verification email."""
@@ -136,7 +131,6 @@ This link will expire in 24 hours.
     """
     
     return email_service.send_email(email, subject, html_body, text_body)
-
 
 def send_password_reset_email(email: str, token: str) -> bool:
     """Send password reset email."""

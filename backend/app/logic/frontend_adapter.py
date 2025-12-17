@@ -4,7 +4,6 @@
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-
 def backend_task_to_frontend(backend_task: Dict[str, Any]) -> Dict[str, Any]:
     """
     Transform backend task format to frontend Task format.
@@ -68,7 +67,6 @@ def backend_task_to_frontend(backend_task: Dict[str, Any]) -> Dict[str, Any]:
         "createdAt": created_at,
         "movedFrom": backend_task.get("moved_from") or backend_task.get("movedFrom"),
     }
-
 
 def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "event") -> Dict[str, Any]:
     """

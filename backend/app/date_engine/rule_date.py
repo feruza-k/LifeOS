@@ -1,16 +1,13 @@
 # app/date_engine/rule_date.py
-# ------------------------------------------------------------
 # Pure rule-based deterministic parsing.
 # Handles: tomorrow, next week, next month, weekdays,
 # explicit times, “morning/evening”, durations.
-# ------------------------------------------------------------
 
 import re
 from datetime import datetime, timedelta
 import pytz
 
 tz = pytz.timezone("Europe/London")
-
 
 def parse_rule_based(message: str):
     text = message.lower()

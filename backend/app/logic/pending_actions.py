@@ -1,6 +1,5 @@
 # app/logic/pending_actions.py
 
-
 from app.storage.repo import load_data, save_data
 
 """
@@ -28,7 +27,6 @@ def create_pending_action(action_type: str, payload: dict, user_id: str):
     save_data(data)
     return data["pending"][user_id]
 
-
 def get_current_pending(user_id: str = None):
     """Get pending action for a specific user."""
     data = load_data()
@@ -39,7 +37,6 @@ def get_current_pending(user_id: str = None):
     if pending:
         return next(iter(pending.values()), {})
     return {}
-
 
 def clear_current_pending(user_id: str = None):
     """Clear pending action for a specific user."""

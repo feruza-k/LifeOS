@@ -6,7 +6,6 @@ from pathlib import Path
 from datetime import datetime
 from app.logging import logger
 
-
 # Compute correct absolute path to db/data.json
 BASE_DIR = Path(__file__).resolve().parent.parent / "db"
 DATA_FILE = BASE_DIR / "data.json"
@@ -41,11 +40,9 @@ if not DATA_FILE.exists():
         indent=4
     ))
 
-
 def load_data():
     with open(DATA_FILE, "r") as f:
         return json.load(f)
-
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
@@ -65,7 +62,6 @@ def clear_pending():
     data = load_data()
     data["pending"] = {}
     save_data(data)
-
 
 class Repo:
     def __init__(self):
@@ -92,15 +88,21 @@ class Repo:
     # User management
     # -----------------------------
     def get_user_by_email(self, email: str):
-        """Get user by email address."""
+        """Get user by email address (case-insensitive)."""
+        # Reload data to ensure we have the latest state
+        self.data = load_data()
+        email_lower = email.lower().strip()
         users = self.data.get("users", [])
         for user in users:
-            if user.get("email") == email:
+            user_email = user.get("email", "").lower().strip()
+            if user_email == email_lower:
                 return user
         return None
 
     def get_user_by_id(self, user_id: str):
         """Get user by ID."""
+        # Reload data to ensure we have the latest state
+        self.data = load_data()
         users = self.data.get("users", [])
         for user in users:
             if user.get("id") == user_id:
@@ -109,12 +111,22 @@ class Repo:
 
     def create_user(self, email: str, hashed_password: str, username: str = None, verification_token: str = None):
         """Create a new user with extended fields."""
+        # Reload data to ensure we have the latest state
+        self.data = load_data()
+        # Normalize email to lowercase for storage
+        email_normalized = email.lower().strip()
+        
+        # Check if user already exists (shouldn't happen if called correctly, but safety check)
+        existing = self.get_user_by_email(email_normalized)
+        if existing:
+            raise ValueError(f"User with email {email_normalized} already exists")
+        
         user_id = str(uuid.uuid4())
         user = {
             "id": user_id,
-            "email": email,
+            "email": email_normalized,
             "password": hashed_password,  # Already hashed
-            "username": username or email.split("@")[0],  # Default to email prefix
+            "username": username or email_normalized.split("@")[0],  # Default to email prefix
             "avatar_path": None,
             "email_verified": False,
             "verification_token": verification_token,
@@ -127,11 +139,13 @@ class Repo:
             self.data["users"] = []
         self.data["users"].append(user)
         save_data(self.data)
-        logger.info(f"User created: {email}")
+        logger.info(f"User created: {email_normalized}")
         return user
     
     def update_user(self, user_id: str, updates: dict):
         """Update user fields."""
+        # Reload data to ensure we have the latest state
+        self.data = load_data()
         for user in self.data.get("users", []):
             if user.get("id") == user_id:
                 user.update(updates)
@@ -142,6 +156,8 @@ class Repo:
     
     def get_user_by_verification_token(self, token: str):
         """Get user by verification token."""
+        # Reload data to ensure we have the latest state
+        self.data = load_data()
         users = self.data.get("users", [])
         for user in users:
             if user.get("verification_token") == token:
@@ -500,7 +516,6 @@ class Repo:
             logger.info(f"Category deleted: {category_id}")
             return True
         return False
-
 
 # Instance
 repo = Repo()

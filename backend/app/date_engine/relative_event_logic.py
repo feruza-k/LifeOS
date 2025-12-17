@@ -1,13 +1,10 @@
 # app/date_engine/relative_event_logic.py
-# ------------------------------------------------------------
 # Handles expressions like:
 # - “after gym”
 # - “before my exam”
 # - “the day after my flight”
-# ------------------------------------------------------------
 
 from datetime import datetime, timedelta
-
 
 def resolve_relative_event(message: str, tasks: list):
     text = message.lower()

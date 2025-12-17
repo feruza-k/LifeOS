@@ -19,6 +19,5 @@ class Task(BaseItem):
     energy: Optional[str] = None   # low / medium / high
     context: Optional[str] = None
 
-
    
 

@@ -1,10 +1,7 @@
 # app/date_engine/free_slot_engine.py
-# ------------------------------------------------------------
 # Finds next free slot, free mornings, afternoons, etc.
-# ------------------------------------------------------------
 
 from datetime import datetime, timedelta
-
 
 def resolve_free_slot(message: str, tasks: list):
     text = message.lower()

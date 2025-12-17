@@ -19,9 +19,7 @@ current_time = now.strftime("%H:%M")
 def test_ai_connection():
     return "AI connection works."
 
-# ---------------------------------------------------------
 # SYSTEM PROMPT
-# ---------------------------------------------------------
 system_prompt = f"""
 You are an intent parser for a personal AI planning assistant.
 Your job is to convert free-form natural language into a structured JSON intent.
@@ -47,10 +45,7 @@ OUTPUT RULES:
 - Always fill fields: intent_type, title, date, time, datetime, category, notes
 """
 
-
-# ---------------------------------------------------------
 # SETUP LLM CLIENT
-# ---------------------------------------------------------
 load_dotenv()
 
 def get_client():
@@ -63,11 +58,7 @@ def get_client():
         )
     return OpenAI(api_key=api_key)
 
-
-
-# ---------------------------------------------------------
 # PARSER FUNCTION
-# ---------------------------------------------------------
 def parse_intent(user_input: str) -> Intent:
     """
     Convert natural language input into a structured Intent.
@@ -204,7 +195,6 @@ def parse_intent(user_input: str) -> Intent:
             })
         }
     ]
-
 
     # -----------------------------------------------------
     # LLM CALL

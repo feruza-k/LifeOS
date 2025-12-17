@@ -1,5 +1,4 @@
 # app/ai/assistant.py
-# ------------------------------------------------------------
 # LifeOS Assistant Core — Stable Edition (Day 8)
 # Natural-language task control with:
 # - Smart weekday date resolution (next Friday, etc.)
@@ -7,7 +6,6 @@
 # - Intent-aware parsing to avoid accidental task creation
 # - Pending actions workflow
 # - Time range detection (e.g., "9am to 11am")
-# ------------------------------------------------------------
 
 import os
 import re
@@ -31,9 +29,7 @@ from app.logic.pending_actions import (
 from app.date_engine.interpret import interpret_datetime
 from app.ai.parser import parse_intent
 
-# ------------------------------------------------------------
 # Setup
-# ------------------------------------------------------------
 tz = pytz.timezone("Europe/London")
 last_referenced_task_id = None
 
@@ -45,9 +41,7 @@ WEEKDAYS = {
     "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6
 }
 
-# ------------------------------------------------------------
 # Natural Language Date Helpers
-# ------------------------------------------------------------
 def contains_new_date_phrase(text: str) -> bool:
     text = text.lower()
     if any(day in text for day in WEEKDAYS):   # weekdays always override date
@@ -83,9 +77,7 @@ def convert_to_24h(raw):
         except: pass
     return None
 
-# ------------------------------------------------------------
 # Schedule Queries
-# ------------------------------------------------------------
 def resolve_schedule_date(cleaned, now):
     if "tomorrow" in cleaned: return (now + timedelta(days=1)).strftime("%Y-%m-%d")
     if "today"    in cleaned: return now.strftime("%Y-%m-%d")
@@ -96,9 +88,7 @@ def resolve_schedule_date(cleaned, now):
             return (now + timedelta(days=offset)).strftime("%Y-%m-%d")
     return None
 
-# =====================================================================
 # MAIN ASSISTANT LOGIC
-# =====================================================================
 def generate_assistant_response(user_message: str, user_id: str = None):
     global last_referenced_task_id
 
@@ -266,7 +256,6 @@ def generate_assistant_response(user_message: str, user_id: str = None):
                     "ui": None
                 }
 
-
         readable = f"{fields['title']} on {fields['date']} at {fields['time']}"
         create_pending_action("create", {"task_fields": fields}, user_id)
 
@@ -350,7 +339,6 @@ def generate_assistant_response(user_message: str, user_id: str = None):
                         "new_time": suggested
                     }
                 }
-
 
             return {
                 "assistant_response": (

@@ -6,7 +6,6 @@ Enforces strong password rules.
 import re
 from typing import Tuple, Optional
 
-
 def validate_password_strength(password: str) -> Tuple[bool, Optional[str]]:
     """
     Validate password strength.
@@ -33,7 +32,6 @@ def validate_password_strength(password: str) -> Tuple[bool, Optional[str]]:
         return False, "Password must contain at least one symbol"
     
     return True, None
-
 
 def get_password_requirements() -> list[str]:
     """Get list of password requirements for UI display."""

@@ -8,9 +8,7 @@ import pytz
 
 tz = pytz.timezone("Europe/London")
 
-# ---------------------------------------------------------
 # Helper: parse datetime
-# ---------------------------------------------------------
 def parse_datetime(task):
     dt_str = task.get("datetime")
 
@@ -27,10 +25,7 @@ def parse_datetime(task):
         task["error"] = f"Invalid datetime format: {dt_str}. Error: {str(e)}"
         return None
 
-
-# ---------------------------------------------------------
 # Get ALL tasks
-# ---------------------------------------------------------
 def get_all_tasks():
     tasks = load_data().get("tasks", [])
     now = datetime.now(tz)
@@ -54,36 +49,27 @@ def get_all_tasks():
     tasks.sort(key=lambda t: t.get("datetime") or "")
     return tasks
 
-
-# ---------------------------------------------------------
 # Today, Upcoming, Overdue
-# ---------------------------------------------------------
 def get_tasks_today():
     today = date.today().strftime("%Y-%m-%d")
     tasks = get_all_tasks()
     return [t for t in tasks if t.get("date") == today]
-
 
 def get_upcoming_tasks():
     now = datetime.now(tz)
     tasks = get_all_tasks()
     return [t for t in tasks if parse_datetime(t) and parse_datetime(t) > now]
 
-
 def get_overdue_tasks():
     now = datetime.now(tz)
     tasks = get_all_tasks()
     return [t for t in tasks if parse_datetime(t) and parse_datetime(t) < now]
 
-
 def get_next_task():
     up = get_upcoming_tasks()
     return up[0] if up else None
 
-
-# ---------------------------------------------------------
 # Grouping
-# ---------------------------------------------------------
 def group_tasks_by_date():
     tasks = get_all_tasks()
     grouped = {}
@@ -99,24 +85,17 @@ def group_tasks_by_date():
 
     return grouped
 
-
 def group_tasks_pretty():
     g = group_tasks_by_date()
     return [{"date": d, "tasks": g[d]} for d in sorted(g.keys())]
 
-
-# ---------------------------------------------------------
 # Today timeline
-# ---------------------------------------------------------
 def get_today_timeline():
     today = get_tasks_today()
     today.sort(key=lambda x: x.get("time") or "")
     return today
 
-
-# ---------------------------------------------------------
 # Reschedule, edit, delete
-# ---------------------------------------------------------
 def apply_reschedule(task_id: str, new_datetime: str):
     data = load_data()
     for task in data["tasks"]:
@@ -136,13 +115,11 @@ def apply_reschedule(task_id: str, new_datetime: str):
             return task
     return None
 
-
 def delete_task(task_id: str):
     data = load_data()
     data["tasks"] = [t for t in data["tasks"] if t["id"] != task_id]
     save_data(data)
     return True
-
 
 def edit_task(task_id: str, fields: dict):
     data = load_data()
@@ -154,10 +131,7 @@ def edit_task(task_id: str, fields: dict):
             return task
     return None
 
-
-# ---------------------------------------------------------
 # CREATE TASK (UPDATED)
-# ---------------------------------------------------------
 def create_task(fields: dict):
     from uuid import uuid4
     data = load_data()
@@ -216,7 +190,6 @@ def create_task(fields: dict):
 
     save_data(data)
     return task
-
 
 def find_next_free_slot(date: str, time: str, all_tasks: list) -> str | None:
     """Given a date & time, find the nearest free 1-hour slot that does NOT overlap."""

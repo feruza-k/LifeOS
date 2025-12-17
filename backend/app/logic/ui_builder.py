@@ -10,7 +10,6 @@ from app.logic.categories import CATEGORY_COLORS
 
 tz = pytz.timezone("Europe/London")
 
-
 def _format_task_ui(t):
     return {
         "id": t.get("id"),
@@ -25,10 +24,7 @@ def _format_task_ui(t):
         "is_completed": t.get("completed", False),
     }
 
-
-# ---------------------------------------------------------
 # TODAY UI SHAPE
-# ---------------------------------------------------------
 def build_today_ui():
     raw = get_today_view()
 
@@ -44,10 +40,7 @@ def build_today_ui():
         }
     }
 
-
-# ---------------------------------------------------------
 # WEEK UI SHAPE
-# ---------------------------------------------------------
 def build_week_ui():
     stats = get_week_stats()
     raw = get_week_view()
@@ -75,10 +68,7 @@ def build_week_ui():
         "days": days_ui,
     }
 
-
-# ---------------------------------------------------------
 # CALENDAR (GENERIC RANGE) UI SHAPE
-# ---------------------------------------------------------
 def build_calendar_ui(start: str, end: str):
     from app.logic.week_engine import get_tasks_in_range
     raw = get_tasks_in_range(start, end)

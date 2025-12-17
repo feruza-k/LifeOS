@@ -16,7 +16,6 @@ tz = pytz.timezone("Europe/London")
 DAILY_CAPACITY_MINUTES = 480  # 8 hours - sustainable daily scheduled time
 OVERLOAD_THRESHOLD = 1.3      # 130% of capacity - triggers hard overload rule
 
-
 def calculate_energy(tasks: List[dict]) -> Dict[str, any]:
     """
     Calculate energy status using weighted task load model.
@@ -154,7 +153,6 @@ def calculate_energy(tasks: List[dict]) -> Dict[str, any]:
         "effectiveLoad": round(effective_load, 2),
         "completedLoadRatio": round(completed_load_ratio, 3)
     }
-
 
 def get_today_view() -> dict:
     """
