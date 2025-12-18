@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 17, 2025
+**Current Date:** December 18, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -24,6 +24,7 @@
   - [Day 15: Calendar Quick Views & Task Interaction Layer](#day-15--calendar-quick-views--task-interaction-layer-dec-15-2025)
   - [Day 16: Authentication & User Identity Foundation](#day-16-authentication--user-identity-foundation-dec-16-2025)
   - [Day 17: Authentication Emails & Verification Flow](#day-17-authentication-emails--verification-flow-dec-17-2025)
+  - [Day 18: Authentication Hardening & Production Readiness](#day-18-authentication-hardening--production-readiness-dec-18-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1359,11 +1360,75 @@ The foundation is solid. From here, the system can scale — technically and con
 
 ---
 
-## Next Steps
-- Verify a custom domain for email delivery
-- Final security hardening (rate limiting, refresh tokens)
-- Database migration
-- Move into Assistant intelligence 
+### **Day 18**: Authentication Hardening & Production Readiness (Dec 18, 2025)
+
+Today was about **locking authentication down properly**.  
+Not adding features — but making sure what exists is secure, scalable, and safe to build on.
+
+The goal: finish auth *once*, so it doesn’t need to be revisited while the rest of LifeOS evolves.
+
+
+## What Was Done
+
+### Security & Abuse Protection
+- **Rate limiting** (slowapi)
+  - Login / signup: 5 attempts per 15 minutes per IP
+  - Password reset / verification email: 1 per 5 minutes per IP
+- **Account lockout**
+  - Locks after 5 failed login attempts
+  - Auto-unlock after 30 minutes
+  - No user-existence leakage (same error for all cases)
+
+### Token & Session Security
+- Replaced `localStorage` with **httpOnly cookies**
+  - `Secure` (prod), `SameSite=Lax`, `httpOnly`
+- **Short-lived access tokens** (30 min)
+- **Refresh token rotation**
+  - Stored in DB with expiry
+  - Old token invalidated on use
+  - Logout revokes refresh tokens
+- Frontend auto-refreshes tokens on `401`
+
+### Platform Hardening
+- **CORS locked down** via `ALLOWED_ORIGINS`
+- **Security headers**
+  - HSTS (prod only)
+  - X-Frame-Options: DENY
+  - X-Content-Type-Options: nosniff
+  - Minimal CSP (non-breaking)
+
+### Observability
+- **Structured audit logs** for all auth events
+  - Login, logout, signup, password reset, verification, lockouts
+  - Includes timestamp, user, IP, user-agent
+
+### Cleanup & Docs
+- Removed legacy / insecure logic
+- Centralised auth utilities
+- Added full technical documentation: `backend/AUTH.md`
+
+
+## Current State
+
+Authentication now supports:
+- Brute-force protection
+- Secure cookie-based auth
+- Refresh token rotation
+- Account lockout
+- Production-grade headers & CORS
+- Full audit trail
+
+Auth is **production-ready behind HTTPS** and can remain unchanged while:
+- The database migrates
+- The assistant layer grows
+- New features are added
+
+
+
+## Next
+- Database migration (JSON → SQLite)
+- Session-aware assistant logic
+- Start expanding intelligence, not infrastructure
 
 
 

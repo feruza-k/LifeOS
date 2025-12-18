@@ -60,7 +60,7 @@ export default function Profile() {
     try {
       await api.deleteAccount();
       toast.success("Account deleted successfully");
-      logout();
+      await logout();
       navigate("/auth");
     } catch (error: any) {
       toast.error(error?.message || "Failed to delete account");
@@ -251,8 +251,8 @@ export default function Profile() {
             <Button
               variant="outline"
               className="w-full justify-start gap-2"
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate("/auth");
               }}
             >

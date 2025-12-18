@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, confirmPassword: string, username?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
   refreshUser: () => Promise<void>;
 }
@@ -27,43 +27,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for existing token on mount
+  // Check for existing session on mount (tokens in httpOnly cookies)
   useEffect(() => {
-    const token = localStorage.getItem("lifeos-token");
-    if (token) {
-      api.setAuthToken(token);
-      // Verify token and get user info
-      api.getCurrentUser()
-        .then((userData: User) => {
-          setUser(userData);
-          setIsAuthenticated(true);
-        })
-        .catch(() => {
-          // Token invalid, clear it
-          localStorage.removeItem("lifeos-token");
-          api.setAuthToken(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    api.getCurrentUser()
+      .then((userData: User) => {
+        setUser(userData);
+        setIsAuthenticated(true);
+      })
+      .catch(() => {
+        // No valid session
+        setUser(null);
+        setIsAuthenticated(false);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const response = await api.login(email, password);
-    localStorage.setItem("lifeos-token", response.access_token);
-    api.setAuthToken(response.access_token);
-    
+    await api.login(email, password);
+    // Tokens are now in httpOnly cookies, get user info
     const userData = await api.getCurrentUser();
     setUser(userData);
     setIsAuthenticated(true);
   }, []);
 
   const signup = useCallback(async (email: string, password: string, confirmPassword: string, username?: string) => {
-    const response = await api.signup(email, password, confirmPassword, username);
-    localStorage.setItem("lifeos-token", response.access_token);
-    api.setAuthToken(response.access_token);
-    
+    await api.signup(email, password, confirmPassword, username);
+    // Tokens are now in httpOnly cookies, get user info
     const userData = await api.getCurrentUser();
     setUser(userData);
     setIsAuthenticated(true);
@@ -78,9 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("lifeos-token");
-    api.setAuthToken(null);
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+    // Clear local state regardless of API call result
     setUser(null);
     setIsAuthenticated(false);
   }, []);

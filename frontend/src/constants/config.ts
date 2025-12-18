@@ -14,6 +14,13 @@ const getBaseURL = () => {
   
   const NETWORK_IP = "192.168.1.5";
   
+  // In development, use Vite proxy (same-origin) for cookies to work
+  // Vite proxy rewrites /api/* to http://localhost:8000/*
+  if (isDev && !isMobileDevice()) {
+    return "/api"; // Use proxy - same origin as frontend
+  }
+  
+  // For mobile or production, use direct backend URL
   if (isMobileDevice() || !isDev) {
     return `http://${NETWORK_IP}:8000`;
   }

@@ -133,7 +133,11 @@ class Repo:
             "verification_token_expires": None,  # Will be set if verification_token is provided
             "reset_token": None,
             "reset_token_expires": None,
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
+            "failed_login_attempts": 0,
+            "locked_until": None,
+            "refresh_token": None,
+            "refresh_token_expires": None
         }
         if "users" not in self.data:
             self.data["users"] = []

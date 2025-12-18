@@ -1,8 +1,11 @@
 import { BASE_URL } from "@/constants/config";
 
-let authToken: string | null = null;
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+let refreshHasFailed = false;
+let hasRedirected = false;
 
-async function request(path: string, options: RequestInit = {}) {
+async function request(path: string, options: RequestInit = {}, retryCount = 0, skipRefresh = false): Promise<any> {
   const url = `${BASE_URL}${path}`;
   
   const headers: HeadersInit = {
@@ -10,23 +13,88 @@ async function request(path: string, options: RequestInit = {}) {
     ...(options.headers || {}),
   };
 
-  if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
-  }
-
   try {
     const res = await fetch(url, {
       ...options,
       headers,
+      credentials: "include",  // Include cookies (httpOnly tokens)
     });
     
     if (res.status === 401) {
-      localStorage.removeItem("lifeos-token");
-      authToken = null;
-      if (typeof window !== "undefined") {
-        window.location.href = "/auth";
+      // If we should skip refresh (e.g., for session checks), just throw
+      if (skipRefresh || refreshHasFailed) {
+        throw new Error("Unauthorized - please log in again");
       }
+      
+      // Prevent infinite loops - don't retry if we've already tried
+      if (retryCount > 1) {
+        throw new Error("Unauthorized - please log in again");
+      }
+      
+      // Prevent multiple simultaneous refresh attempts
+      if (isRefreshing && refreshPromise) {
+        const refreshSucceeded = await refreshPromise;
+        if (refreshSucceeded) {
+          // Retry the original request after successful refresh
+          return request(path, options, retryCount + 1, skipRefresh);
+        }
+        // Refresh failed, mark it so we don't try again
+        refreshHasFailed = true;
+      } else if (!isRefreshing) {
+        // Try to refresh token
+        isRefreshing = true;
+        refreshPromise = (async () => {
+          try {
+            const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+              method: "POST",
+              credentials: "include",
+            });
+            
+            const succeeded = refreshRes.ok;
+            
+            if (!succeeded) {
+              refreshHasFailed = true;
+              // Only redirect once
+              if (!hasRedirected && typeof window !== "undefined" && path !== "/auth/me") {
+                hasRedirected = true;
+                // Don't redirect if we're already on auth pages
+                if (!window.location.pathname.startsWith("/auth") && !window.location.pathname.startsWith("/verify-email")) {
+                  window.location.href = "/auth";
+                }
+              }
+            }
+            
+            return succeeded;
+          } catch {
+            refreshHasFailed = true;
+            if (!hasRedirected && typeof window !== "undefined" && path !== "/auth/me") {
+              hasRedirected = true;
+              if (!window.location.pathname.startsWith("/auth") && !window.location.pathname.startsWith("/verify-email")) {
+                window.location.href = "/auth";
+              }
+            }
+            return false;
+          } finally {
+            isRefreshing = false;
+            refreshPromise = null;
+          }
+        })();
+        
+        const refreshSucceeded = await refreshPromise;
+        
+        if (refreshSucceeded) {
+          // Retry original request after successful refresh
+          return request(path, options, retryCount + 1, skipRefresh);
+        }
+      }
+      
       throw new Error("Unauthorized - please log in again");
+    }
+    
+    // Reset refresh failed flag on successful request (user might have logged in)
+    if (res.ok && refreshHasFailed) {
+      refreshHasFailed = false;
+      hasRedirected = false;
     }
     
     if (!res.ok) {
@@ -56,10 +124,6 @@ async function request(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  setAuthToken: (token: string | null) => {
-    authToken = token;
-  },
-
   // --- Auth ---
   login: async (email: string, password: string) => {
     const formData = new FormData();
@@ -69,6 +133,7 @@ export const api = {
     const res = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       body: formData,
+      credentials: "include",  // Include cookies
     });
     
     if (!res.ok) {
@@ -93,7 +158,7 @@ export const api = {
     });
   },
 
-  getCurrentUser: () => request("/auth/me"),
+  getCurrentUser: () => request("/auth/me"), // Allow auto-refresh if access token is missing
 
   verifyEmail: (token: string) =>
     request("/auth/verify-email-by-token", {
@@ -134,6 +199,16 @@ export const api = {
   deleteAccount: () =>
     request("/auth/account", {
       method: "DELETE",
+    }),
+
+  logout: () =>
+    request("/auth/logout", {
+      method: "POST",
+    }),
+
+  refreshToken: () =>
+    request("/auth/refresh", {
+      method: "POST",
     }),
 
   uploadAvatar: async (file: File) => {

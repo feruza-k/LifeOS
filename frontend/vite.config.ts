@@ -10,6 +10,15 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     strictPort: false, // Try next available port if 8080 is taken
     https: false, // Explicitly disable HTTPS to avoid SSL errors on mobile
+    proxy: {
+      // Proxy API requests to backend - makes frontend and backend same-origin
+      // This allows SameSite=Lax cookies to work in development
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""), // Remove /api prefix
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

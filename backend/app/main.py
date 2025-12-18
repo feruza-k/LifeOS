@@ -3,7 +3,7 @@ import os
 import sys
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Depends, status
+from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Depends, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -27,9 +27,21 @@ from app.models.ui import AssistantReply
 from app.services.email_service import send_email
 from app.templates.email.auth import render_password_reset_email, render_verification_email
 from app.logging import logger
+from app.auth.rate_limiter import limiter, rate_limit_error_handler, get_ip_rate_limit_key
+from app.auth.audit_log import log_auth_event, get_client_info
+from app.auth.middleware import SecurityHeadersMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 load_dotenv()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+# Allow localhost and common network IPs for development
+default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173"
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 
 try:
     from app.auth.auth import (
@@ -49,13 +61,17 @@ app = FastAPI(
     version="0.1"
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
 
 class ChatRequest(BaseModel):
     message: str
@@ -141,6 +157,28 @@ class MonthlyFocusRequest(BaseModel):
     id: str | None = None
     createdAt: str | None = None
 
+@app.options("/{full_path:path}")
+async def catch_all_options(request: Request, full_path: str):
+    """Catch-all OPTIONS handler for CORS preflight - must be registered early"""
+    origin = request.headers.get("Origin")
+    allowed_origin = "*"
+    if origin:
+        if origin in ALLOWED_ORIGINS:
+            allowed_origin = origin
+        elif "*" in ALLOWED_ORIGINS:
+            allowed_origin = "*"
+    
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": allowed_origin,
+            "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
 @app.get("/")
 def home():
     """Basic API health check."""
@@ -183,7 +221,8 @@ def complete_task(task_id: str, current_user: dict = Depends(get_current_user)):
     return {"error": "Task not found"}
 
 @app.post("/auth/signup", response_model=Token)
-def signup(user_data: UserCreate):
+@limiter.limit("5/15minutes", key_func=get_ip_rate_limit_key)
+def signup(request: Request, response: Response, user_data: UserCreate):
     from app.auth.password_validator import validate_password_strength
     
     # Validate passwords match
@@ -296,30 +335,243 @@ def signup(user_data: UserCreate):
         
         # User account is still created, they can use resend-verification endpoint
     
-    # Create access token (user can log in but will be redirected to verification)
+    # Create tokens and set cookies
+    from app.auth.auth import create_refresh_token
+    from app.auth.security import set_auth_cookies
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["id"]}, expires_delta=access_token_expires
     )
+    refresh_token = create_refresh_token(user["id"])
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
+    repo.update_user(user["id"], {
+        "refresh_token": refresh_token,
+        "refresh_token_expires": refresh_token_expires
+    })
+    
+    ip, user_agent = get_client_info(request)
+    log_auth_event(
+        "signup_success",
+        user_id=user["id"],
+        email=user_data.email,
+        ip=ip,
+        user_agent=user_agent,
+        success=True
+    )
+    
+    # Create JSONResponse and set cookies on it
+    json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
+    set_auth_cookies(json_response, access_token, refresh_token)
+    return json_response
 
-@app.post("/auth/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+@app.post("/auth/login")
+@limiter.limit("6/15minutes", key_func=get_ip_rate_limit_key)  # 6 attempts allows account lockout at 5 to trigger first
+def login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
+    from app.auth.security import is_account_locked, handle_failed_login, clear_failed_attempts
+    from slowapi.util import get_remote_address
+    
     email_normalized = form_data.username.lower().strip()
+    ip, user_agent = get_client_info(request)
+    
     user = repo.get_user_by_email(email_normalized)
-    if not user or not verify_password(form_data.password, user["password"]):
+    
+    # Check account lockout (but don't reveal user existence if no user)
+    if user and is_account_locked(user):
+        log_auth_event(
+            "account_locked_login_attempt",
+            user_id=user["id"],
+            email=email_normalized,
+            ip=ip,
+            user_agent=user_agent,
+            success=False,
+            details={"reason": "account_locked"}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Account temporarily locked due to too many failed login attempts. Please try again later or use the unlock link sent to your email.",
+        )
+    
+    # Verify credentials (don't reveal user existence)
+    if not user or not verify_password(form_data.password, user.get("password", "")):
+        if user:
+            should_lock = handle_failed_login(user)
+            if should_lock:
+                log_auth_event(
+                    "account_locked",
+                    user_id=user["id"],
+                    email=email_normalized,
+                    ip=ip,
+                    user_agent=user_agent,
+                    success=False
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_423_LOCKED,
+                    detail="Account temporarily locked due to too many failed login attempts. Please try again later.",
+                )
+        
+        log_auth_event(
+            "login_failure",
+            email=email_normalized,
+            ip=ip,
+            user_agent=user_agent,
+            success=False
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Clear failed attempts on successful login
+    clear_failed_attempts(user["id"])
+    
+    # Create tokens
+    from app.auth.auth import create_refresh_token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["id"]}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = create_refresh_token(user["id"])
+    
+    # Store refresh token
+    refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
+    repo.update_user(user["id"], {
+        "refresh_token": refresh_token,
+        "refresh_token_expires": refresh_token_expires
+    })
+    
+    # Set httpOnly cookies
+    from app.auth.security import set_auth_cookies
+    
+    log_auth_event(
+        "login_success",
+        user_id=user["id"],
+        email=email_normalized,
+        ip=ip,
+        user_agent=user_agent,
+        success=True
+    )
+    
+    # Create JSONResponse and set cookies on it
+    json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
+    set_auth_cookies(json_response, access_token, refresh_token)
+    return json_response
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str | None = None
+
+@app.post("/auth/refresh")
+def refresh_token(request: Request, response: Response, req: RefreshTokenRequest | None = None):
+    """Refresh access token using refresh token from cookie or request body."""
+    from app.auth.security import get_token_from_cookie, set_auth_cookies
+    from app.auth.auth import verify_refresh_token
+    
+    # Try to get refresh token from cookie first
+    refresh_token_value = get_token_from_cookie(request, "refresh")
+    
+    # Fallback to request body if not in cookie
+    if not refresh_token_value and req and req.refresh_token:
+        refresh_token_value = req.refresh_token
+    
+    if not refresh_token_value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required"
+        )
+    
+    # Verify refresh token
+    user_id = verify_refresh_token(refresh_token_value)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    
+    # Verify refresh token matches stored token (rotation check)
+    user = repo.get_user_by_id(user_id)
+    if not user or user.get("refresh_token") != refresh_token_value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+    
+    # Check if refresh token expired
+    refresh_token_expires = user.get("refresh_token_expires")
+    if refresh_token_expires:
+        try:
+            expires_dt = datetime.fromisoformat(refresh_token_expires)
+            if datetime.utcnow() > expires_dt:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Refresh token expired"
+                )
+        except:
+            pass
+    
+    # Generate new tokens (rotation: invalidate old refresh token)
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user_id}, expires_delta=access_token_expires
+    )
+    new_refresh_token = create_refresh_token(user_id)
+    
+    # Store new refresh token (old one is invalidated)
+    new_refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
+    repo.update_user(user_id, {
+        "refresh_token": new_refresh_token,
+        "refresh_token_expires": new_refresh_token_expires
+    })
+    
+    # Create JSONResponse and set cookies on it
+    json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
+    set_auth_cookies(json_response, access_token, new_refresh_token)
+    return json_response
+
+@app.post("/auth/logout")
+def logout(request: Request, response: Response, current_user: dict = Depends(get_current_user)):
+    """Logout user and revoke refresh token."""
+    from app.auth.security import clear_auth_cookies, get_token_from_cookie
+    from app.auth.auth import verify_refresh_token
+    
+    # Revoke refresh token
+    refresh_token_value = get_token_from_cookie(request, "refresh")
+    if refresh_token_value:
+        user_id = verify_refresh_token(refresh_token_value)
+        if user_id:
+            repo.update_user(user_id, {
+                "refresh_token": None,
+                "refresh_token_expires": None
+            })
+    
+    ip, user_agent = get_client_info(request)
+    log_auth_event(
+        "logout",
+        user_id=current_user["id"],
+        email=current_user.get("email"),
+        ip=ip,
+        user_agent=user_agent,
+        success=True
+    )
+    
+    # Clear cookies and return response
+    json_response = JSONResponse(content={"message": "Logged out successfully"})
+    clear_auth_cookies(json_response)
+    return json_response
+
+@app.options("/auth/me")
+async def options_auth_me(request: Request):
+    """Handle OPTIONS preflight for /auth/me"""
+    origin = request.headers.get("Origin", "*")
+    if origin in ALLOWED_ORIGINS or "*" in ALLOWED_ORIGINS:
+        return Response(status_code=200, headers={
+            "Access-Control-Allow-Origin": origin if origin != "*" else "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Credentials": "true",
+        })
+    return Response(status_code=200)
 
 @app.get("/auth/me", response_model=UserResponse)
 def get_current_user_info(current_user: dict = Depends(get_current_user)):
@@ -367,7 +619,7 @@ def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Depends(g
     return {"message": "Email verified successfully", "verified": True}
 
 @app.post("/auth/verify-email-by-token")
-def verify_email_by_token(verify_data: VerifyEmailRequest):
+def verify_email_by_token(request: Request, verify_data: VerifyEmailRequest):
     """Verify user's email with token directly (DEVELOPMENT ONLY).
     
     ⚠️  WARNING: This endpoint bypasses email verification and should only be used

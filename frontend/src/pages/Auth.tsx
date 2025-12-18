@@ -11,31 +11,39 @@ import { api } from "@/lib/api";
 type AuthMode = "login" | "signup" | "forgot-password" | "reset-password";
 
 export default function Auth() {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Initialize state from URL params immediately to avoid showing error on first render
+  const urlMode = searchParams.get("mode");
+  const urlToken = searchParams.get("token");
+  const initialMode = (urlMode === "reset-password" && urlToken) ? "reset-password" : "login";
+  const initialToken = urlMode === "reset-password" && urlToken ? urlToken : "";
+  
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [resetToken, setResetToken] = useState("");
+  const [resetToken, setResetToken] = useState(initialToken);
   const [isLoading, setIsLoading] = useState(false);
   const { login, signup, refreshUser } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   const passwordValidation = mode === "signup" || mode === "reset-password" 
     ? validatePassword(password) 
     : { isValid: true, errors: [] };
 
-  // Pick up reset-password mode and token from URL query params
+  // Update state when URL params change
   useEffect(() => {
     const urlMode = searchParams.get("mode");
     const urlToken = searchParams.get("token");
 
-    if (urlMode === "reset-password") {
+    if (urlMode === "reset-password" && urlToken) {
       setMode("reset-password");
-      if (urlToken) {
-        setResetToken(urlToken);
-      }
+      setResetToken(urlToken);
+    } else if (urlMode !== "reset-password") {
+      // If mode changes away from reset-password, reset token
+      setResetToken("");
     }
   }, [searchParams]);
 
@@ -50,8 +58,10 @@ export default function Auth() {
       setIsLoading(true);
       try {
         await api.forgotPassword(email);
-        toast.success("If the email exists, a password reset email has been sent.");
-        setMode("reset-password");
+        toast.success("If the email exists, a password reset email has been sent. Please check your inbox.");
+        // Don't switch to reset-password mode - user needs to click link in email
+        // Clear form
+        setEmail("");
       } catch (error: any) {
         toast.error(error?.message || "Failed to send reset token");
       } finally {
@@ -192,7 +202,31 @@ export default function Auth() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {(mode === "signup" || mode === "forgot-password") && (
+          {mode === "forgot-password" && (
+            <>
+              <div className="mb-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
+                <p className="text-sm text-foreground font-sans">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-sans text-foreground">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="h-12 bg-card border-border/50 focus:border-primary/50"
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          )}
+
+          {mode === "signup" && (
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-sans text-foreground">
                 Email
@@ -211,15 +245,22 @@ export default function Auth() {
           
           {mode === "reset-password" && !resetToken && (
             <div className="mb-6 p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-              <p className="text-sm text-destructive font-sans">
-                Invalid or missing reset link. Please request a new password reset.
+              <p className="text-sm text-destructive font-sans mb-3">
+                Invalid or missing reset link.
               </p>
+              <button
+                type="button"
+                onClick={() => setMode("forgot-password")}
+                className="text-sm font-sans text-primary hover:text-primary/80 transition-colors underline"
+              >
+                Request a new password reset
+              </button>
             </div>
           )}
           
           {mode === "reset-password" && resetToken && (
-            <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border/50">
-              <p className="text-sm text-muted-foreground font-sans">
+            <div className="mb-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <p className="text-sm text-foreground font-sans">
                 Enter your new password below.
               </p>
             </div>

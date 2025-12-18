@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 
 # Security configuration
@@ -23,9 +23,46 @@ except KeyError:
         "export SECRET_KEY=$(openssl rand -hex 32)"
     )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 30 minutes - short-lived
+REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 days
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+async def get_token_from_request(request: Request) -> Optional[str]:
+    """Extract token from cookie or Authorization header."""
+    from app.auth.security import get_token_from_cookie
+    
+    # Try cookie first (preferred for security)
+    token = get_token_from_cookie(request, "access")
+    
+    # Fallback to Authorization header for backwards compatibility
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    
+    return token
+
+def create_refresh_token(user_id: str) -> str:
+    """Create a refresh token valid for 30 days."""
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode = {
+        "sub": user_id,
+        "type": "refresh",
+        "exp": expire,
+        "iat": datetime.utcnow(),
+    }
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def verify_refresh_token(token: str) -> Optional[str]:
+    """Verify and extract user_id from refresh token."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
@@ -65,11 +102,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     
-    # Include exp, iat, and sub in token
+    # Add standard JWT claims
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),  # Issued at time for auditing
-        "sub": data["sub"],  # Subject (user_id)
+        "iat": datetime.utcnow(),
+        "sub": data["sub"],
     })
     
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -83,9 +120,13 @@ def generate_reset_token() -> str:
     """Generate a random password reset token."""
     return secrets.token_urlsafe(32)
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme)
+):
     """
     Dependency to get the current authenticated user from JWT token.
+    Supports both cookie-based and header-based token extraction.
     
     Raises:
         HTTPException: If token is invalid or user doesn't exist
@@ -95,6 +136,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # Skip authentication for OPTIONS requests (CORS preflight)
+    # Middleware handles this, but ensure we don't try to authenticate preflight requests
+    if request.method == "OPTIONS":
+        raise HTTPException(status_code=status.HTTP_200_OK, detail="OK")
+    
+    # Try to get token from cookie if not in header
+    if not token:
+        token = await get_token_from_request(request)
+    
+    if not token:
+        raise credentials_exception
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
