@@ -12,7 +12,8 @@ from pydantic import BaseModel, EmailStr
 
 from app.ai.parser import test_ai_connection, parse_intent
 from app.ai.assistant import generate_assistant_response
-from app.storage.repo import repo, load_data, save_data
+from app.storage.repo import load_data, save_data
+from db.repo import db_repo
 from app.storage.photo_storage import save_photo, delete_photo, get_photo_path, photo_exists
 from app.logic.intent_handler import handle_intent
 from app.logic.today_engine import get_today_view
@@ -199,30 +200,29 @@ def process(text: str):
     return {"intent": intent, "result": result}
 
 @app.get("/tasks")
-def get_tasks():
-    return get_all_tasks()
+async def get_tasks(current_user: dict = Depends(get_current_user)):
+    return await get_all_tasks(current_user["id"])
 
 @app.get("/all")
 def get_all():
     return load_data()
 
 @app.post("/clear")
-def clear_data():
+async def clear_data():
     empty = {"tasks": [], "diary": [], "memories": [], "pending": {}, "notes": [], "checkins": [], "reminders": [], "monthly_focus": []}
     save_data(empty)
-    repo.data = empty
     return {"status": "cleared"}
 
 @app.post("/tasks/{task_id}/complete")
-def complete_task(task_id: str, current_user: dict = Depends(get_current_user)):
-    result = repo.toggle_task_complete(task_id, current_user["id"])
+async def complete_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    result = await db_repo.toggle_task_complete(task_id, current_user["id"])
     if result:
         return {"status": "completed" if result.get("completed") else "incomplete", "task": result}
     return {"error": "Task not found"}
 
 @app.post("/auth/signup", response_model=Token)
 @limiter.limit("5/15minutes", key_func=get_ip_rate_limit_key)
-def signup(request: Request, response: Response, user_data: UserCreate):
+async def signup(request: Request, response: Response, user_data: UserCreate):
     from app.auth.password_validator import validate_password_strength
     
     # Validate passwords match
@@ -241,10 +241,10 @@ def signup(request: Request, response: Response, user_data: UserCreate):
         )
     
     email_normalized = user_data.email.lower().strip()
-    existing_user = repo.get_user_by_email(email_normalized)
+    existing_user = await db_repo.get_user_by_email(email_normalized)
     
     if existing_user:
-        existing_user = repo.get_user_by_id(existing_user["id"])
+        existing_user = await db_repo.get_user_by_id(existing_user["id"])
         email_verified = existing_user.get("email_verified", False) if existing_user else False
         
         if email_verified:
@@ -258,16 +258,16 @@ def signup(request: Request, response: Response, user_data: UserCreate):
     verification_expires = (datetime.utcnow() + timedelta(hours=24)).isoformat()
     
     if existing_user:
-        final_check_user = repo.get_user_by_id(existing_user["id"])
+        final_check_user = await db_repo.get_user_by_id(existing_user["id"])
         if final_check_user and not final_check_user.get("email_verified", False):
             hashed_password = get_password_hash(user_data.password)
-            repo.update_user(existing_user["id"], {
+            await db_repo.update_user(existing_user["id"], {
                 "password": hashed_password,
                 "username": user_data.username or existing_user.get("username"),
                 "verification_token": verification_token,
                 "verification_token_expires": verification_expires
             })
-            user = repo.get_user_by_id(existing_user["id"])
+            user = await db_repo.get_user_by_id(existing_user["id"])
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -283,13 +283,13 @@ def signup(request: Request, response: Response, user_data: UserCreate):
     
     if not existing_user:
         hashed_password = get_password_hash(user_data.password)
-        user = repo.create_user(
+        user = await db_repo.create_user(
             email=email_normalized,
             hashed_password=hashed_password,
             username=user_data.username,
             verification_token=verification_token
         )
-        repo.update_user(user["id"], {
+        await db_repo.update_user(user["id"], {
             "verification_token_expires": verification_expires
         })
     
@@ -346,7 +346,7 @@ def signup(request: Request, response: Response, user_data: UserCreate):
     refresh_token = create_refresh_token(user["id"])
     
     refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "refresh_token": refresh_token,
         "refresh_token_expires": refresh_token_expires
     })
@@ -368,14 +368,14 @@ def signup(request: Request, response: Response, user_data: UserCreate):
 
 @app.post("/auth/login")
 @limiter.limit("6/15minutes", key_func=get_ip_rate_limit_key)  # 6 attempts allows account lockout at 5 to trigger first
-def login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
     from app.auth.security import is_account_locked, handle_failed_login, clear_failed_attempts
     from slowapi.util import get_remote_address
     
     email_normalized = form_data.username.lower().strip()
     ip, user_agent = get_client_info(request)
     
-    user = repo.get_user_by_email(email_normalized)
+    user = await db_repo.get_user_by_email(email_normalized)
     
     # Check account lockout (but don't reveal user existence if no user)
     if user and is_account_locked(user):
@@ -396,7 +396,7 @@ def login(request: Request, response: Response, form_data: OAuth2PasswordRequest
     # Verify credentials (don't reveal user existence)
     if not user or not verify_password(form_data.password, user.get("password", "")):
         if user:
-            should_lock = handle_failed_login(user)
+            should_lock = await handle_failed_login(user)
             if should_lock:
                 log_auth_event(
                     "account_locked",
@@ -425,7 +425,7 @@ def login(request: Request, response: Response, form_data: OAuth2PasswordRequest
         )
     
     # Clear failed attempts on successful login
-    clear_failed_attempts(user["id"])
+    await clear_failed_attempts(user["id"])
     
     # Create tokens
     from app.auth.auth import create_refresh_token
@@ -437,7 +437,7 @@ def login(request: Request, response: Response, form_data: OAuth2PasswordRequest
     
     # Store refresh token
     refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "refresh_token": refresh_token,
         "refresh_token_expires": refresh_token_expires
     })
@@ -463,7 +463,7 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str | None = None
 
 @app.post("/auth/refresh")
-def refresh_token(request: Request, response: Response, req: RefreshTokenRequest | None = None):
+async def refresh_token(request: Request, response: Response, req: RefreshTokenRequest | None = None):
     """Refresh access token using refresh token from cookie or request body."""
     from app.auth.security import get_token_from_cookie, set_auth_cookies
     from app.auth.auth import verify_refresh_token
@@ -490,7 +490,7 @@ def refresh_token(request: Request, response: Response, req: RefreshTokenRequest
         )
     
     # Verify refresh token matches stored token (rotation check)
-    user = repo.get_user_by_id(user_id)
+    user = await db_repo.get_user_by_id(user_id)
     if not user or user.get("refresh_token") != refresh_token_value:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -519,7 +519,7 @@ def refresh_token(request: Request, response: Response, req: RefreshTokenRequest
     
     # Store new refresh token (old one is invalidated)
     new_refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
-    repo.update_user(user_id, {
+    await db_repo.update_user(user_id, {
         "refresh_token": new_refresh_token,
         "refresh_token_expires": new_refresh_token_expires
     })
@@ -530,7 +530,7 @@ def refresh_token(request: Request, response: Response, req: RefreshTokenRequest
     return json_response
 
 @app.post("/auth/logout")
-def logout(request: Request, response: Response, current_user: dict = Depends(get_current_user)):
+async def logout(request: Request, response: Response, current_user: dict = Depends(get_current_user)):
     """Logout user and revoke refresh token."""
     from app.auth.security import clear_auth_cookies, get_token_from_cookie
     from app.auth.auth import verify_refresh_token
@@ -540,7 +540,7 @@ def logout(request: Request, response: Response, current_user: dict = Depends(ge
     if refresh_token_value:
         user_id = verify_refresh_token(refresh_token_value)
         if user_id:
-            repo.update_user(user_id, {
+            await db_repo.update_user(user_id, {
                 "refresh_token": None,
                 "refresh_token_expires": None
             })
@@ -574,7 +574,7 @@ async def options_auth_me(request: Request):
     return Response(status_code=200)
 
 @app.get("/auth/me", response_model=UserResponse)
-def get_current_user_info(current_user: dict = Depends(get_current_user)):
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     return {
         "id": current_user["id"],
         "email": current_user["email"],
@@ -591,8 +591,8 @@ class ResendVerificationRequest(BaseModel):
     email: EmailStr
 
 @app.post("/auth/verify-email")
-def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Depends(get_current_user)):
-    user = repo.get_user_by_id(current_user["id"])
+async def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Depends(get_current_user)):
+    user = await db_repo.get_user_by_id(current_user["id"])
     
     if not user:
         raise HTTPException(
@@ -610,7 +610,7 @@ def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Depends(g
         )
     
     # Verify email
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "email_verified": True,
         "verification_token": None,
         "verification_token_expires": None
@@ -619,7 +619,7 @@ def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Depends(g
     return {"message": "Email verified successfully", "verified": True}
 
 @app.post("/auth/verify-email-by-token")
-def verify_email_by_token(request: Request, verify_data: VerifyEmailRequest):
+async def verify_email_by_token(request: Request, verify_data: VerifyEmailRequest):
     """Verify user's email with token directly (DEVELOPMENT ONLY).
     
     ⚠️  WARNING: This endpoint bypasses email verification and should only be used
@@ -632,7 +632,7 @@ def verify_email_by_token(request: Request, verify_data: VerifyEmailRequest):
     - Testing verification flow in development
     """
     # Find user by verification token
-    user = repo.get_user_by_verification_token(verify_data.token)
+    user = await db_repo.get_user_by_verification_token(verify_data.token)
     
     if not user:
         raise HTTPException(
@@ -643,7 +643,7 @@ def verify_email_by_token(request: Request, verify_data: VerifyEmailRequest):
     if user.get("email_verified"):
         return {"message": "Email already verified", "verified": True}
     
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "email_verified": True,
         "verification_token": None,
         "verification_token_expires": None
@@ -652,9 +652,9 @@ def verify_email_by_token(request: Request, verify_data: VerifyEmailRequest):
     return {"message": "Email verified successfully", "verified": True}
 
 @app.post("/auth/resend-verification")
-def resend_verification(req: ResendVerificationRequest):
+async def resend_verification(req: ResendVerificationRequest):
     email_normalized = req.email.lower().strip()
-    user = repo.get_user_by_email(email_normalized)
+    user = await db_repo.get_user_by_email(email_normalized)
     
     if not user:
         return {"message": "If the email exists, a verification token has been sent"}
@@ -666,7 +666,7 @@ def resend_verification(req: ResendVerificationRequest):
     verification_token = generate_verification_token()
     verification_expires = (datetime.utcnow() + timedelta(hours=24)).isoformat()
     
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "verification_token": verification_token,
         "verification_token_expires": verification_expires
     })
@@ -701,9 +701,9 @@ class ChangePasswordRequest(BaseModel):
     confirm_password: str
 
 @app.post("/auth/forgot-password")
-def forgot_password(req: ForgotPasswordRequest):
+async def forgot_password(req: ForgotPasswordRequest):
     email_normalized = req.email.lower().strip()
-    user = repo.get_user_by_email(email_normalized)
+    user = await db_repo.get_user_by_email(email_normalized)
     
     if not user:
         return {"message": "If the email exists, a password reset token has been sent"}
@@ -718,7 +718,7 @@ def forgot_password(req: ForgotPasswordRequest):
     reset_token = generate_reset_token()
     reset_expires = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
     
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "reset_token": reset_token,
         "reset_token_expires": reset_expires
     })
@@ -739,7 +739,7 @@ def forgot_password(req: ForgotPasswordRequest):
     return {"message": "If the email exists, a password reset token has been sent"}
 
 @app.post("/auth/reset-password")
-def reset_password(req: ResetPasswordRequest):
+async def reset_password(req: ResetPasswordRequest):
     """Reset password using reset token."""
     from app.auth.password_validator import validate_password_strength
     
@@ -759,7 +759,7 @@ def reset_password(req: ResetPasswordRequest):
         )
     
     # Find user by reset token
-    user = repo.get_user_by_reset_token(req.token)
+    user = await db_repo.get_user_by_reset_token(req.token)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -768,7 +768,7 @@ def reset_password(req: ResetPasswordRequest):
     
     # Update password
     hashed_password = get_password_hash(req.new_password)
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "password": hashed_password,
         "reset_token": None,
         "reset_token_expires": None
@@ -777,11 +777,11 @@ def reset_password(req: ResetPasswordRequest):
     return {"message": "Password reset successfully"}
 
 @app.post("/auth/change-password")
-def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+async def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
     """Change password (requires current password)."""
     from app.auth.password_validator import validate_password_strength
     
-    user = repo.get_user_by_id(current_user["id"])
+    user = await db_repo.get_user_by_id(current_user["id"])
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -812,7 +812,7 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
     
     # Update password
     hashed_password = get_password_hash(req.new_password)
-    repo.update_user(user["id"], {
+    await db_repo.update_user(user["id"], {
         "password": hashed_password
     })
     
@@ -822,9 +822,9 @@ class UpdateProfileRequest(BaseModel):
     username: str | None = None
 
 @app.patch("/auth/profile")
-def update_profile(updates: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
+async def update_profile(updates: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
     """Update user profile (username, etc.)."""
-    user = repo.get_user_by_id(current_user["id"])
+    user = await db_repo.get_user_by_id(current_user["id"])
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -846,7 +846,7 @@ def update_profile(updates: UpdateProfileRequest, current_user: dict = Depends(g
             detail="No updates provided"
         )
     
-    updated_user = repo.update_user(user["id"], update_dict)
+    updated_user = await db_repo.update_user(user["id"], update_dict)
     return {
         "id": updated_user["id"],
         "email": updated_user["email"],
@@ -896,7 +896,7 @@ async def upload_avatar(
     current_user: dict = Depends(get_current_user)
 ):
     """Upload user avatar."""
-    user = repo.get_user_by_id(current_user["id"])
+    user = await db_repo.get_user_by_id(current_user["id"])
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -927,14 +927,14 @@ async def upload_avatar(
     
     # Update user record with avatar path
     avatar_url = f"/photos/{saved_filename}"
-    repo.update_user(user["id"], {"avatar_path": avatar_url})
+    await db_repo.update_user(user["id"], {"avatar_path": avatar_url})
     
     return {"avatar_path": avatar_url, "message": "Avatar uploaded successfully"}
 
 @app.delete("/auth/avatar")
-def delete_avatar(current_user: dict = Depends(get_current_user)):
+async def delete_avatar(current_user: dict = Depends(get_current_user)):
     """Delete user avatar."""
-    user = repo.get_user_by_id(current_user["id"])
+    user = await db_repo.get_user_by_id(current_user["id"])
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -953,23 +953,23 @@ def delete_avatar(current_user: dict = Depends(get_current_user)):
     except:
         pass  # Ignore errors if file doesn't exist
     
-    repo.update_user(user["id"], {"avatar_path": None})
+    await db_repo.update_user(user["id"], {"avatar_path": None})
     
     return {"message": "Avatar deleted successfully"}
 
 # Frontend-Compatible Task Endpoints (Protected)
 
 @app.get("/tasks/by-date")
-def get_tasks_by_date(
+async def get_tasks_by_date(
     date: str = Query(..., description="Date in YYYY-MM-DD format"),
     current_user: dict = Depends(get_current_user)
 ):
     """Get tasks for a specific date in frontend format (user-scoped)."""
-    tasks = repo.get_tasks_by_date_and_user(date, current_user["id"])
+    tasks = await db_repo.get_tasks_by_date_and_user(date, current_user["id"])
     return [backend_task_to_frontend(t) for t in tasks]
 
 @app.post("/tasks")
-def create_task(
+async def create_task(
     task_data: TaskCreateRequest,
     current_user: dict = Depends(get_current_user)
 ):
@@ -985,7 +985,7 @@ def create_task(
         backend_task = frontend_task_to_backend(task_dict)
         # Ensure user_id is preserved (frontend_task_to_backend might not include it)
         backend_task["user_id"] = current_user["id"]
-        result = repo.add_task_dict(backend_task)
+        result = await db_repo.add_task_dict(backend_task)
         return backend_task_to_frontend(result)
     
     # Handle recurring tasks - create all instances
@@ -1002,7 +1002,7 @@ def create_task(
                     task_dict["date"] = current_date.strftime("%Y-%m-%d")
                     backend_task = frontend_task_to_backend(task_dict)
                     backend_task["user_id"] = current_user["id"]
-                    result = repo.add_task_dict(backend_task)
+                    result = await db_repo.add_task_dict(backend_task)
                     created_tasks.append(backend_task_to_frontend(result))
                     # Check if we've completed a full week cycle
                     if current_date.weekday() == max(repeat_config["weekDays"]):
@@ -1021,7 +1021,7 @@ def create_task(
             while current_date <= end:
                 task_dict["date"] = current_date.strftime("%Y-%m-%d")
                 backend_task = frontend_task_to_backend(task_dict)
-                result = repo.add_task_dict(backend_task)
+                result = await db_repo.add_task_dict(backend_task)
                 created_tasks.append(backend_task_to_frontend(result))
                 current_date += timedelta(days=1)
     
@@ -1031,14 +1031,14 @@ def create_task(
             for date_str in repeat_config["customDates"]:
                 task_dict["date"] = date_str
                 backend_task = frontend_task_to_backend(task_dict)
-                result = repo.add_task_dict(backend_task)
+                result = await db_repo.add_task_dict(backend_task)
                 created_tasks.append(backend_task_to_frontend(result))
     
     # Return the first created task (for compatibility)
     return created_tasks[0] if created_tasks else backend_task_to_frontend(result)
 
 @app.patch("/tasks/{task_id}")
-def update_task(
+async def update_task(
     task_id: str,
     updates: TaskUpdateRequest,
     current_user: dict = Depends(get_current_user)
@@ -1068,27 +1068,27 @@ def update_task(
         if key in updates_dict:
             backend_updates[key] = updates_dict[key]
     
-    result = repo.update_task(task_id, backend_updates, current_user["id"])
+    result = await db_repo.update_task(task_id, backend_updates, current_user["id"])
     if result:
         return backend_task_to_frontend(result)
     return {"error": "Task not found"}
 
 @app.delete("/tasks/{task_id}")
-def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a task (user-scoped)."""
-    success = repo.delete_task(task_id, current_user["id"])
+    success = await db_repo.delete_task(task_id, current_user["id"])
     if success:
         return {"status": "deleted", "id": task_id}
     return {"error": "Task not found"}
 
 @app.post("/tasks/{task_id}/move")
-def move_task(
+async def move_task(
     task_id: str,
     new_date: str = Query(..., description="New date in YYYY-MM-DD format"),
     current_user: dict = Depends(get_current_user)
 ):
     """Move a task to a new date (user-scoped)."""
-    task = repo.get_task(task_id, current_user["id"])
+    task = await db_repo.get_task(task_id, current_user["id"])
     if not task:
         return {"error": "Task not found"}
     
@@ -1097,7 +1097,7 @@ def move_task(
         "date": new_date,
         "moved_from": task.get("date")
     }
-    result = repo.update_task(task_id, updates, current_user["id"])
+    result = await db_repo.update_task(task_id, updates, current_user["id"])
     if result:
         return backend_task_to_frontend(result)
     return {"error": "Failed to move task"}
@@ -1105,24 +1105,24 @@ def move_task(
 # Notes Endpoints
 
 @app.get("/notes")
-def get_note(
+async def get_note(
     date: str = Query(..., description="Date in YYYY-MM-DD format"),
     current_user: dict = Depends(get_current_user)
 ):
     """Get note for a specific date (user-scoped)."""
-    note = repo.get_note(date, current_user["id"])
+    note = await db_repo.get_note(date, current_user["id"])
     if note:
         return note
     return None
 
 @app.post("/notes")
 @app.put("/notes")
-def save_note(
+async def save_note(
     note_data: dict,
     current_user: dict = Depends(get_current_user)
 ):
     """Save or update a note (user-scoped)."""
-    result = repo.save_note(note_data, current_user["id"])
+    result = await db_repo.save_note(note_data, current_user["id"])
     return result
 
 # Photo Endpoints
@@ -1136,7 +1136,7 @@ async def upload_photo(
     """Upload or replace a photo for a specific date (only one photo per date, user-scoped)."""
     try:
         # Get existing note
-        note = repo.get_note(date, current_user["id"])
+        note = await db_repo.get_note(date, current_user["id"])
         if not note:
             note = {"date": date, "content": "", "photo": None, "user_id": current_user["id"]}
         
@@ -1159,7 +1159,7 @@ async def upload_photo(
             "filename": filename,
             "uploadedAt": datetime.now().isoformat()
         }
-        repo.save_note(note, current_user["id"])
+        await db_repo.save_note(note, current_user["id"])
         
         return {"filename": filename, "uploadedAt": note["photo"]["uploadedAt"]}
     except Exception as e:
@@ -1178,7 +1178,7 @@ def get_photo(filename: str):
     )
 
 @app.delete("/photos/{filename}")
-def delete_photo_endpoint(
+async def delete_photo_endpoint(
     filename: str,
     date: str = Query(..., description="Date in YYYY-MM-DD format"),
     current_user: dict = Depends(get_current_user)
@@ -1188,7 +1188,7 @@ def delete_photo_endpoint(
         raise HTTPException(status_code=404, detail="Photo not found")
     
     # Get note to verify ownership
-    note = repo.get_note(date, current_user["id"])
+    note = await db_repo.get_note(date, current_user["id"])
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     
@@ -1208,47 +1208,47 @@ def delete_photo_endpoint(
     # Remove photo reference from note
     if "photo" in note and note["photo"] and note["photo"].get("filename") == filename:
         note["photo"] = None
-        repo.save_note(note, current_user["id"])
+        await db_repo.save_note(note, current_user["id"])
     # Also handle old "photos" array format for backward compatibility
     elif "photos" in note:
         note["photos"] = [p for p in note["photos"] if p.get("filename") != filename]
-        repo.save_note(note, current_user["id"])
+        await db_repo.save_note(note, current_user["id"])
     
     return {"success": True, "message": "Photo deleted"}
 
 # Check-ins Endpoints
 
 @app.get("/checkins")
-def get_checkin(
+async def get_checkin(
     date: str = Query(..., description="Date in YYYY-MM-DD format"),
     current_user: dict = Depends(get_current_user)
 ):
     """Get check-in for a specific date (user-scoped)."""
-    checkin = repo.get_checkin(date, current_user["id"])
+    checkin = await db_repo.get_checkin(date, current_user["id"])
     if checkin:
         return checkin
     return None
 
 @app.post("/checkins")
-def save_checkin(
+async def save_checkin(
     checkin_data: CheckInRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """Save or update a check-in (user-scoped)."""
-    result = repo.save_checkin(checkin_data.model_dump(exclude_none=True), current_user["id"])
+    result = await db_repo.save_checkin(checkin_data.model_dump(exclude_none=True), current_user["id"])
     return result
 
 # Reminders Endpoints (separate from task reminders)
 
 @app.get("/reminders")
-def get_all_reminders(current_user: dict = Depends(get_current_user)):
+async def get_all_reminders(current_user: dict = Depends(get_current_user)):
     """Get all reminders for the current user (separate from task reminders)."""
-    return repo.get_reminders(current_user["id"])
+    return await db_repo.get_reminders(current_user["id"])
 
 @app.post("/reminders")
-def create_reminder(reminder_data: ReminderRequest, current_user: dict = Depends(get_current_user)):
+async def create_reminder(reminder_data: ReminderRequest, current_user: dict = Depends(get_current_user)):
     """Create a new reminder (user-scoped)."""
-    result = repo.add_reminder(reminder_data.model_dump(exclude_none=True), current_user["id"])
+    result = await db_repo.add_reminder(reminder_data.model_dump(exclude_none=True), current_user["id"])
     return result
 
 class ReminderUpdateRequest(BaseModel):
@@ -1262,18 +1262,18 @@ class ReminderUpdateRequest(BaseModel):
     visible: bool | None = None
 
 @app.patch("/reminders/{reminder_id}")
-def update_reminder(reminder_id: str, updates: ReminderUpdateRequest, current_user: dict = Depends(get_current_user)):
+async def update_reminder(reminder_id: str, updates: ReminderUpdateRequest, current_user: dict = Depends(get_current_user)):
     """Update a reminder (user-scoped)."""
     updates_dict = updates.model_dump(exclude_none=True)
-    result = repo.update_reminder(reminder_id, updates_dict, current_user["id"])
+    result = await db_repo.update_reminder(reminder_id, updates_dict, current_user["id"])
     if result:
         return result
     return {"error": "Reminder not found"}
 
 @app.delete("/reminders/{reminder_id}")
-def delete_reminder(reminder_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_reminder(reminder_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a reminder (user-scoped)."""
-    success = repo.delete_reminder(reminder_id, current_user["id"])
+    success = await db_repo.delete_reminder(reminder_id, current_user["id"])
     if success:
         return {"status": "deleted", "id": reminder_id}
     return {"error": "Reminder not found"}
@@ -1281,20 +1281,20 @@ def delete_reminder(reminder_id: str, current_user: dict = Depends(get_current_u
 # Monthly Focus Endpoints
 
 @app.get("/monthly-focus")
-def get_monthly_focus(
+async def get_monthly_focus(
     month: str = Query(..., description="Month in YYYY-MM format"),
     current_user: dict = Depends(get_current_user)
 ):
     """Get monthly focus for a specific month (user-scoped)."""
-    focus = repo.get_monthly_focus(month, current_user["id"])
+    focus = await db_repo.get_monthly_focus(month, current_user["id"])
     if focus:
         return focus
     return None
 
 @app.post("/monthly-focus")
-def save_monthly_focus(focus_data: MonthlyFocusRequest, current_user: dict = Depends(get_current_user)):
+async def save_monthly_focus(focus_data: MonthlyFocusRequest, current_user: dict = Depends(get_current_user)):
     """Save or update monthly focus (user-scoped)."""
-    result = repo.save_monthly_focus(focus_data.model_dump(exclude_none=True), current_user["id"])
+    result = await db_repo.save_monthly_focus(focus_data.model_dump(exclude_none=True), current_user["id"])
     return result
 
 # Categories Endpoints
@@ -1309,38 +1309,55 @@ class CategoryUpdateRequest(BaseModel):
     color: str | None = None
 
 @app.get("/categories")
-def get_all_categories():
-    """Get all categories."""
-    return repo.get_categories()
+async def get_all_categories(current_user: dict = Depends(get_current_user)):
+    """Get categories for the current user (global + user-specific)."""
+    return await db_repo.get_categories(current_user["id"])
 
 @app.get("/categories/{category_id}")
-def get_category(category_id: str):
+async def get_category(category_id: str):
     """Get a specific category by ID."""
-    category = repo.get_category(category_id)
+    category = await db_repo.get_category(category_id)
     if category:
         return category
     return {"error": "Category not found"}
 
 @app.post("/categories")
-def create_category(category_data: CategoryRequest):
-    """Create a new category."""
+async def create_category(category_data: CategoryRequest, current_user: dict = Depends(get_current_user)):
+    """Create a new category (user-scoped)."""
     category_dict = category_data.model_dump(exclude_none=True)
-    result = repo.add_category(category_dict)
+    # Automatically set user_id from current user
+    category_dict["user_id"] = current_user["id"]
+    result = await db_repo.add_category(category_dict)
     return result
 
 @app.patch("/categories/{category_id}")
-def update_category(category_id: str, updates: CategoryUpdateRequest):
-    """Update a category."""
+async def update_category(category_id: str, updates: CategoryUpdateRequest, current_user: dict = Depends(get_current_user)):
+    """Update a category (user-scoped - can only update own categories)."""
     updates_dict = updates.model_dump(exclude_none=True)
-    result = repo.update_category(category_id, updates_dict)
+    # Verify category belongs to user before updating
+    category = await db_repo.get_category(category_id)
+    if not category:
+        return {"error": "Category not found"}
+    if category.get("user_id") and category["user_id"] != current_user["id"]:
+        return {"error": "Unauthorized: Cannot update other users' categories"}
+    result = await db_repo.update_category(category_id, updates_dict)
     if result:
         return result
     return {"error": "Category not found"}
 
 @app.delete("/categories/{category_id}")
-def delete_category(category_id: str):
-    """Delete a category."""
-    success = repo.delete_category(category_id)
+async def delete_category(category_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a category (user-scoped - can only delete own categories)."""
+    # Verify category belongs to user before deleting
+    category = await db_repo.get_category(category_id)
+    if not category:
+        return {"error": "Category not found"}
+    if category.get("user_id") and category["user_id"] != current_user["id"]:
+        return {"error": "Unauthorized: Cannot delete other users' categories"}
+    # Global categories (user_id is None) cannot be deleted by users
+    if not category.get("user_id"):
+        return {"error": "Cannot delete global categories"}
+    success = await db_repo.delete_category(category_id)
     if success:
         return {"status": "deleted", "id": category_id}
     return {"error": "Category not found"}
@@ -1348,7 +1365,7 @@ def delete_category(category_id: str):
 # Weekly & Calendar Views (Used by Frontend)
 
 @app.get("/tasks/calendar")
-def tasks_calendar(
+async def tasks_calendar(
     start: str = Query(...),
     end: str = Query(...),
     current_user: dict = Depends(get_current_user)
@@ -1356,7 +1373,7 @@ def tasks_calendar(
     """Get tasks for a date range, returned as flat array in frontend format (user-scoped)."""
     try:
         # Get user's tasks first
-        user_tasks = repo.get_tasks_by_user(current_user["id"])
+        user_tasks = await db_repo.get_tasks_by_user(current_user["id"])
         # Filter by date range
         all_tasks = [
             backend_task_to_frontend(t) 
@@ -1368,33 +1385,34 @@ def tasks_calendar(
         return {"error": str(e)}
 
 @app.get("/tasks/conflicts")
-def tasks_conflicts(
+async def tasks_conflicts(
     start: str | None = Query(None),
     end: str | None = Query(None),
+    current_user: dict = Depends(get_current_user)
 ):
-    return find_conflicts(start, end)
+    return await find_conflicts(start, end, current_user["id"])
 
 # Assistant Endpoints (SolAI)
 
 @app.post("/assistant/chat", response_model=AssistantReply)
-def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)):
+async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)):
     """Main SolAI chat endpoint (user-scoped)."""
-    reply = generate_assistant_response(payload.message, current_user["id"])
+    reply = await generate_assistant_response(payload.message, current_user["id"])
     return {
         "assistant_response": reply.get("assistant_response", "Something went wrong."),
         "ui": reply.get("ui")
     }
 
 @app.post("/assistant/confirm")
-def assistant_confirm(current_user: dict = Depends(get_current_user)):
+async def assistant_confirm(current_user: dict = Depends(get_current_user)):
     """Confirm pending action (equivalent to user saying 'yes', user-scoped)."""
-    return generate_assistant_response("yes", current_user["id"])
+    return await generate_assistant_response("yes", current_user["id"])
 
 @app.get("/assistant/bootstrap")
-def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
+async def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
     """Bootstrap endpoint: returns all initial data needed by frontend (user-scoped)."""
     # Get user's tasks only
-    user_tasks = repo.get_tasks_by_user(current_user["id"])
+    user_tasks = await db_repo.get_tasks_by_user(current_user["id"])
     # Filter today view to user's tasks only
     from datetime import datetime
     import pytz
@@ -1418,15 +1436,15 @@ def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
             "load": today_view["load"],  # Deprecated
             "energy": today_view["energy"]
         },
-        "week": get_week_stats(),
-        "suggestions": get_suggestions().get("suggestions", []),
-        "conflicts": find_conflicts(),
-        "categories": get_category_colors(),
+        "week": await get_week_stats(current_user["id"]),
+        "suggestions": (await get_suggestions(current_user["id"])).get("suggestions", []),
+        "conflicts": await find_conflicts(user_id=current_user["id"]),
+        "categories": await get_category_colors(current_user["id"]),
         "pending": load_data().get("pending", {}).get(current_user["id"], {})
     }
 
 @app.get("/assistant/today")
-def assistant_today(
+async def assistant_today(
     date: str | None = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
     current_user: dict = Depends(get_current_user)
 ):
@@ -1438,7 +1456,7 @@ def assistant_today(
     tz = pytz.timezone("Europe/London")
     
     # Get user's tasks only
-    user_tasks = repo.get_tasks_by_user(current_user["id"])
+    user_tasks = await db_repo.get_tasks_by_user(current_user["id"])
     
     # If date provided, filter tasks for that date
     if date:
@@ -1479,16 +1497,14 @@ def assistant_today(
     }
 
 @app.get("/assistant/suggestions")
-def assistant_suggestions(current_user: dict = Depends(get_current_user)):
+async def assistant_suggestions(current_user: dict = Depends(get_current_user)):
     """Get suggestions for the user (user-scoped)."""
-    # Filter suggestions to user's tasks only
-    user_tasks = repo.get_tasks_by_user(current_user["id"])
-    return get_suggestions()
+    return await get_suggestions(current_user["id"])
 
 @app.get("/assistant/reschedule-options")
-def assistant_reschedule_options(task_id: str, current_user: dict = Depends(get_current_user)):
+async def assistant_reschedule_options(task_id: str, current_user: dict = Depends(get_current_user)):
     """Get rescheduling suggestions for a specific task (user-scoped)."""
-    task = repo.get_task(task_id, current_user["id"])
+    task = await db_repo.get_task(task_id, current_user["id"])
 
     if not task:
         return {"error": "Task not found"}
@@ -1499,7 +1515,7 @@ def assistant_reschedule_options(task_id: str, current_user: dict = Depends(get_
 # Meta Endpoints
 
 @app.get("/meta/categories")
-def meta_categories():
+async def meta_categories(current_user: dict = Depends(get_current_user)):
     """Get category color mapping."""
-    return get_category_colors()
+    return await get_category_colors(current_user["id"])
 

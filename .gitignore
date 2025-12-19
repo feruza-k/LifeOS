@@ -6,6 +6,8 @@ __pycache__/
 
 # Environment variables (API keys)
 .env
+.env.bak
+*.env.bak
 
 # Database files (contains sensitive user data)
 backend/app/db/data.json

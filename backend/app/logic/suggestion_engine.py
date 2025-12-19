@@ -4,11 +4,11 @@ from app.logic.conflict_engine import find_conflicts
 from app.logic.week_engine import get_week_stats
 from app.logic.today_engine import get_today_view
 
-def get_suggestions():
+async def get_suggestions(user_id: str = None):
     suggestions = []
 
     # 1) Conflict-based suggestions
-    conflicts = find_conflicts()
+    conflicts = await find_conflicts(user_id=user_id)
     if conflicts:
         c = conflicts[0]
         task_a = c["task_a"]["title"]
@@ -19,7 +19,7 @@ def get_suggestions():
         })
 
     # 2) Overload suggestion (weekly)
-    stats = get_week_stats()
+    stats = await get_week_stats(user_id)
     if stats["busiest_day"] and stats["busiest_day"]["count"] >= 3:
         wd = stats["busiest_day"]["weekday"]
         suggestions.append({

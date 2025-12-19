@@ -22,7 +22,9 @@ def _parse_end_datetime(task, start_dt: datetime) -> datetime:
     end_str = task.get("end_datetime")
     if end_str:
         try:
-            return tz.localize(datetime.strptime(end_str, "%Y-%m-%d %H:%M"))
+            if isinstance(end_str, str):
+                return tz.localize(datetime.strptime(end_str, "%Y-%m-%d %H:%M"))
+            return end_str
         except Exception:
             pass
 
@@ -36,14 +38,15 @@ def _parse_end_datetime(task, start_dt: datetime) -> datetime:
     else:
         return start_dt + timedelta(minutes=15)
 
-def get_scheduled_blocks(
+async def get_scheduled_blocks(
     start_date_str: Optional[str] = None,
-    end_date_str: Optional[str] = None
+    end_date_str: Optional[str] = None,
+    user_id: str = None
 ) -> List[Dict]:
     """
     Build a list of scheduled time blocks for tasks that have a datetime.
     """
-    tasks = get_all_tasks()
+    tasks = await get_all_tasks(user_id)
     blocks = []
 
     start_date = (
@@ -79,14 +82,15 @@ def get_scheduled_blocks(
     blocks.sort(key=lambda b: b["start"])
     return blocks
 
-def find_conflicts(
+async def find_conflicts(
     start: Optional[str] = None,
-    end: Optional[str] = None
+    end: Optional[str] = None,
+    user_id: str = None
 ) -> List[Dict]:
     """
     Find conflicts between scheduled tasks *on the same date*.
     """
-    blocks = get_scheduled_blocks(start, end)
+    blocks = await get_scheduled_blocks(start, end, user_id)
     conflicts = []
 
     for i in range(len(blocks) - 1):

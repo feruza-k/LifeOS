@@ -1,7 +1,7 @@
 # categories.py
 # Category utilities and color mappings
 
-from app.storage.repo import repo
+from db.repo import db_repo
 
 # Legacy category colors (for backward compatibility)
 CATEGORY_COLORS = {
@@ -18,20 +18,20 @@ CATEGORY_COLORS = {
     "default": "#EBEBEB"  # Cloud Grey
 }
 
-def get_category_colors():
+async def get_category_colors(user_id: str = None):
     """
     Get category color mapping.
     Returns stored categories as a dict, or falls back to legacy colors.
     """
-    categories = repo.get_categories()
+    categories = await db_repo.get_categories(user_id)
     if categories:
         # Convert categories list to color mapping dict
         return {cat["id"]: cat["color"] for cat in categories}
     return CATEGORY_COLORS
 
-def get_category_color(category_id: str) -> str:
+async def get_category_color(category_id: str) -> str:
     """Get color for a specific category ID."""
-    category = repo.get_category(category_id)
+    category = await db_repo.get_category(category_id)
     if category:
         return category.get("color", CATEGORY_COLORS.get(category_id, "#EBEBEB"))
     return CATEGORY_COLORS.get(category_id, "#EBEBEB")

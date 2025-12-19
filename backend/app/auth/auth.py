@@ -158,8 +158,8 @@ async def get_current_user(
         raise credentials_exception
     
     # Verify user exists
-    from app.storage.repo import repo
-    user = repo.get_user_by_id(user_id)
+    from db.repo import db_repo
+    user = await db_repo.get_user_by_id(user_id)
     if user is None:
         raise credentials_exception
     

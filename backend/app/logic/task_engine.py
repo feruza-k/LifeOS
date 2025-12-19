@@ -1,8 +1,8 @@
 # app/logic/task_engine.py
 
 from datetime import datetime, date, timedelta
-from app.storage.repo import load_data, save_data
 from app.logging import logger
+from db.repo import db_repo
 
 import pytz
 
@@ -20,14 +20,21 @@ def parse_datetime(task):
         return None
 
     try:
-        return tz.localize(datetime.strptime(dt_str, "%Y-%m-%d %H:%M"))
+        if isinstance(dt_str, str):
+            return tz.localize(datetime.strptime(dt_str, "%Y-%m-%d %H:%M"))
+        return dt_str
     except Exception as e:
         task["error"] = f"Invalid datetime format: {dt_str}. Error: {str(e)}"
         return None
 
-# Get ALL tasks
-def get_all_tasks():
-    tasks = load_data().get("tasks", [])
+# Get ALL tasks (async, user-scoped)
+async def get_all_tasks(user_id: str = None):
+    if user_id:
+        tasks = await db_repo.get_tasks_by_user(user_id)
+    else:
+        # Fallback: return empty if no user_id (shouldn't happen in production)
+        tasks = []
+    
     now = datetime.now(tz)
 
     for t in tasks:
@@ -36,42 +43,42 @@ def get_all_tasks():
 
         if not dt:
             t["status"] = "unscheduled"
-        elif dt.date() == now.date():
+        elif isinstance(dt, datetime) and dt.date() == now.date():
             t["status"] = "today"
-        elif dt < now:
+        elif isinstance(dt, datetime) and dt < now:
             t["status"] = "overdue"
         else:
             t["status"] = "upcoming"
 
-        if dt:
+        if dt and isinstance(dt, datetime):
             t["datetime"] = dt.strftime("%Y-%m-%d %H:%M")
 
     tasks.sort(key=lambda t: t.get("datetime") or "")
     return tasks
 
-# Today, Upcoming, Overdue
-def get_tasks_today():
+# Today, Upcoming, Overdue (async)
+async def get_tasks_today(user_id: str = None):
     today = date.today().strftime("%Y-%m-%d")
-    tasks = get_all_tasks()
+    tasks = await get_all_tasks(user_id)
     return [t for t in tasks if t.get("date") == today]
 
-def get_upcoming_tasks():
+async def get_upcoming_tasks(user_id: str = None):
     now = datetime.now(tz)
-    tasks = get_all_tasks()
-    return [t for t in tasks if parse_datetime(t) and parse_datetime(t) > now]
+    tasks = await get_all_tasks(user_id)
+    return [t for t in tasks if parse_datetime(t) and isinstance(parse_datetime(t), datetime) and parse_datetime(t) > now]
 
-def get_overdue_tasks():
+async def get_overdue_tasks(user_id: str = None):
     now = datetime.now(tz)
-    tasks = get_all_tasks()
-    return [t for t in tasks if parse_datetime(t) and parse_datetime(t) < now]
+    tasks = await get_all_tasks(user_id)
+    return [t for t in tasks if parse_datetime(t) and isinstance(parse_datetime(t), datetime) and parse_datetime(t) < now]
 
-def get_next_task():
-    up = get_upcoming_tasks()
+async def get_next_task(user_id: str = None):
+    up = await get_upcoming_tasks(user_id)
     return up[0] if up else None
 
-# Grouping
-def group_tasks_by_date():
-    tasks = get_all_tasks()
+# Grouping (async)
+async def group_tasks_by_date(user_id: str = None):
+    tasks = await get_all_tasks(user_id)
     grouped = {}
 
     for t in tasks:
@@ -85,111 +92,75 @@ def group_tasks_by_date():
 
     return grouped
 
-def group_tasks_pretty():
-    g = group_tasks_by_date()
+async def group_tasks_pretty(user_id: str = None):
+    g = await group_tasks_by_date(user_id)
     return [{"date": d, "tasks": g[d]} for d in sorted(g.keys())]
 
-# Today timeline
-def get_today_timeline():
-    today = get_tasks_today()
+# Today timeline (async)
+async def get_today_timeline(user_id: str = None):
+    today = await get_tasks_today(user_id)
     today.sort(key=lambda x: x.get("time") or "")
     return today
 
-# Reschedule, edit, delete
-def apply_reschedule(task_id: str, new_datetime: str):
-    data = load_data()
-    for task in data["tasks"]:
-        if task["id"] == task_id:
-            task["datetime"] = new_datetime
-            date, time = new_datetime.split(" ")
-            task["date"] = date
-            task["time"] = time
-
-            # recompute end time if duration exists
-            if task.get("duration_minutes"):
-                start_dt = datetime.strptime(new_datetime, "%Y-%m-%d %H:%M")
-                end_dt = start_dt + timedelta(minutes=task["duration_minutes"])
-                task["end_datetime"] = end_dt.strftime("%Y-%m-%d %H:%M")
-
-            save_data(data)
-            return task
-    return None
-
-def delete_task(task_id: str):
-    data = load_data()
-    data["tasks"] = [t for t in data["tasks"] if t["id"] != task_id]
-    save_data(data)
-    return True
-
-def edit_task(task_id: str, fields: dict):
-    data = load_data()
-    for task in data["tasks"]:
-        if task["id"] == task_id:
-            for k, v in fields.items():
-                task[k] = v
-            save_data(data)
-            return task
-    return None
-
-# CREATE TASK (UPDATED)
-def create_task(fields: dict):
-    from uuid import uuid4
-    data = load_data()
-
-    task = {
-        "id": str(uuid4()),
-        "type": fields.get("type", "event"),
-        "title": fields["title"],
-        "date": fields.get("date"),
-        "time": fields.get("time"),
-        "datetime": fields.get("datetime"),
-        "duration_minutes": fields.get("duration_minutes"),   # NEW
-        "end_datetime": fields.get("end_datetime"),           # NEW
-        "category": fields.get("category"),
-        "notes": fields.get("notes"),
-        "completed": False,
-        "energy": None,
-        "context": None
+# Reschedule, edit, delete (async)
+async def apply_reschedule(task_id: str, new_datetime: str, user_id: str):
+    # Parse new datetime
+    date_str, time_str = new_datetime.split(" ")
+    
+    # Get task to check duration
+    task = await db_repo.get_task(task_id, user_id)
+    if not task:
+        return None
+    
+    updates = {
+        "datetime": new_datetime,
+        "date": date_str,
+        "time": time_str,
     }
-    # Include user_id if provided
-    if "user_id" in fields:
-        task["user_id"] = fields["user_id"]
-
-    # ---------------------------------------------------------
-    # 1) Auto-fill datetime if missing
-    # ---------------------------------------------------------
-    if task["date"] and task["time"] and not task["datetime"]:
-        task["datetime"] = f"{task['date']} {task['time']}"
-
-    # ---------------------------------------------------------
-    # 2) Default duration if none exists
-    # ---------------------------------------------------------
-    if task["duration_minutes"] is None:
-        if task["type"] == "event":
-            task["duration_minutes"] = 60
-        else:
-            task["duration_minutes"] = 15
-
-    # ---------------------------------------------------------
-    # 3) Auto-calculate end_datetime
-    # ---------------------------------------------------------
-    try:
-        start_dt = datetime.strptime(task["datetime"], "%Y-%m-%d %H:%M")
+    
+    # Recompute end time if duration exists
+    if task.get("duration_minutes"):
+        start_dt = datetime.strptime(new_datetime, "%Y-%m-%d %H:%M")
         end_dt = start_dt + timedelta(minutes=task["duration_minutes"])
-        task["end_datetime"] = end_dt.strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        # If the datetime is malformed, skip end calculation
-        pass
+        updates["end_datetime"] = end_dt.strftime("%Y-%m-%d %H:%M")
+    
+    updated = await db_repo.update_task(task_id, updates, user_id)
+    return updated
 
-    # Add to storage
-    data["tasks"].append(task)
+async def delete_task_async(task_id: str, user_id: str):
+    return await db_repo.delete_task(task_id, user_id)
 
-    # Normalize all datetime strings for consistency
-    for t in data["tasks"]:
-        parse_datetime(t)
+async def edit_task_async(task_id: str, fields: dict, user_id: str):
+    updated = await db_repo.update_task(task_id, fields, user_id)
+    return updated
 
-    save_data(data)
-    return task
+# CREATE TASK (async, uses database)
+async def create_task_async(fields: dict, user_id: str):
+    # Ensure user_id is set
+    if "user_id" not in fields:
+        fields["user_id"] = user_id
+    
+    # Auto-fill datetime if missing
+    if fields.get("date") and fields.get("time") and not fields.get("datetime"):
+        fields["datetime"] = f"{fields['date']} {fields['time']}"
+    
+    # Default duration if none exists
+    if fields.get("duration_minutes") is None:
+        task_type = fields.get("type", "event")
+        fields["duration_minutes"] = 60 if task_type == "event" else 15
+    
+    # Auto-calculate end_datetime
+    if fields.get("datetime") and fields.get("duration_minutes"):
+        try:
+            start_dt = datetime.strptime(fields["datetime"], "%Y-%m-%d %H:%M")
+            end_dt = start_dt + timedelta(minutes=fields["duration_minutes"])
+            fields["end_datetime"] = end_dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+    
+    # Create task via database
+    created = await db_repo.add_task_dict(fields)
+    return created
 
 def find_next_free_slot(date: str, time: str, all_tasks: list) -> str | None:
     """Given a date & time, find the nearest free 1-hour slot that does NOT overlap."""

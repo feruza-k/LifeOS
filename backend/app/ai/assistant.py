@@ -14,12 +14,13 @@ import pytz
 
 from app.logic.task_engine import (
     apply_reschedule,
-    create_task,
+    create_task_async,
     group_tasks_by_date,
-    find_next_free_slot,  
+    find_next_free_slot,
+    get_all_tasks,
 )
 
-from app.storage.repo import load_data, repo
+from db.repo import db_repo
 from app.ai.utils import try_extract_task_from_message
 from app.logic.pending_actions import (
     get_current_pending,
@@ -89,17 +90,12 @@ def resolve_schedule_date(cleaned, now):
     return None
 
 # MAIN ASSISTANT LOGIC
-def generate_assistant_response(user_message: str, user_id: str = None):
+async def generate_assistant_response(user_message: str, user_id: str = None):
     global last_referenced_task_id
 
     cleaned = user_message.lower().strip()
     now     = datetime.now(tz)
-    all_tasks_raw = load_data().get("tasks", [])
-    # Filter by user_id if provided
-    if user_id:
-        all_tasks = [t for t in all_tasks_raw if t.get("user_id") == user_id]
-    else:
-        all_tasks = all_tasks_raw
+    all_tasks = await get_all_tasks(user_id)
     pending   = get_current_pending(user_id) if user_id else get_current_pending()
 
     # --------------------------------------------------------
@@ -118,7 +114,7 @@ def generate_assistant_response(user_message: str, user_id: str = None):
         payload = pending["payload"]
 
         if action == "reschedule":
-            task = apply_reschedule(payload["task_id"], payload["new_datetime"])
+            task = await apply_reschedule(payload["task_id"], payload["new_datetime"], user_id)
             clear_current_pending(user_id)
             last_referenced_task_id = task["id"]
             return {"assistant_response": f"Okay, I moved '{task['title']}'.",
@@ -128,7 +124,7 @@ def generate_assistant_response(user_message: str, user_id: str = None):
             task_fields = payload["task_fields"]
             if user_id and "user_id" not in task_fields:
                 task_fields["user_id"] = user_id
-            task = create_task(task_fields)
+            task = await create_task_async(task_fields, user_id)
             clear_current_pending(user_id)
             last_referenced_task_id = task["id"]
             return {"assistant_response": f"Added '{task['title']}'.",
@@ -141,7 +137,7 @@ def generate_assistant_response(user_message: str, user_id: str = None):
             if user_id and "user_id" not in fields:
                 fields["user_id"] = user_id
 
-            task = create_task(fields)
+            task = await create_task_async(fields, user_id)
             clear_current_pending(user_id)
             last_referenced_task_id = task["id"]
 
@@ -162,7 +158,8 @@ def generate_assistant_response(user_message: str, user_id: str = None):
         if not date:
             return {"assistant_response": "Which day do you mean?", "ui": None}
 
-        tasks = group_tasks_by_date().get(date, [])
+        grouped = await group_tasks_by_date(user_id)
+        tasks = grouped.get(date, [])
         if not tasks:
             return {"assistant_response": "You have no tasks on that day.", "ui": None}
 

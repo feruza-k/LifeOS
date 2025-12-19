@@ -105,9 +105,20 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
           : date.toISOString().slice(0, 10);
 
       const res = await api.getToday(d);
+      const todayTasks = res.tasks || [];
+      
+      // Merge today's tasks with existing tasks (update existing, add new)
+      const existingTasks = get().tasks;
+      const existingTaskMap = new Map(existingTasks.map(t => [t.id, t]));
+      
+      // Update or add today's tasks
+      todayTasks.forEach(task => {
+        existingTaskMap.set(task.id, task);
+      });
+      
       set({
         today: res,
-        tasks: res.tasks || [],
+        tasks: Array.from(existingTaskMap.values()),
       });
     } catch (error) {
       console.error("Failed to load today:", error);
@@ -120,6 +131,12 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   addTask: async (task) => {
     try {
       const created = await api.createTask(task);
+      // Add to store.tasks immediately for calendar views
+      const existingTasks = get().tasks;
+      const taskExists = existingTasks.some(t => t.id === created.id);
+      if (!taskExists) {
+        set({ tasks: [...existingTasks, created] });
+      }
       // Reload today to get fresh data from server
       await get().loadToday(task.date);
       return created;
@@ -130,20 +147,39 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   },
 
   updateTask: async (id: string, updates: any) => {
-    await api.updateTask(id, updates);
+    const updated = await api.updateTask(id, updates);
+    // Update task in store.tasks immediately
+    if (updated) {
+      const existingTasks = get().tasks;
+      set({
+        tasks: existingTasks.map(t => t.id === id ? updated : t)
+      });
+    }
     // Reload tasks for the date
     const taskDate = updates.date || get().today?.date || new Date().toISOString().slice(0, 10);
     await get().loadToday(taskDate);
   },
 
   toggleTask: async (id: string) => {
-    await api.completeTask(id);
+    const response = await api.completeTask(id);
+    // Update task in store.tasks immediately
+    if (response && response.task) {
+      const existingTasks = get().tasks;
+      set({
+        tasks: existingTasks.map(t => t.id === id ? response.task : t)
+      });
+    }
     const currentDate = get().today?.date || new Date().toISOString().slice(0, 10);
     await get().loadToday(currentDate);
   },
 
   deleteTask: async (id: string) => {
     await api.deleteTask(id);
+    // Remove from store.tasks immediately
+    const existingTasks = get().tasks;
+    set({
+      tasks: existingTasks.filter(t => t.id !== id)
+    });
     const currentDate = get().today?.date || new Date().toISOString().slice(0, 10);
     await get().loadToday(currentDate);
   },
@@ -152,7 +188,14 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
     const dateStr = typeof newDate === "string" 
       ? newDate 
       : newDate.toISOString().slice(0, 10);
-    await api.moveTask(id, dateStr);
+    const updated = await api.moveTask(id, dateStr);
+    // Update task in store.tasks immediately
+    if (updated) {
+      const existingTasks = get().tasks;
+      set({
+        tasks: existingTasks.map(t => t.id === id ? updated : t)
+      });
+    }
     await get().loadToday(dateStr);
   },
 
@@ -180,11 +223,18 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       const startStr = typeof start === "string" ? start : start.toISOString().slice(0, 10);
       const endStr = typeof end === "string" ? end : end.toISOString().slice(0, 10);
       const tasks = await api.getTasksByDateRange(startStr, endStr);
-      // Merge with existing tasks (don't replace, as we might have tasks from today view)
+      // Update existing tasks and add new ones (merge by ID)
       const existingTasks = get().tasks;
-      const existingTaskIds = new Set(existingTasks.map(t => t.id));
-      const newTasks = tasks.filter(t => !existingTaskIds.has(t.id));
-      set({ tasks: [...existingTasks, ...newTasks] });
+      const existingTaskMap = new Map(existingTasks.map(t => [t.id, t]));
+      
+      // Update or add tasks from the date range
+      tasks.forEach(task => {
+        existingTaskMap.set(task.id, task);
+      });
+      
+      // Keep tasks outside the date range, but update/remove tasks within range
+      const allTasks = Array.from(existingTaskMap.values());
+      set({ tasks: allTasks });
       return tasks;
     } catch (error) {
       console.error("Failed to load tasks for date range:", error);
@@ -354,8 +404,9 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
 
   addCategory: async (label: string, color: string) => {
     try {
-      const newCategory = await api.createCategory({ label, color });
-      set({ categories: [...get().categories, newCategory] });
+      await api.createCategory({ label, color });
+      // Reload categories from server to ensure consistency and get the new category with proper ID
+      await get().loadCategories();
     } catch (error) {
       console.error("Failed to add category:", error);
       throw error;
@@ -364,12 +415,9 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
 
   updateCategory: async (id: string, updates: Partial<Omit<Category, 'id'>>) => {
     try {
-      const updated = await api.updateCategory(id, updates);
-      if (updated) {
-        set({
-          categories: get().categories.map((c) => (c.id === id ? updated : c)),
-        });
-      }
+      await api.updateCategory(id, updates);
+      // Reload categories from server to ensure consistency
+      await get().loadCategories();
     } catch (error) {
       console.error("Failed to update category:", error);
       throw error;
@@ -379,9 +427,8 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   deleteCategory: async (id: string) => {
     try {
       await api.deleteCategory(id);
-      set({
-        categories: get().categories.filter((c) => c.id !== id),
-      });
+      // Reload categories from server to ensure consistency
+      await get().loadCategories();
     } catch (error) {
       console.error("Failed to delete category:", error);
       throw error;

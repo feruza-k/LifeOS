@@ -16,7 +16,7 @@ def get_current_week_boundaries():
     week_end = week_start + timedelta(days=6)
     return week_start, week_end
 
-def get_week_view():
+async def get_week_view(user_id: str = None):
     """
     Return tasks grouped by day for the current week (Mon–Sun).
 
@@ -36,7 +36,7 @@ def get_week_view():
     }
     """
     week_start, week_end = get_current_week_boundaries()
-    tasks = get_all_tasks()  # already sorted + status from task_engine
+    tasks = await get_all_tasks(user_id)  # already sorted + status from task_engine
 
     days = []
     for offset in range(7):
@@ -60,7 +60,7 @@ def get_week_view():
         "days": days,
     }
 
-def get_tasks_in_range(start_date_str: str, end_date_str: str):
+async def get_tasks_in_range(start_date_str: str, end_date_str: str, user_id: str = None):
     """
     Generic calendar range helper.
 
@@ -83,7 +83,7 @@ def get_tasks_in_range(start_date_str: str, end_date_str: str):
     if end_date < start_date:
         raise ValueError("end_date must be on or after start_date")
 
-    tasks = get_all_tasks()
+    tasks = await get_all_tasks(user_id)
     days = []
 
     current = start_date
@@ -110,12 +110,12 @@ def get_tasks_in_range(start_date_str: str, end_date_str: str):
 
 # Week statistics
 
-def get_week_stats():
+async def get_week_stats(user_id: str = None):
     """
     Return simple statistics for the current week (Mon–Sun).
     Uses get_week_view() under the hood.
     """
-    week = get_week_view()
+    week = await get_week_view(user_id)
     days = week["days"]
 
     total_tasks = 0
@@ -181,12 +181,12 @@ def get_week_stats():
 
 # Human-readable week overview
 
-def get_week_summary_text() -> str:
+async def get_week_summary_text(user_id: str = None) -> str:
     """
     Create a short, human-readable summary of the current week.
     This is what the assistant could 'say' to you.
     """
-    stats = get_week_stats()
+    stats = await get_week_stats(user_id)
 
     week_start = stats["week_start"]
     week_end = stats["week_end"]

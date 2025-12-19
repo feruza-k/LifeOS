@@ -101,38 +101,38 @@ def is_account_locked(user: dict) -> bool:
     except:
         return False
 
-def lock_account(user_id: str, minutes: int = 30):
+async def lock_account(user_id: str, minutes: int = 30):
     """Lock user account for specified minutes."""
-    from app.storage.repo import repo
+    from db.repo import db_repo
     
     locked_until = (datetime.utcnow() + timedelta(minutes=minutes)).isoformat()
-    repo.update_user(user_id, {
+    await db_repo.update_user(user_id, {
         "locked_until": locked_until,
         "failed_login_attempts": 5
     })
 
-def handle_failed_login(user: dict) -> bool:
+async def handle_failed_login(user: dict) -> bool:
     """
     Handle failed login attempt. Returns True if account should be locked.
     
     Returns:
         True if account should be locked, False otherwise
     """
-    from app.storage.repo import repo
+    from db.repo import db_repo
     
     attempts = user.get("failed_login_attempts", 0) + 1
     
     if attempts >= 5:
-        lock_account(user["id"], minutes=30)
+        await lock_account(user["id"], minutes=30)
         return True
     
-    repo.update_user(user["id"], {"failed_login_attempts": attempts})
+    await db_repo.update_user(user["id"], {"failed_login_attempts": attempts})
     return False
 
-def clear_failed_attempts(user_id: str):
+async def clear_failed_attempts(user_id: str):
     """Clear failed login attempts on successful login."""
-    from app.storage.repo import repo
-    repo.update_user(user_id, {
+    from db.repo import db_repo
+    await db_repo.update_user(user_id, {
         "failed_login_attempts": 0,
         "locked_until": None
     })

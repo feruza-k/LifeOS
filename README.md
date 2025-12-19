@@ -25,6 +25,7 @@
   - [Day 16: Authentication & User Identity Foundation](#day-16-authentication--user-identity-foundation-dec-16-2025)
   - [Day 17: Authentication Emails & Verification Flow](#day-17-authentication-emails--verification-flow-dec-17-2025)
   - [Day 18: Authentication Hardening & Production Readiness](#day-18-authentication-hardening--production-readiness-dec-18-2025)
+  - [Day 19: PostgreSQL Migration & Async Backend Refactor](#day-19-postgresql-migration--async-backend-refactor-dec-19-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1421,12 +1422,51 @@ Auth is **production-ready behind HTTPS** and can remain unchanged while:
 - The assistant layer grows
 - New features are added
 
+---
 
+### **Day 19:** PostgreSQL Migration & Async Backend Refactor (Dec 19, 2025)
 
-## Next
-- Database migration (JSON → SQLite)
-- Session-aware assistant logic
-- Start expanding intelligence, not infrastructure
+Today I made a deliberate architectural decision to move LifeOS away from JSON-based storage and fully migrate the backend to **PostgreSQL**.
 
+At this stage of the project, JSON was starting to limit reliability and future scalability. Since I want LifeOS to eventually support real users, multi-device sync, and more advanced assistant logic, a proper database foundation was necessary.
 
+#### **What I Did**
 
+- Migrated the entire backend from JSON file storage to **PostgreSQL (Supabase)**
+- Finalised and deployed a production-ready database schema
+- Set up async SQLAlchemy using `asyncpg`
+- Built a repository adapter (`db/repo.py`) that:
+  - preserves the existing dict-based interface
+  - internally uses ORM models
+  - allows a clean swap without breaking the API
+- Migrated existing data using a safe migration script with:
+  - dry-run support
+  - transaction handling
+  - ID preservation
+- Refactored the backend to be **fully async**:
+  - authentication flows
+  - all main API endpoints
+  - shared business logic modules
+- Replaced all JSON repository calls with async PostgreSQL access
+
+The focus today wasn’t adding new features, but making sure the system is **stable, scalable, and ready for real usage**.
+
+#### **Current Status**
+
+- PostgreSQL schema deployed
+- Data successfully migrated
+- All endpoints now read/write from the database
+- JSON storage kept temporarily as a safety fallback
+- Full endpoint and flow testing still pending
+
+#### **Reflection**
+
+This was one of the most important technical days of the challenge so far.  
+Moving to PostgreSQL wasn’t about optimisation — it was about committing to LifeOS as a real system rather than a prototype. The backend now has a solid foundation, but I still need to test everything end-to-end and make small adjustments where necessary.
+
+## **Next Steps**
+
+- Thoroughly test all core flows (auth, tasks, notes, check-ins, assistant endpoints)
+- Fix any edge cases or async-related issues found during testing
+- Remove legacy JSON storage once stability is confirmed
+- Continue building on top of a stable, database-backed foundation
