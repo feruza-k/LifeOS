@@ -32,7 +32,7 @@
 
 ---
 
-## Overview
+## Overview.
 
 LifeOS is a personal project I’m building throughout December as part of a 31-day AI challenge.
 
@@ -1491,13 +1491,6 @@ At this point, LifeOS no longer has two mental models. There is one source of tr
 - Old migration scripts removed or archived
 - App runs consistently across sessions and restarts
 
-#### **Reflection**
-
-This day wasn’t exciting, but it mattered.
-
-Migrations don’t really count until you delete the safety nets. Today was about owning the decision I made yesterday and cleaning up everything that no longer belonged in the system.
-
-LifeOS now feels less like something I’m *testing* and more like something I’m responsible for maintaining.
 
 ## **Next Steps**
 
