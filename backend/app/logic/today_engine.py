@@ -111,7 +111,6 @@ def calculate_energy(tasks: List[dict]) -> Dict[str, any]:
             
             # Track absolute scheduled minutes for capacity guardrail
             # This ensures extreme-duration days (e.g., single 13-hour task) are caught
-            # Note: This uses the actual calculated duration_minutes, not the weight
             total_scheduled_minutes += duration_minutes
         
         # Add to effective load

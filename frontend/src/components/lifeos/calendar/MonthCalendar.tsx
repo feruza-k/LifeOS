@@ -38,10 +38,26 @@ export function MonthCalendar({
 }: MonthCalendarProps) {
   const today = new Date();
 
-  // Get category color by id
-  const getCategoryColor = (categoryId: string): string => {
-    const category = categories.find(c => c.id === categoryId);
-    return category?.color || "#EBEBEB";
+  const getCategoryColor = (categoryId: string | undefined): string => {
+    if (!categoryId) {
+      return "#EBEBEB"; // Default gray for tasks without category
+    }
+    
+    if (categories.length === 0) {
+      return "#EBEBEB";
+    }
+    
+    let category = categories.find(c => c.id === categoryId);
+    
+    if (!category) {
+      category = categories.find(c => c.label.toLowerCase() === categoryId.toLowerCase());
+    }
+    
+    if (!category || !category.color || !category.color.startsWith('#')) {
+      return "#EBEBEB";
+    }
+    
+    return category.color;
   };
 
   // Convert hex color to rgba with opacity
@@ -60,8 +76,43 @@ export function MonthCalendar({
   const getTasksForDate = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     const allDateTasks = tasks.filter((task) => {
-      const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(task.value);
-      return matchesCategory && task.date === dateStr;
+      if (!task || !task.date) {
+        return false;
+      }
+      // Normalize task date for comparison
+      let taskDate = task.date;
+      if (typeof taskDate === 'string') {
+        if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
+        if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
+        if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
+      } else if (taskDate instanceof Date) {
+        taskDate = taskDate.toISOString().slice(0, 10);
+      }
+      
+      // Date must match
+      if (taskDate !== dateStr) {
+        return false;
+      }
+      
+      // Category matching logic:
+      // - If no categories selected OR all categories selected, show all tasks
+      // - Otherwise, show tasks that match selected categories OR tasks without a value
+      const allCategoryIds = categories.map(c => c.id);
+      const allSelected = selectedCategories.length === 0 || 
+                         (selectedCategories.length === allCategoryIds.length && 
+                          allCategoryIds.every(id => selectedCategories.includes(id)));
+      
+      if (allSelected) {
+        return true; // All categories selected = no filter, show all
+      }
+      
+      // If task has a value, check if it matches selected categories
+      if (task.value) {
+        return selectedCategories.includes(task.value);
+      }
+      
+      // If task has no value, show it anyway (legacy task or uncategorized)
+      return true;
     });
     
     // Separate scheduled (with time) and anytime (without time) tasks
@@ -120,7 +171,11 @@ export function MonthCalendar({
           {/* Task titles */}
           <div className="w-full space-y-1 overflow-hidden flex-1">
             {displayTasks.map((task, i) => {
-              const categoryColor = getCategoryColor(task.value);
+              const categoryColor = getCategoryColor(task.value || "");
+              const bgColor = isSelected 
+                ? "rgba(255, 255, 255, 0.2)" 
+                : hexToRgba(categoryColor, 0.4);
+              
               return (
                 <div
                   key={task.id + i}
@@ -130,10 +185,9 @@ export function MonthCalendar({
                     isSelected && "text-primary-foreground"
                   )}
                   style={{
-                    backgroundColor: isSelected 
-                      ? "rgba(255, 255, 255, 0.2)" 
-                      : hexToRgba(categoryColor, 0.4),
-                    color: isSelected ? undefined : "inherit"
+                    backgroundColor: bgColor,
+                    color: isSelected ? undefined : "inherit",
+                    borderLeft: !isSelected && task.value ? `3px solid ${categoryColor}` : undefined
                   }}
                 >
                   {task.title}

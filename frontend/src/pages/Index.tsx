@@ -61,7 +61,21 @@ const Index = () => {
       store.loadReminders();
     }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
   
-    const todayTasks = store.tasks ?? [];
+    // Filter tasks for the selected date
+    const currentDateStr = format(selectedDate, "yyyy-MM-dd");
+    const todayTasks = (store.tasks ?? []).filter(t => {
+      if (!t.date) return false;
+      // Normalize date format for comparison
+      let taskDate = t.date;
+      if (typeof taskDate === 'string') {
+        if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
+        if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
+        if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
+      } else if (taskDate instanceof Date) {
+        taskDate = taskDate.toISOString().slice(0, 10);
+      }
+      return taskDate === currentDateStr;
+    });
 
   // Convert to legacy format for TaskList
   const legacyTasks: Task[] = todayTasks.map(t => ({
@@ -111,9 +125,22 @@ const Index = () => {
     if (!r.dueDate) return false;
     
     try {
-      const reminderDateOnly = r.dueDate.split('T')[0];
+      // Normalize date format - handle both ISO with time and date-only formats
+      let reminderDateOnly = r.dueDate;
+      if (typeof reminderDateOnly === 'string') {
+        if (reminderDateOnly.includes('T')) {
+          reminderDateOnly = reminderDateOnly.split('T')[0];
+        } else if (reminderDateOnly.includes(' ')) {
+          reminderDateOnly = reminderDateOnly.split(' ')[0];
+        }
+        // Ensure it's exactly YYYY-MM-DD
+        if (reminderDateOnly.length > 10) {
+          reminderDateOnly = reminderDateOnly.substring(0, 10);
+        }
+      }
       return reminderDateOnly === selectedDateStr;
     } catch (error) {
+      console.error("Error filtering reminder:", error, r);
       return false;
     }
   });

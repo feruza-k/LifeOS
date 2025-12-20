@@ -34,8 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(userData);
         setIsAuthenticated(true);
       })
-      .catch(() => {
-        // No valid session
+      .catch((error) => {
+        // No valid session - this is expected if user is not logged in
         setUser(null);
         setIsAuthenticated(false);
       })
@@ -63,7 +63,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await api.getCurrentUser();
       setUser(userData);
     } catch (error) {
-      console.error("Failed to refresh user:", error);
     }
   }, []);
 
@@ -71,7 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.logout();
     } catch (error) {
-      console.error("Logout error:", error);
     }
     // Clear local state regardless of API call result
     setUser(null);

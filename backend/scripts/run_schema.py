@@ -10,9 +10,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     print("❌ Error: DATABASE_URL not set")
     print("\nTo set it:")
-    print("  export DATABASE_URL='postgresql+asyncpg://postgres:[YOUR-PASSWORD]@db.nuuvagaayowrvgsbduwr.supabase.co:5432/postgres'")
+    print("  export DATABASE_URL='postgresql+asyncpg://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres'")
     print("\nOr add to .env file:")
-    print("  DATABASE_URL=postgresql+asyncpg://postgres:[YOUR-PASSWORD]@db.nuuvagaayowrvgsbduwr.supabase.co:5432/postgres")
+    print("  DATABASE_URL=postgresql+asyncpg://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres")
     print("\n💡 Tip: Get the correct connection string from Supabase Dashboard → Project Settings → Database")
     sys.exit(1)
 

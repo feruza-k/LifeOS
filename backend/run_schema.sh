@@ -15,5 +15,13 @@ if [ -z "$PGPASSWORD" ]; then
     exit 1
 fi
 
-psql -h db.nuuvagaayowrvgsbduwr.supabase.co -p 5432 -U postgres -d postgres -f database_schema.sql
+# Extract host from DATABASE_URL or use environment variable
+DB_HOST="${DB_HOST:-$(echo $DATABASE_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')}"
+if [ -z "$DB_HOST" ]; then
+    echo "❌ Error: DB_HOST not set. Set it from DATABASE_URL or export it:"
+    echo "  export DB_HOST='your-database-host'"
+    exit 1
+fi
+
+psql -h "$DB_HOST" -p 5432 -U postgres -d postgres -f database_schema.sql
 

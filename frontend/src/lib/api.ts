@@ -158,7 +158,7 @@ export const api = {
     });
   },
 
-  getCurrentUser: () => request("/auth/me"), // Allow auto-refresh if access token is missing
+  getCurrentUser: () => request("/auth/me", {}, 0, true), // Skip auto-refresh to avoid loops, just check session
 
   verifyEmail: (token: string) =>
     request("/auth/verify-email-by-token", {
@@ -293,7 +293,6 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
     const url = `${BASE_URL}/photos/upload?date=${date}`;
-    console.log(`🌐 API Request: POST ${url}`);
     
     try {
       const res = await fetch(url, {
@@ -301,11 +300,8 @@ export const api = {
         body: formData,
       });
       
-      console.log(`✅ API Response: ${res.status} /photos/upload`);
-      
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("❌ API ERROR:", res.status, "/photos/upload", errorText);
         throw new Error(`API error ${res.status}: ${errorText}`);
       }
       return res.json();

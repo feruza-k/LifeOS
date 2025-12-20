@@ -44,10 +44,7 @@ export default function Reminders() {
       setIsLoadingReminders(true);
       try {
         await store.loadReminders();
-        console.log("📋 Reminders loaded:", store.reminders?.length || 0);
-        console.log("📋 Reminders data:", store.reminders);
       } catch (error) {
-        console.error("Failed to load reminders:", error);
       } finally {
         setIsLoadingReminders(false);
       }

@@ -87,7 +87,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       // Load categories
       await get().loadCategories();
     } catch (error) {
-      console.error("Failed to load bootstrap:", error);
       // Set empty state on error
       set({
         today: null,
@@ -121,7 +120,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         tasks: Array.from(existingTaskMap.values()),
       });
     } catch (error) {
-      console.error("Failed to load today:", error);
       // Keep existing state on error
     }
   },
@@ -131,17 +129,30 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   addTask: async (task) => {
     try {
       const created = await api.createTask(task);
+      // Ensure date is in YYYY-MM-DD format for calendar filtering
+      // The backend returns date as ISO string, but ensure it's in the right format
+      if (created) {
+        if (!created.date && task.date) {
+          created.date = typeof task.date === 'string' ? task.date : task.date.toISOString().slice(0, 10);
+        }
+        // Normalize date format to YYYY-MM-DD if it's in a different format
+        if (created.date && created.date.includes('T')) {
+          created.date = created.date.split('T')[0];
+        }
+      }
       // Add to store.tasks immediately for calendar views
       const existingTasks = get().tasks;
       const taskExists = existingTasks.some(t => t.id === created.id);
       if (!taskExists) {
         set({ tasks: [...existingTasks, created] });
+      } else {
+        // Update existing task if it exists
+        set({ tasks: existingTasks.map(t => t.id === created.id ? created : t) });
       }
       // Reload today to get fresh data from server
       await get().loadToday(task.date);
       return created;
     } catch (error) {
-      console.error("Failed to create task:", error);
       throw error; // Re-throw so caller can handle it
     }
   },
@@ -222,22 +233,53 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
     try {
       const startStr = typeof start === "string" ? start : start.toISOString().slice(0, 10);
       const endStr = typeof end === "string" ? end : end.toISOString().slice(0, 10);
+      
       const tasks = await api.getTasksByDateRange(startStr, endStr);
-      // Update existing tasks and add new ones (merge by ID)
+      
+      if (!tasks || !Array.isArray(tasks)) {
+        return [];
+      }
+      
+      const normalizedTasks = tasks
+        .map(task => {
+          if (!task || !task.id) {
+            return null;
+          }
+          
+          let taskDate = task.date;
+          if (taskDate) {
+            if (typeof taskDate === 'string') {
+              if (taskDate.includes('T')) {
+                taskDate = taskDate.split('T')[0];
+              } else if (taskDate.includes(' ')) {
+                taskDate = taskDate.split(' ')[0];
+              }
+              if (taskDate.length > 10) {
+                taskDate = taskDate.substring(0, 10);
+              }
+            } else if (taskDate instanceof Date) {
+              taskDate = taskDate.toISOString().slice(0, 10);
+            }
+          }
+          
+          return {
+            ...task,
+            date: taskDate,
+          };
+        })
+        .filter(task => task && task.date);
+      
       const existingTasks = get().tasks;
       const existingTaskMap = new Map(existingTasks.map(t => [t.id, t]));
       
-      // Update or add tasks from the date range
-      tasks.forEach(task => {
+      normalizedTasks.forEach(task => {
         existingTaskMap.set(task.id, task);
       });
       
-      // Keep tasks outside the date range, but update/remove tasks within range
       const allTasks = Array.from(existingTaskMap.values());
       set({ tasks: allTasks });
-      return tasks;
+      return normalizedTasks;
     } catch (error) {
-      console.error("Failed to load tasks for date range:", error);
       return [];
     }
   },
@@ -249,7 +291,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       const r = await api.getAllReminders();
       set({ reminders: r || [] });
     } catch (error) {
-      console.error("Failed to load reminders:", error);
       set({ reminders: [] });
     }
   },
@@ -270,7 +311,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         return updated;
       }
     } catch (error) {
-      console.error("Failed to update reminder:", error);
     }
   },
 
@@ -295,7 +335,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
 
   getNoteForDate: (date: Date | string) => {
     // Synchronous getter - returns cached note if available
-    // Note: This assumes note is loaded. For calendar, we'll load notes on demand.
     return get().note;
   },
 
@@ -397,7 +436,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         set({ categories });
       }
     } catch (error) {
-      console.error("Failed to load categories:", error);
       // Keep existing categories on error
     }
   },
@@ -408,7 +446,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       // Reload categories from server to ensure consistency and get the new category with proper ID
       await get().loadCategories();
     } catch (error) {
-      console.error("Failed to add category:", error);
       throw error;
     }
   },
@@ -419,7 +456,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       // Reload categories from server to ensure consistency
       await get().loadCategories();
     } catch (error) {
-      console.error("Failed to update category:", error);
       throw error;
     }
   },
@@ -430,7 +466,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       // Reload categories from server to ensure consistency
       await get().loadCategories();
     } catch (error) {
-      console.error("Failed to delete category:", error);
       throw error;
     }
   },

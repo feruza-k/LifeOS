@@ -212,18 +212,11 @@ def parse_intent(user_input: str) -> Intent:
 
     raw_output = response.choices[0].message.content.strip()
 
-    # Log raw output
-    logger.debug(f"LLM raw output: {raw_output}")
-
-    # Clean JSON if needed
     try:
         data = json.loads(raw_output)
     except json.JSONDecodeError:
         cleaned = raw_output.replace("```json", "").replace("```", "").strip()
         data = json.loads(cleaned)
-
-    # Log parsed JSON
-    logger.debug(f"Parsed intent JSON: {data}")
 
     # Convert to Pydantic model
     return Intent(**data)

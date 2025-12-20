@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, addDays, subDays, isSameMonth } from "date-fns";
 import { LayoutGrid, Calendar as CalendarIcon } from "lucide-react";
 import { BottomNav } from "@/components/lifeos/BottomNav";
@@ -61,7 +61,7 @@ const CalendarPage = () => {
         const monthEnd = endOfMonth(currentMonth);
         await store.loadTasksForDateRange(monthStart, monthEnd);
       } catch (error) {
-        console.error("Failed to load calendar tasks:", error);
+        // Error loading tasks - silently fail
       } finally {
         setLoading(false);
       }
@@ -78,8 +78,6 @@ const CalendarPage = () => {
       store.loadNote(dateStr).then(note => {
         if (note) {
           setNotes(prev => ({ ...prev, [dateStr]: note?.content || "" }));
-          // Also load photo from note (single photo, not array)
-          // Handle both new format (photo) and old format (photos array) for backward compatibility
           try {
             if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
               setPhotos(prev => ({ ...prev, [dateStr]: note.photo }));
@@ -87,11 +85,9 @@ const CalendarPage = () => {
               // Migrate from old photos array to single photo (take first photo)
               setPhotos(prev => ({ ...prev, [dateStr]: note.photos[0] }));
             } else {
-              // Initialize null if note exists but has no photo
               setPhotos(prev => ({ ...prev, [dateStr]: null }));
             }
           } catch (error) {
-            console.error("Error loading photo:", error);
             setPhotos(prev => ({ ...prev, [dateStr]: null }));
           }
         }
@@ -115,16 +111,43 @@ const CalendarPage = () => {
     }
   }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Convert stored tasks to Task format with date
-  const allTasks = store.tasks.map(t => ({
-    id: t.id,
-    title: t.title,
-    time: t.time,
-    endTime: t.endTime,
-    completed: t.completed,
-    value: t.value,
-    date: t.date,
-  }));
+  // Normalize tasks to ensure dates are in YYYY-MM-DD format
+  const allTasks = useMemo(() => {
+    const normalized = store.tasks
+      .filter(t => t && t.id && t.date) // Filter out invalid tasks and tasks without dates
+      .map(t => {
+        let taskDate = t.date;
+        // Normalize date format to YYYY-MM-DD
+        if (taskDate) {
+          if (typeof taskDate === 'string') {
+            // Handle ISO datetime strings (remove time portion)
+            if (taskDate.includes('T')) {
+              taskDate = taskDate.split('T')[0];
+            } else if (taskDate.includes(' ')) {
+              taskDate = taskDate.split(' ')[0];
+            }
+            // Ensure it's exactly 10 characters (YYYY-MM-DD)
+            if (taskDate.length > 10) {
+              taskDate = taskDate.substring(0, 10);
+            }
+          } else if (taskDate instanceof Date) {
+            taskDate = taskDate.toISOString().slice(0, 10);
+          }
+        }
+        return {
+          id: t.id,
+          title: t.title || '',
+          time: t.time || undefined,
+          endTime: t.endTime || undefined,
+          completed: t.completed || false,
+          value: t.value,
+          date: taskDate,
+        };
+      })
+      .filter(t => t.date && t.date.length === 10);
+    
+    return normalized;
+  }, [store.tasks]);
 
   const handleToggleCategory = (category: ValueType) => {
     setSelectedCategories(prev => 
@@ -238,9 +261,9 @@ const CalendarPage = () => {
           <div {...monthSwipeHandlers} className="pb-4 flex-1">
             <MonthCalendar 
               currentMonth={currentMonth}
-              selectedDate={selectedDate} 
-              onSelectDate={handleSelectDate} 
-              tasks={allTasks} 
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+              tasks={allTasks}
               selectedCategories={selectedCategories}
               categories={store.categories || []}
             />
@@ -348,10 +371,8 @@ const CalendarPage = () => {
             const dateStr = format(newDate, "yyyy-MM-dd");
             if (!notes[dateStr]) {
               store.loadNote(dateStr).then(note => {
-                if (note) {
+                  if (note) {
                   setNotes(prev => ({ ...prev, [dateStr]: note?.content || "" }));
-                  // Also load photo from note (single photo, not array)
-                  // Handle both new format (photo) and old format (photos array) for backward compatibility
                   try {
                     if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
                       setPhotos(prev => ({ ...prev, [dateStr]: note.photo }));
@@ -359,11 +380,9 @@ const CalendarPage = () => {
                       // Migrate from old photos array to single photo (take first photo)
                       setPhotos(prev => ({ ...prev, [dateStr]: note.photos[0] }));
                     } else {
-                      // Initialize null if note exists but has no photo
                       setPhotos(prev => ({ ...prev, [dateStr]: null }));
                     }
                   } catch (error) {
-                    console.error("Error loading photo:", error);
                     setPhotos(prev => ({ ...prev, [dateStr]: null }));
                   }
                 }

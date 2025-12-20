@@ -2,7 +2,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, update
 from db.session import AsyncSessionLocal
 from db.repositories.task import TaskRepository
 from db.repositories.note import NoteRepository
@@ -47,8 +47,9 @@ class DatabaseRepo:
             "type": task.type,
             "title": task.title,
             "datetime": task.datetime.isoformat() if task.datetime else None,
-            "date": task.date.isoformat() if task.date else None,
-            "time": task.datetime.strftime("%H:%M") if task.datetime else None,
+            "date": task.date.isoformat() if task.date else (task.datetime.date().isoformat() if task.datetime else None),
+            # Only set time if it's not midnight (00:00) - midnight indicates an "anytime" task
+            "time": task.datetime.strftime("%H:%M") if task.datetime and task.datetime.strftime("%H:%M") != "00:00" else None,
             "end_datetime": task.end_datetime.isoformat() if task.end_datetime else None,
             "duration_minutes": task.duration_minutes,
             "category_id": str(task.category_id) if task.category_id else None,
@@ -200,6 +201,36 @@ class DatabaseRepo:
             tasks = await repo.list_by_user(UUID(user_id))
             return [self._task_to_dict(t) for t in tasks]
     
+    async def get_tasks_by_date_range(self, user_id: str, start_date: date, end_date: date) -> List[Dict]:
+        """Get tasks for a user within a date range."""
+        async with AsyncSessionLocal() as session:
+            repo = TaskRepository(session)
+            tasks = await repo.get_by_user_and_date_range(UUID(user_id), start_date, end_date)
+            task_dicts = []
+            for t in tasks:
+                task_dict = self._task_to_dict(t)
+                # Ensure date field is always set (generated column should have it, but add fallback)
+                if not task_dict.get("date"):
+                    if task_dict.get("datetime"):
+                        dt_str = task_dict["datetime"]
+                        if isinstance(dt_str, str):
+                            if "T" in dt_str:
+                                task_dict["date"] = dt_str.split("T")[0]
+                            elif " " in dt_str:
+                                task_dict["date"] = dt_str.split(" ")[0]
+                        elif hasattr(dt_str, 'date'):
+                            task_dict["date"] = dt_str.date().isoformat()
+                    elif t.datetime:
+                        # Direct access to model attribute
+                        task_dict["date"] = t.datetime.date().isoformat()
+                # Ensure date is in YYYY-MM-DD format
+                if task_dict.get("date"):
+                    date_str = task_dict["date"]
+                    if isinstance(date_str, str) and len(date_str) > 10:
+                        task_dict["date"] = date_str[:10]
+                task_dicts.append(task_dict)
+            return task_dicts
+    
     async def get_tasks_by_date_and_user(self, date_str: str, user_id: str) -> List[Dict]:
         """Get tasks for a specific date and user."""
         async with AsyncSessionLocal() as session:
@@ -223,20 +254,45 @@ class DatabaseRepo:
             repo = TaskRepository(session)
             
             datetime_str = task_dict.get("datetime")
-            if not datetime_str and task_dict.get("date") and task_dict.get("time"):
-                datetime_str = f"{task_dict['date']} {task_dict['time']}"
-            
             if not datetime_str:
-                raise ValueError("Task must have datetime")
+                # Try to construct from date and time
+                if task_dict.get("date") and task_dict.get("time"):
+                    datetime_str = f"{task_dict['date']} {task_dict['time']}"
+                elif task_dict.get("date"):
+                    # For tasks without time, use date at midnight (00:00)
+                    datetime_str = f"{task_dict['date']} 00:00"
+                else:
+                    raise ValueError("Task must have date or datetime")
             
             task_datetime = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
+            
+            # Parse end_datetime - handle both ISO format and space-separated format
+            end_datetime_obj = None
+            if task_dict.get("end_datetime"):
+                end_dt_str = task_dict["end_datetime"]
+                try:
+                    # Try ISO format first (with T or space)
+                    if "T" in end_dt_str or " " in end_dt_str:
+                        # Handle ISO format or space-separated
+                        end_dt_str = end_dt_str.replace('Z', '+00:00')
+                        try:
+                            end_datetime_obj = datetime.fromisoformat(end_dt_str)
+                        except ValueError:
+                            # Fallback to strptime for "YYYY-MM-DD HH:MM" format
+                            end_datetime_obj = datetime.strptime(end_dt_str, "%Y-%m-%d %H:%M")
+                    else:
+                        end_datetime_obj = datetime.fromisoformat(end_dt_str)
+                except Exception as e:
+                    # Log but don't fail - end_datetime will be None
+                    import logging
+                    logging.warning(f"Failed to parse end_datetime '{end_dt_str}': {e}")
             
             task_data = {
                 "user_id": UUID(task_dict["user_id"]),
                 "type": task_dict.get("type", "event"),
                 "title": task_dict.get("title", ""),
                 "datetime": task_datetime,
-                "end_datetime": datetime.fromisoformat(task_dict["end_datetime"].replace('Z', '+00:00')) if task_dict.get("end_datetime") else None,
+                "end_datetime": end_datetime_obj,
                 "duration_minutes": task_dict.get("duration_minutes"),
                 "category_id": UUID(task_dict["category_id"]) if task_dict.get("category_id") else None,
                 "category": task_dict.get("category"),
@@ -320,6 +376,27 @@ class DatabaseRepo:
             if success:
                 await session.commit()
             return success
+    
+    async def update_tasks_category(self, old_category_id: str, new_category_id: str, user_id: str) -> int:
+        """Update all tasks for a user that reference old_category_id to use new_category_id.
+        Returns the number of tasks updated."""
+        async with AsyncSessionLocal() as session:
+            from sqlalchemy import update
+            repo = TaskRepository(session)
+            
+            # Update all tasks for this user that have the old category_id
+            result = await session.execute(
+                update(Task)
+                .where(
+                    and_(
+                        Task.user_id == UUID(user_id),
+                        Task.category_id == UUID(old_category_id)
+                    )
+                )
+                .values(category_id=UUID(new_category_id))
+            )
+            await session.commit()
+            return result.rowcount
     
     async def toggle_task_complete(self, task_id: str, user_id: str) -> Optional[Dict]:
         """Toggle a task's completed status."""
@@ -430,11 +507,11 @@ class DatabaseRepo:
                 "user_id": str(r.user_id),
                 "title": r.title,
                 "description": r.description,
-                "dueDate": r.due_date.isoformat() if r.due_date else None,
+                "dueDate": r.due_date.isoformat() if r.due_date else None,  # ISO format: YYYY-MM-DD
                 "time": r.time.strftime("%H:%M") if r.time else None,
                 "type": r.type,
                 "recurring": r.recurring,
-                "visible": r.visible,
+                "visible": r.visible if r.visible is not None else True,
                 "note": r.note,
                 "createdAt": r.created_at.isoformat() if r.created_at else None,
                 "updatedAt": r.updated_at.isoformat() if r.updated_at else None,
@@ -669,6 +746,132 @@ class DatabaseRepo:
             if not category:
                 return False
             await session.delete(category)
+            await session.commit()
+            return True
+    
+    # -----------------------------
+    # Pending Actions
+    # -----------------------------
+    
+    async def create_pending_action(self, action_type: str, action_data: dict, user_id: str) -> Dict:
+        """Create a pending action for a user."""
+        async with AsyncSessionLocal() as session:
+            pending_action = PendingAction(
+                user_id=UUID(user_id),
+                action_type=action_type,
+                action_data=action_data
+            )
+            session.add(pending_action)
+            await session.commit()
+            await session.refresh(pending_action)
+            return {
+                "id": str(pending_action.id),
+                "user_id": str(pending_action.user_id),
+                "type": pending_action.action_type,
+                "payload": pending_action.action_data,
+                "created_at": pending_action.created_at.isoformat() if pending_action.created_at else None,
+            }
+    
+    async def get_pending_action(self, user_id: str) -> Optional[Dict]:
+        """Get the current pending action for a user (most recent)."""
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(PendingAction)
+                .where(PendingAction.user_id == UUID(user_id))
+                .order_by(PendingAction.created_at.desc())
+                .limit(1)
+            )
+            pending_action = result.scalar_one_or_none()
+            if pending_action:
+                return {
+                    "id": str(pending_action.id),
+                    "user_id": str(pending_action.user_id),
+                    "type": pending_action.action_type,
+                    "payload": pending_action.action_data,
+                    "created_at": pending_action.created_at.isoformat() if pending_action.created_at else None,
+                }
+            return None
+    
+    async def clear_pending_action(self, user_id: str) -> bool:
+        """Clear all pending actions for a user."""
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(PendingAction).where(PendingAction.user_id == UUID(user_id))
+            )
+            pending_actions = result.scalars().all()
+            for action in pending_actions:
+                await session.delete(action)
+            await session.commit()
+            return True
+    
+    # -----------------------------
+    # Diary Entries
+    # -----------------------------
+    
+    async def add_diary_entry(self, diary_dict: dict, user_id: str) -> Dict:
+        """Add a diary entry."""
+        async with AsyncSessionLocal() as session:
+            diary_entry = DiaryEntry(
+                user_id=UUID(user_id),
+                text=diary_dict.get("text", ""),
+                category=diary_dict.get("category")
+            )
+            session.add(diary_entry)
+            await session.commit()
+            await session.refresh(diary_entry)
+            return {
+                "id": str(diary_entry.id),
+                "user_id": str(diary_entry.user_id),
+                "text": diary_entry.text,
+                "category": diary_entry.category,
+                "created_at": diary_entry.created_at.isoformat() if diary_entry.created_at else None,
+            }
+    
+    # -----------------------------
+    # Memories
+    # -----------------------------
+    
+    async def add_memory(self, memory_dict: dict, user_id: str) -> Dict:
+        """Add a memory."""
+        async with AsyncSessionLocal() as session:
+            memory = Memory(
+                user_id=UUID(user_id),
+                text=memory_dict.get("text", ""),
+                category=memory_dict.get("category")
+            )
+            session.add(memory)
+            await session.commit()
+            await session.refresh(memory)
+            return {
+                "id": str(memory.id),
+                "user_id": str(memory.user_id),
+                "text": memory.text,
+                "category": memory.category,
+                "created_at": memory.created_at.isoformat() if memory.created_at else None,
+                "updated_at": memory.updated_at.isoformat() if memory.updated_at else None,
+            }
+    
+    # -----------------------------
+    # Account Deletion
+    # -----------------------------
+    
+    async def delete_user_account(self, user_id: str) -> bool:
+        """Delete a user account and all associated data.
+        
+        Note: Due to CASCADE foreign keys, deleting the user will automatically
+        delete all related data (tasks, notes, checkins, reminders, etc.).
+        We just need to delete the user record.
+        """
+        async with AsyncSessionLocal() as session:
+            user = await session.get(User, UUID(user_id))
+            if not user:
+                return False
+            
+            # Clear pending actions explicitly (if not CASCADE)
+            await self.clear_pending_action(user_id)
+            
+            # Delete the user (CASCADE will handle the rest)
+            await session.delete(user)
             await session.commit()
             return True
 

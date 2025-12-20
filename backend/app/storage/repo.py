@@ -1,4 +1,10 @@
 # app/storage/repo.py
+#
+# DEPRECATED: This module is no longer used by the main application.
+# The application has been fully migrated to PostgreSQL.
+# This file is kept for reference only and may be removed in the future.
+#
+# All active code now uses db.repo.DatabaseRepo instead of this JSON-based repository.
 
 import json
 import uuid
@@ -7,6 +13,7 @@ from datetime import datetime
 from app.logging import logger
 
 # Compute correct absolute path to db/data.json
+# NOTE: data.json no longer exists - this code is deprecated
 BASE_DIR = Path(__file__).resolve().parent.parent / "db"
 DATA_FILE = BASE_DIR / "data.json"
 

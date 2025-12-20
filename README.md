@@ -26,6 +26,7 @@
   - [Day 17: Authentication Emails & Verification Flow](#day-17-authentication-emails--verification-flow-dec-17-2025)
   - [Day 18: Authentication Hardening & Production Readiness](#day-18-authentication-hardening--production-readiness-dec-18-2025)
   - [Day 19: PostgreSQL Migration & Async Backend Refactor](#day-19-postgresql-migration--async-backend-refactor-dec-19-2025)
+  - [Day 20: Closing the PostgreSQL Migration](#day-20-closing-the-postgresql-migration-dec-20-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1464,9 +1465,44 @@ The focus today wasn’t adding new features, but making sure the system is **st
 This was one of the most important technical days of the challenge so far.  
 Moving to PostgreSQL wasn’t about optimisation — it was about committing to LifeOS as a real system rather than a prototype. The backend now has a solid foundation, but I still need to test everything end-to-end and make small adjustments where necessary.
 
+### **Day 20: Closing the PostgreSQL Migration (Dec 20, 2025)**
+
+Yesterday was about moving LifeOS to PostgreSQL.  
+Today was about making sure that decision is actually real.
+
+After the initial migration, there were still small remnants of the old JSON world — fallbacks, one-off scripts, temporary logic that made the system *look* migrated without fully committing to it. Today I removed that ambiguity.
+
+#### **What I Did**
+
+- Finished the PostgreSQL migration end-to-end
+- Removed all remaining JSON storage usage from the running application
+- Migrated pending actions and assistant state fully into the database
+- Updated intent handling and core flows to rely only on PostgreSQL
+- Removed one-time migration scripts and temporary fixes
+- Fixed a few migration-related bugs that only showed up once everything was database-backed
+
+At this point, LifeOS no longer has two mental models. There is one source of truth, and it’s the database.
+
+#### **Current Status**
+
+- 100% PostgreSQL-backed
+- No JSON fallbacks in active code
+- All endpoints and business logic read/write from the database
+- Old migration scripts removed or archived
+- App runs consistently across sessions and restarts
+
+#### **Reflection**
+
+This day wasn’t exciting, but it mattered.
+
+Migrations don’t really count until you delete the safety nets. Today was about owning the decision I made yesterday and cleaning up everything that no longer belonged in the system.
+
+LifeOS now feels less like something I’m *testing* and more like something I’m responsible for maintaining.
+
 ## **Next Steps**
 
-- Thoroughly test all core flows (auth, tasks, notes, check-ins, assistant endpoints)
-- Fix any edge cases or async-related issues found during testing
-- Remove legacy JSON storage once stability is confirmed
-- Continue building on top of a stable, database-backed foundation
+- Focus fully on the assistant’s behaviour and reliability
+- Make sure intent → action → result is predictable and correct
+- Stop expanding features until the assistant does the basics well
+- Build trust in the system before adding more surface area
+

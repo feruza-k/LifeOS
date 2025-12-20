@@ -54,7 +54,16 @@ export function WeekScheduleView({
 
   // Get category color by id
   const getCategoryColor = (categoryId: string): string => {
-    const category = categories.find(c => c.id === categoryId);
+    if (!categoryId) {
+      return "#EBEBEB";
+    }
+    
+    let category = categories.find(c => c.id === categoryId);
+    
+    if (!category) {
+      category = categories.find(c => c.label.toLowerCase() === categoryId.toLowerCase());
+    }
+    
     return category?.color || "#EBEBEB";
   };
 
@@ -111,13 +120,47 @@ export function WeekScheduleView({
 
   // Get tasks for a specific date (Week View = Scheduled Tasks Only)
   const getTasksForDate = (dateStr: string) => {
+    // Normalize date string for comparison
+    const normalizedDateStr = dateStr.length > 10 ? dateStr.substring(0, 10) : dateStr;
+    
     const allTasks = tasks.filter(
-      (task) =>
-        task.date === dateStr &&
-        task.value &&
-        selectedCategories.includes(task.value as ValueType) &&
-        task.time && // Only scheduled tasks in Week view
-        task.endTime // Must have both time and endTime (duration)
+      (task) => {
+        // Must have date and time (scheduled tasks only)
+        if (!task.date || !task.time) return false;
+        
+        // Normalize task date for comparison
+        let taskDate = task.date;
+        if (typeof taskDate === 'string') {
+          if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
+          if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
+          if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
+        } else if (taskDate instanceof Date) {
+          taskDate = taskDate.toISOString().slice(0, 10);
+        }
+        
+        // Date must match
+        if (taskDate !== normalizedDateStr) return false;
+        
+        // Category matching logic (same as month view):
+        // - If no categories selected OR all categories selected, show all tasks
+        // - Otherwise, show tasks that match selected categories OR tasks without a value
+        const allCategoryIds = categories.map(c => c.id);
+        const allSelected = selectedCategories.length === 0 || 
+                           (selectedCategories.length === allCategoryIds.length && 
+                            allCategoryIds.every(id => selectedCategories.includes(id)));
+        
+        if (allSelected) {
+          return true; // All categories selected = no filter, show all
+        }
+        
+        // If task has a value, check if it matches selected categories
+        if (task.value) {
+          return selectedCategories.includes(task.value);
+        }
+        
+        // If task has no value, show it anyway (legacy task or uncategorized)
+        return true;
+      }
     );
     
     // Only scheduled tasks - sorted by time
@@ -126,37 +169,7 @@ export function WeekScheduleView({
       return a.time.localeCompare(b.time);
     });
     
-    return { scheduled, anytime: [] }; // No anytime tasks in Week view
-  };
-
-  // Legacy function - keeping for reference but not using
-  const getSimulatedTasks = (dateStr: string, dayIndex: number) => {
-    const baseDate = new Date(dateStr);
-    const dateNum = baseDate.getDate();
-    
-    const allTasks = [
-      { id: `${dateStr}-1`, title: "Meditation", time: "07:00", duration: 30, completed: false, value: "health" as ValueType },
-      { id: `${dateStr}-2`, title: "Standup", time: "09:30", duration: 30, completed: dayIndex < 3, value: "work" as ValueType },
-      { id: `${dateStr}-3`, title: "Deep Work", time: "10:00", duration: 120, completed: false, value: "work" as ValueType },
-      { id: `${dateStr}-4`, title: "Lunch", time: "12:30", duration: 60, completed: false, value: "family" as ValueType },
-      { id: `${dateStr}-5`, title: "Meeting", time: "14:00", duration: 60, completed: false, value: "work" as ValueType },
-      { id: `${dateStr}-6`, title: "Workout", time: "18:00", duration: 60, completed: false, value: "health" as ValueType },
-      { id: `${dateStr}-7`, title: "Writing", time: "20:00", duration: 60, completed: false, value: "creativity" as ValueType },
-    ];
-
-    const tasksPerDay = [
-      [0, 1, 2, 4, 5], // Monday
-      [0, 2, 3, 6], // Tuesday
-      [1, 2, 4, 5], // Wednesday
-      [0, 3, 4, 5, 6], // Thursday
-      [1, 2, 3], // Friday
-      [0, 5, 6], // Saturday
-      [3, 5], // Sunday
-    ];
-
-    return tasksPerDay[dayIndex]
-      .map((i) => allTasks[i])
-      .filter((task) => task.value && selectedCategories.includes(task.value));
+    return { scheduled, anytime: [] };
   };
 
   const handlers = useSwipeable({
@@ -281,7 +294,7 @@ export function WeekScheduleView({
                   {scheduled.map((task) => {
                     const duration = getDuration(task);
                     const style = getTaskStyle(task.time!, duration);
-                    const categoryColor = getCategoryColor(task.value);
+                    const categoryColor = getCategoryColor(task.value || "");
                     return (
                       <button
                         key={task.id}
@@ -323,6 +336,7 @@ export function WeekScheduleView({
                           top: style.top, 
                           height: style.height,
                           backgroundColor: hexToRgba(categoryColor, 0.6),
+                          borderLeft: `4px solid ${categoryColor}`,
                         }}
                         className={cn(
                           "absolute left-0.5 right-0.5 rounded px-1 py-1 overflow-hidden transition-all duration-300 flex items-start text-left",

@@ -1,67 +1,98 @@
 # intent_handler.py
 
-from app.storage.repo import repo
-from app.models.task import Task
-from app.models.diary import DiaryEntry
-from app.models.memory import Memory
+from db.repo import db_repo
+from app.logic.frontend_adapter import frontend_task_to_backend
 from app.models.intent import Intent
 
-def handle_intent(intent: Intent):
+async def handle_intent(intent: Intent, user_id: str):
     """
     Routes parsed intent to the correct storage action.
+    Requires user_id for database operations.
     """
 
     # Event
 
     if intent.intent_type == "event":
-        task = Task(
-            type="event",
-            title=intent.title,
-            date=intent.date,
-            time=intent.time,
-            datetime=intent.datetime,
-            category=intent.category,
-            notes=intent.notes
-        )
-        repo.add_task(task)
-        return {"message": "Event saved", "event": task}
+        # Convert intent to task dict format
+        task_dict = {
+            "title": intent.title,
+            "date": intent.date,
+            "time": intent.time,
+            "datetime": intent.datetime,
+            "category": intent.category,
+            "notes": intent.notes,
+            "type": "event",
+            "user_id": user_id
+        }
+        # Convert to backend format
+        backend_task = frontend_task_to_backend(task_dict, task_type="event")
+        backend_task["user_id"] = user_id
+        
+        # Get categories for mapping
+        categories = await db_repo.get_categories(user_id)
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        
+        # Look up category_id if category label is provided
+        if backend_task.get("category"):
+            category_label = backend_task["category"].lower()
+            if category_label in category_label_to_id:
+                backend_task["category_id"] = category_label_to_id[category_label]
+        
+        result = await db_repo.add_task_dict(backend_task)
+        return {"message": "Event saved", "event": result}
 
     # Reminder
 
     elif intent.intent_type == "reminder":
-        task = Task(
-            type="reminder",
-            title=intent.title,
-            date=intent.date,
-            time=intent.time,
-            datetime=intent.datetime,
-            category=intent.category,
-            notes=intent.notes
-        )
-        repo.add_task(task)
-        return {"message": "Reminder saved", "reminder": task}
+        # Convert intent to task dict format
+        task_dict = {
+            "title": intent.title,
+            "date": intent.date,
+            "time": intent.time,
+            "datetime": intent.datetime,
+            "category": intent.category,
+            "notes": intent.notes,
+            "type": "reminder",
+            "user_id": user_id
+        }
+        # Convert to backend format
+        backend_task = frontend_task_to_backend(task_dict, task_type="reminder")
+        backend_task["user_id"] = user_id
+        
+        # Get categories for mapping
+        categories = await db_repo.get_categories(user_id)
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        
+        # Look up category_id if category label is provided
+        if backend_task.get("category"):
+            category_label = backend_task["category"].lower()
+            if category_label in category_label_to_id:
+                backend_task["category_id"] = category_label_to_id[category_label]
+        
+        result = await db_repo.add_task_dict(backend_task)
+        return {"message": "Reminder saved", "reminder": result}
 
     # -------------------
     # DIARY ENTRY
     # -------------------
     elif intent.intent_type == "diary":
-        entry = DiaryEntry(
-            text=intent.notes,
-            category=intent.category
-        )
-        repo.add_diary(entry)
-        return {"message": "Diary saved", "diary": entry}
+        diary_dict = {
+            "text": intent.notes or "",
+            "category": intent.category
+        }
+        result = await db_repo.add_diary_entry(diary_dict, user_id)
+        return {"message": "Diary saved", "diary": result}
 
     # -------------------
     # MEMORY
     # -------------------
     elif intent.intent_type == "memory":
-        mem = Memory(
-            text=intent.notes,
-            category=intent.category
-        )
-        repo.add_memory(mem)
-        return {"message": "Memory saved", "memory": mem}
+        memory_dict = {
+            "text": intent.notes or "",
+            "category": intent.category
+        }
+        result = await db_repo.add_memory(memory_dict, user_id)
+        return {"message": "Memory saved", "memory": result}
 
     # -------------------
     # UNKNOWN

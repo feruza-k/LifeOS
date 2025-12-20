@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import os
 import sys
 from typing import Optional, List, Dict, Any
@@ -12,7 +12,6 @@ from pydantic import BaseModel, EmailStr
 
 from app.ai.parser import test_ai_connection, parse_intent
 from app.ai.assistant import generate_assistant_response
-from app.storage.repo import load_data, save_data
 from db.repo import db_repo
 from app.storage.photo_storage import save_photo, delete_photo, get_photo_path, photo_exists
 from app.logic.intent_handler import handle_intent
@@ -194,9 +193,10 @@ def parse_endpoint(user_input: str):
     return parse_intent(user_input)
 
 @app.get("/process")
-def process(text: str):
+async def process(text: str, current_user: dict = Depends(get_current_user)):
+    """Process intent (requires authentication)."""
     intent = parse_intent(text)
-    result = handle_intent(intent)
+    result = await handle_intent(intent, current_user["id"])
     return {"intent": intent, "result": result}
 
 @app.get("/tasks")
@@ -204,14 +204,38 @@ async def get_tasks(current_user: dict = Depends(get_current_user)):
     return await get_all_tasks(current_user["id"])
 
 @app.get("/all")
-def get_all():
-    return load_data()
+async def get_all(current_user: dict = Depends(get_current_user)):
+    """Get all user data from database. Development use only."""
+    user_id = current_user["id"]
+    
+    tasks = await db_repo.get_tasks_by_date_range(user_id, date(2000, 1, 1), date(2100, 12, 31))
+    reminders = await db_repo.get_reminders(user_id)
+    categories = await db_repo.get_categories(user_id)
+    pending = await db_repo.get_pending_action(user_id)
+    
+    return {
+        "tasks": tasks,
+        "reminders": reminders,
+        "categories": categories,
+        "pending": pending if pending else {}
+    }
 
 @app.post("/clear")
-async def clear_data():
-    empty = {"tasks": [], "diary": [], "memories": [], "pending": {}, "notes": [], "checkins": [], "reminders": [], "monthly_focus": []}
-    save_data(empty)
-    return {"status": "cleared"}
+async def clear_data(current_user: dict = Depends(get_current_user)):
+    """Clear all user tasks and pending actions. Development use only.
+    
+    WARNING: This will delete all tasks and pending actions for the authenticated user.
+    To fully delete account, use DELETE /auth/account
+    """
+    user_id = current_user["id"]
+    
+    tasks = await db_repo.get_tasks_by_date_range(user_id, date(2000, 1, 1), date(2100, 12, 31))
+    for task in tasks:
+        await db_repo.delete_task(task["id"], user_id)
+    
+    await db_repo.clear_pending_action(user_id)
+    
+    return {"status": "cleared", "message": "User tasks and pending actions cleared"}
 
 @app.post("/tasks/{task_id}/complete")
 async def complete_task(task_id: str, current_user: dict = Depends(get_current_user)):
@@ -225,14 +249,12 @@ async def complete_task(task_id: str, current_user: dict = Depends(get_current_u
 async def signup(request: Request, response: Response, user_data: UserCreate):
     from app.auth.password_validator import validate_password_strength
     
-    # Validate passwords match
     if user_data.password != user_data.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Passwords do not match"
         )
     
-    # Validate password strength
     is_valid, error_msg = validate_password_strength(user_data.password)
     if not is_valid:
         raise HTTPException(
@@ -335,7 +357,6 @@ async def signup(request: Request, response: Response, user_data: UserCreate):
         
         # User account is still created, they can use resend-verification endpoint
     
-    # Create tokens and set cookies
     from app.auth.auth import create_refresh_token
     from app.auth.security import set_auth_cookies
     
@@ -361,7 +382,6 @@ async def signup(request: Request, response: Response, user_data: UserCreate):
         success=True
     )
     
-    # Create JSONResponse and set cookies on it
     json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
     set_auth_cookies(json_response, access_token, refresh_token)
     return json_response
@@ -393,7 +413,6 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
             detail="Account temporarily locked due to too many failed login attempts. Please try again later or use the unlock link sent to your email.",
         )
     
-    # Verify credentials (don't reveal user existence)
     if not user or not verify_password(form_data.password, user.get("password", "")):
         if user:
             should_lock = await handle_failed_login(user)
@@ -435,14 +454,12 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
     )
     refresh_token = create_refresh_token(user["id"])
     
-    # Store refresh token
     refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
     await db_repo.update_user(user["id"], {
         "refresh_token": refresh_token,
         "refresh_token_expires": refresh_token_expires
     })
     
-    # Set httpOnly cookies
     from app.auth.security import set_auth_cookies
     
     log_auth_event(
@@ -454,7 +471,6 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
         success=True
     )
     
-    # Create JSONResponse and set cookies on it
     json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
     set_auth_cookies(json_response, access_token, refresh_token)
     return json_response
@@ -466,12 +482,10 @@ class RefreshTokenRequest(BaseModel):
 async def refresh_token(request: Request, response: Response, req: RefreshTokenRequest | None = None):
     """Refresh access token using refresh token from cookie or request body."""
     from app.auth.security import get_token_from_cookie, set_auth_cookies
-    from app.auth.auth import verify_refresh_token
+    from app.auth.auth import verify_refresh_token, create_refresh_token, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
     
-    # Try to get refresh token from cookie first
     refresh_token_value = get_token_from_cookie(request, "refresh")
     
-    # Fallback to request body if not in cookie
     if not refresh_token_value and req and req.refresh_token:
         refresh_token_value = req.refresh_token
     
@@ -481,7 +495,6 @@ async def refresh_token(request: Request, response: Response, req: RefreshTokenR
             detail="Refresh token required"
         )
     
-    # Verify refresh token
     user_id = verify_refresh_token(refresh_token_value)
     if not user_id:
         raise HTTPException(
@@ -489,7 +502,6 @@ async def refresh_token(request: Request, response: Response, req: RefreshTokenR
             detail="Invalid or expired refresh token"
         )
     
-    # Verify refresh token matches stored token (rotation check)
     user = await db_repo.get_user_by_id(user_id)
     if not user or user.get("refresh_token") != refresh_token_value:
         raise HTTPException(
@@ -497,7 +509,6 @@ async def refresh_token(request: Request, response: Response, req: RefreshTokenR
             detail="Invalid refresh token"
         )
     
-    # Check if refresh token expired
     refresh_token_expires = user.get("refresh_token_expires")
     if refresh_token_expires:
         try:
@@ -510,21 +521,18 @@ async def refresh_token(request: Request, response: Response, req: RefreshTokenR
         except:
             pass
     
-    # Generate new tokens (rotation: invalidate old refresh token)
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user_id}, expires_delta=access_token_expires
     )
     new_refresh_token = create_refresh_token(user_id)
     
-    # Store new refresh token (old one is invalidated)
     new_refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
     await db_repo.update_user(user_id, {
         "refresh_token": new_refresh_token,
         "refresh_token_expires": new_refresh_token_expires
     })
     
-    # Create JSONResponse and set cookies on it
     json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
     set_auth_cookies(json_response, access_token, new_refresh_token)
     return json_response
@@ -535,7 +543,6 @@ async def logout(request: Request, response: Response, current_user: dict = Depe
     from app.auth.security import clear_auth_cookies, get_token_from_cookie
     from app.auth.auth import verify_refresh_token
     
-    # Revoke refresh token
     refresh_token_value = get_token_from_cookie(request, "refresh")
     if refresh_token_value:
         user_id = verify_refresh_token(refresh_token_value)
@@ -609,7 +616,6 @@ async def verify_email(verify_data: VerifyEmailRequest, current_user: dict = Dep
             detail="Invalid verification token"
         )
     
-    # Verify email
     await db_repo.update_user(user["id"], {
         "email_verified": True,
         "verification_token": None,
@@ -631,7 +637,6 @@ async def verify_email_by_token(request: Request, verify_data: VerifyEmailReques
     - Email sending fails due to Resend restrictions (domain not verified)
     - Testing verification flow in development
     """
-    # Find user by verification token
     user = await db_repo.get_user_by_verification_token(verify_data.token)
     
     if not user:
@@ -750,7 +755,6 @@ async def reset_password(req: ResetPasswordRequest):
             detail="Passwords do not match"
         )
     
-    # Validate password strength
     is_valid, error_msg = validate_password_strength(req.new_password)
     if not is_valid:
         raise HTTPException(
@@ -758,7 +762,6 @@ async def reset_password(req: ResetPasswordRequest):
             detail=error_msg
         )
     
-    # Find user by reset token
     user = await db_repo.get_user_by_reset_token(req.token)
     if not user:
         raise HTTPException(
@@ -766,7 +769,6 @@ async def reset_password(req: ResetPasswordRequest):
             detail="Invalid or expired reset token"
         )
     
-    # Update password
     hashed_password = get_password_hash(req.new_password)
     await db_repo.update_user(user["id"], {
         "password": hashed_password,
@@ -802,7 +804,6 @@ async def change_password(req: ChangePasswordRequest, current_user: dict = Depen
             detail="Passwords do not match"
         )
     
-    # Validate password strength
     is_valid, error_msg = validate_password_strength(req.new_password)
     if not is_valid:
         raise HTTPException(
@@ -810,11 +811,8 @@ async def change_password(req: ChangePasswordRequest, current_user: dict = Depen
             detail=error_msg
         )
     
-    # Update password
     hashed_password = get_password_hash(req.new_password)
-    await db_repo.update_user(user["id"], {
-        "password": hashed_password
-    })
+    await db_repo.update_user(user["id"], {"password": hashed_password})
     
     return {"message": "Password changed successfully"}
 
@@ -857,38 +855,22 @@ async def update_profile(updates: UpdateProfileRequest, current_user: dict = Dep
     }
 
 @app.delete("/auth/account")
-def delete_account(current_user: dict = Depends(get_current_user)):
-    """Delete user account and all associated data."""
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """Delete user account and all associated data.
+    
+    Note: Due to CASCADE foreign keys in the database, deleting the user
+    will automatically delete all related data (tasks, notes, checkins,
+    reminders, monthly focus, etc.). We just need to delete the user record.
+    """
     user_id = current_user["id"]
     
-    # Delete all user data
-    data = load_data()
+    # Delete user account (CASCADE will handle all related data)
+    success = await db_repo.delete_user_account(user_id)
     
-    # Delete user's tasks
-    data["tasks"] = [t for t in data.get("tasks", []) if t.get("user_id") != user_id]
-    
-    # Delete user's notes
-    data["notes"] = [n for n in data.get("notes", []) if n.get("user_id") != user_id]
-    
-    # Delete user's check-ins
-    data["checkins"] = [c for c in data.get("checkins", []) if c.get("user_id") != user_id]
-    
-    # Delete user's reminders
-    data["reminders"] = [r for r in data.get("reminders", []) if r.get("user_id") != user_id]
-    
-    # Delete user's monthly focus
-    data["monthly_focus"] = [f for f in data.get("monthly_focus", []) if f.get("user_id") != user_id]
-    
-    # Delete user's pending actions
-    if user_id in data.get("pending", {}):
-        del data["pending"][user_id]
-    
-    # Delete user account
-    data["users"] = [u for u in data.get("users", []) if u.get("id") != user_id]
-    
-    save_data(data)
-    
-    return {"message": "Account deleted successfully"}
+    if success:
+        return {"message": "Account deleted successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
 
 @app.post("/auth/avatar")
 async def upload_avatar(
@@ -914,18 +896,14 @@ async def upload_avatar(
     old_avatar_path = user.get("avatar_path")
     if old_avatar_path:
         try:
-            # Extract filename from path
             import os
             old_filename = os.path.basename(old_avatar_path)
             delete_photo(old_filename)
         except:
             pass  # Ignore errors if file doesn't exist
     
-    # Save new avatar with user-specific prefix
-    # Use user ID as "date" parameter for filename organization
     saved_filename = save_photo(file, f"avatar_{current_user['id']}")
     
-    # Update user record with avatar path
     avatar_url = f"/photos/{saved_filename}"
     await db_repo.update_user(user["id"], {"avatar_path": avatar_url})
     
@@ -945,7 +923,6 @@ async def delete_avatar(current_user: dict = Depends(get_current_user)):
     if not avatar_path:
         return {"message": "No avatar to delete"}
     
-    # Extract filename from path
     import os
     filename = os.path.basename(avatar_path)
     try:
@@ -974,19 +951,46 @@ async def create_task(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new task from frontend format. Handles recurring tasks (user-scoped)."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     task_dict = task_data.model_dump(exclude_none=True)
     repeat_config = task_dict.pop("repeat", None)
     
-    # Add user_id to all tasks
     task_dict["user_id"] = current_user["id"]
     
-    # If no repeat config, create single task
     if not repeat_config:
         backend_task = frontend_task_to_backend(task_dict)
-        # Ensure user_id is preserved (frontend_task_to_backend might not include it)
         backend_task["user_id"] = current_user["id"]
+        
+        if "value" in task_dict:
+            categories = await db_repo.get_categories(current_user["id"])
+            category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+            
+            frontend_value = task_dict["value"]
+            if len(frontend_value) == 36 and frontend_value.count("-") == 4:
+                backend_task["category_id"] = frontend_value
+            elif frontend_value.lower() in category_label_to_id:
+                backend_task["category_id"] = category_label_to_id[frontend_value.lower()]
+            else:
+                value_to_label = {
+                    "health": "health",
+                    "work": "work",
+                    "family": "family",
+                    "growth": "growth",
+                    "creativity": "creativity",
+                }
+                mapped_label = value_to_label.get(frontend_value.lower(), "growth")
+                if mapped_label in category_label_to_id:
+                    backend_task["category_id"] = category_label_to_id[mapped_label]
+                else:
+                    logger.warning(f"Could not map value '{frontend_value}' to any category UUID")
+        
         result = await db_repo.add_task_dict(backend_task)
-        return backend_task_to_frontend(result)
+        categories = await db_repo.get_categories(current_user["id"])
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        frontend_result = backend_task_to_frontend(result, category_label_to_id)
+        return frontend_result
     
     # Handle recurring tasks - create all instances
     created_tasks = []
@@ -1002,8 +1006,17 @@ async def create_task(
                     task_dict["date"] = current_date.strftime("%Y-%m-%d")
                     backend_task = frontend_task_to_backend(task_dict)
                     backend_task["user_id"] = current_user["id"]
+                    
+                    # Set category_id if value is provided
+                    if "value" in task_dict:
+                        frontend_value = task_dict["value"]
+                        if len(frontend_value) == 36 and frontend_value.count("-") == 4:
+                            backend_task["category_id"] = frontend_value
+                        elif frontend_value.lower() in category_label_to_id:
+                            backend_task["category_id"] = category_label_to_id[frontend_value.lower()]
+                    
                     result = await db_repo.add_task_dict(backend_task)
-                    created_tasks.append(backend_task_to_frontend(result))
+                    created_tasks.append(backend_task_to_frontend(result, category_label_to_id))
                     # Check if we've completed a full week cycle
                     if current_date.weekday() == max(repeat_config["weekDays"]):
                         weeks_created += 1
@@ -1021,8 +1034,18 @@ async def create_task(
             while current_date <= end:
                 task_dict["date"] = current_date.strftime("%Y-%m-%d")
                 backend_task = frontend_task_to_backend(task_dict)
+                backend_task["user_id"] = current_user["id"]
+                
+                # Set category_id if value is provided
+                if "value" in task_dict:
+                    frontend_value = task_dict["value"]
+                    if len(frontend_value) == 36 and frontend_value.count("-") == 4:
+                        backend_task["category_id"] = frontend_value
+                    elif frontend_value.lower() in category_label_to_id:
+                        backend_task["category_id"] = category_label_to_id[frontend_value.lower()]
+                
                 result = await db_repo.add_task_dict(backend_task)
-                created_tasks.append(backend_task_to_frontend(result))
+                created_tasks.append(backend_task_to_frontend(result, category_label_to_id))
                 current_date += timedelta(days=1)
     
     elif repeat_config["type"] == "custom":
@@ -1031,8 +1054,18 @@ async def create_task(
             for date_str in repeat_config["customDates"]:
                 task_dict["date"] = date_str
                 backend_task = frontend_task_to_backend(task_dict)
+                backend_task["user_id"] = current_user["id"]
+                
+                # Set category_id if value is provided
+                if "value" in task_dict:
+                    frontend_value = task_dict["value"]
+                    if len(frontend_value) == 36 and frontend_value.count("-") == 4:
+                        backend_task["category_id"] = frontend_value
+                    elif frontend_value.lower() in category_label_to_id:
+                        backend_task["category_id"] = category_label_to_id[frontend_value.lower()]
+                
                 result = await db_repo.add_task_dict(backend_task)
-                created_tasks.append(backend_task_to_frontend(result))
+                created_tasks.append(backend_task_to_frontend(result, category_label_to_id))
     
     # Return the first created task (for compatibility)
     return created_tasks[0] if created_tasks else backend_task_to_frontend(result)
@@ -1048,7 +1081,33 @@ async def update_task(
     # Convert frontend updates to backend format if needed
     backend_updates = {}
     if "value" in updates_dict:
-        backend_updates["category"] = updates_dict["value"]
+        # Look up category UUID by value (which could be UUID or category label)
+        categories = await db_repo.get_categories(current_user["id"])
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        
+        frontend_value = updates_dict["value"]
+        # Check if it's already a UUID
+        if len(frontend_value) == 36 and frontend_value.count("-") == 4:
+            # It's a UUID, use it directly
+            backend_updates["category_id"] = frontend_value
+        elif frontend_value.lower() in category_label_to_id:
+            # It's a label, look up UUID
+            backend_updates["category_id"] = category_label_to_id[frontend_value.lower()]
+        else:
+            # Fallback: try to map legacy values
+            value_to_label = {
+                "health": "health",
+                "work": "work",
+                "family": "family",
+                "growth": "growth",
+                "creativity": "creativity",
+            }
+            mapped_label = value_to_label.get(frontend_value.lower(), "growth")
+            if mapped_label in category_label_to_id:
+                backend_updates["category_id"] = category_label_to_id[mapped_label]
+            else:
+                # Last resort: set category label
+                backend_updates["category"] = mapped_label
     if "endTime" in updates_dict and updates_dict.get("time") and updates_dict.get("date"):
         # Calculate duration
         try:
@@ -1070,7 +1129,10 @@ async def update_task(
     
     result = await db_repo.update_task(task_id, backend_updates, current_user["id"])
     if result:
-        return backend_task_to_frontend(result)
+        # Get categories for mapping
+        categories = await db_repo.get_categories(current_user["id"])
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        return backend_task_to_frontend(result, category_label_to_id)
     return {"error": "Task not found"}
 
 @app.delete("/tasks/{task_id}")
@@ -1243,13 +1305,22 @@ async def save_checkin(
 @app.get("/reminders")
 async def get_all_reminders(current_user: dict = Depends(get_current_user)):
     """Get all reminders for the current user (separate from task reminders)."""
-    return await db_repo.get_reminders(current_user["id"])
+    reminders = await db_repo.get_reminders(current_user["id"])
+    return reminders
 
 @app.post("/reminders")
 async def create_reminder(reminder_data: ReminderRequest, current_user: dict = Depends(get_current_user)):
     """Create a new reminder (user-scoped)."""
-    result = await db_repo.add_reminder(reminder_data.model_dump(exclude_none=True), current_user["id"])
+    data = reminder_data.model_dump(exclude_none=True)
+
+    # Restore legacy behavior: "show" reminders default to today
+    if data.get("type") == "show" and not data.get("dueDate"):
+        data["dueDate"] = datetime.utcnow().date().isoformat()
+
+    result = await db_repo.add_reminder(data, current_user["id"])
     return result
+
+
 
 class ReminderUpdateRequest(BaseModel):
     title: str | None = None
@@ -1332,14 +1403,50 @@ async def create_category(category_data: CategoryRequest, current_user: dict = D
 
 @app.patch("/categories/{category_id}")
 async def update_category(category_id: str, updates: CategoryUpdateRequest, current_user: dict = Depends(get_current_user)):
-    """Update a category (user-scoped - can only update own categories)."""
+    """Update a category (user-scoped - can only update own categories).
+    
+    If updating a global category (user_id = NULL), creates a user-specific copy instead.
+    """
     updates_dict = updates.model_dump(exclude_none=True)
-    # Verify category belongs to user before updating
+    # Verify category exists
     category = await db_repo.get_category(category_id)
     if not category:
         return {"error": "Category not found"}
-    if category.get("user_id") and category["user_id"] != current_user["id"]:
+    
+    # If it's a global category (user_id = NULL), create or update a user-specific copy
+    if not category.get("user_id"):
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Check if user already has a user-specific category with this label
+        user_categories = await db_repo.get_categories(current_user["id"])
+        existing_user_category = next(
+            (c for c in user_categories if c.get("user_id") == current_user["id"] and c.get("label", "").lower() == category.get("label", "").lower()),
+            None
+        )
+        
+        if existing_user_category:
+            # User already has a custom version, update it instead
+            result = await db_repo.update_category(existing_user_category["id"], updates_dict)
+            # Also update tasks that reference the old global category
+            updated_count = await db_repo.update_tasks_category(category_id, existing_user_category["id"], current_user["id"])
+            logger.info(f"Updated existing user category and {updated_count} tasks")
+        else:
+            new_category = {
+                "label": category["label"],
+                "color": updates_dict.get("color", category["color"]),
+                "user_id": current_user["id"]
+            }
+            result = await db_repo.add_category(new_category)
+            
+            updated_count = await db_repo.update_tasks_category(category_id, result["id"], current_user["id"])
+            logger.info(f"Created new user category and updated {updated_count} tasks")
+        
+        return result
+    
+    if category.get("user_id") != current_user["id"]:
         return {"error": "Unauthorized: Cannot update other users' categories"}
+    
     result = await db_repo.update_category(category_id, updates_dict)
     if result:
         return result
@@ -1366,23 +1473,52 @@ async def delete_category(category_id: str, current_user: dict = Depends(get_cur
 
 @app.get("/tasks/calendar")
 async def tasks_calendar(
-    start: str = Query(...),
-    end: str = Query(...),
+    start: str,
+    end: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get tasks for a date range, returned as flat array in frontend format (user-scoped)."""
+    """Get tasks for a date range in frontend format (user-scoped). Uses database only."""
+    from datetime import date as date_type
+    from db.session import AsyncSessionLocal
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Force database usage - fail if not configured
+    if AsyncSessionLocal is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Database not configured. Please set DATABASE_URL environment variable."
+        )
+    
     try:
-        # Get user's tasks first
-        user_tasks = await db_repo.get_tasks_by_user(current_user["id"])
-        # Filter by date range
-        all_tasks = [
-            backend_task_to_frontend(t) 
-            for t in user_tasks 
-            if start <= t.get("date", "") <= end
-        ]
-        return all_tasks
+        # Parse date strings to date objects
+        start_date = date_type.fromisoformat(start[:10])
+        end_date = date_type.fromisoformat(end[:10])
+        
+        logger.info(f"[tasks/calendar] Querying database for tasks: user={current_user['id']}, range={start[:10]} to {end[:10]}")
+        
+        # Use database repo to get tasks in date range
+        tasks = await db_repo.get_tasks_by_date_range(current_user["id"], start_date, end_date)
+        
+        logger.info(f"[tasks/calendar] Database returned {len(tasks)} tasks for range {start[:10]} to {end[:10]}")
+        
+        categories = await db_repo.get_categories(current_user["id"])
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        
+        frontend_tasks = [backend_task_to_frontend(t, category_label_to_id) for t in tasks]
+        
+        return frontend_tasks
     except ValueError as e:
-        return {"error": str(e)}
+        # Invalid date format
+        logger.error(f"[tasks/calendar] Invalid date format: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {e}")
+    except Exception as e:
+        logger.error(f"Database query failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch tasks from database: {str(e)}"
+        )
+
 
 @app.get("/tasks/conflicts")
 async def tasks_conflicts(
@@ -1397,11 +1533,26 @@ async def tasks_conflicts(
 @app.post("/assistant/chat", response_model=AssistantReply)
 async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)):
     """Main SolAI chat endpoint (user-scoped)."""
-    reply = await generate_assistant_response(payload.message, current_user["id"])
-    return {
-        "assistant_response": reply.get("assistant_response", "Something went wrong."),
-        "ui": reply.get("ui")
-    }
+    try:
+        reply = await generate_assistant_response(payload.message, current_user["id"])
+        return {
+            "assistant_response": reply.get("assistant_response", "Something went wrong."),
+            "ui": reply.get("ui")
+        }
+    except ValueError as e:
+        if "OPENAI_API_KEY" in str(e):
+            logger.error(f"OpenAI API key not configured: {e}")
+            return {
+                "assistant_response": "I'm having trouble connecting to the AI service. Please check that OPENAI_API_KEY is set in the backend configuration.",
+                "ui": None
+            }
+        raise
+    except Exception as e:
+        logger.error(f"Error in assistant chat: {e}", exc_info=True)
+        return {
+            "assistant_response": "I'm having trouble processing that request. Please try again.",
+            "ui": None
+        }
 
 @app.post("/assistant/confirm")
 async def assistant_confirm(current_user: dict = Depends(get_current_user)):
@@ -1411,36 +1562,46 @@ async def assistant_confirm(current_user: dict = Depends(get_current_user)):
 @app.get("/assistant/bootstrap")
 async def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
     """Bootstrap endpoint: returns all initial data needed by frontend (user-scoped)."""
-    # Get user's tasks only
-    user_tasks = await db_repo.get_tasks_by_user(current_user["id"])
-    # Filter today view to user's tasks only
     from datetime import datetime
     import pytz
+    from app.logic.today_engine import calculate_energy
+    
     tz = pytz.timezone("Europe/London")
     today = datetime.now(tz).strftime("%Y-%m-%d")
-    today_tasks = [t for t in user_tasks if t.get("date") == today]
-    from app.logic.today_engine import calculate_energy
+    
+    # Get today's tasks using the database query (more efficient)
+    today_tasks = await db_repo.get_tasks_by_date_and_user(today, current_user["id"])
+    
+    # Calculate energy using backend format
     energy = calculate_energy(today_tasks)
+    
+    # Convert to frontend format
+    frontend_tasks = [backend_task_to_frontend(t) for t in today_tasks]
+    
+    # Calculate load
+    total_tasks = len(frontend_tasks)
+    if total_tasks == 0:
+        load = "empty"
+    elif total_tasks <= 2:
+        load = "light"
+    elif total_tasks <= 5:
+        load = "medium"
+    else:
+        load = "heavy"
     
     today_view = {
         "date": today,
-        "tasks": today_tasks,
-        "load": "light" if len(today_tasks) <= 2 else ("medium" if len(today_tasks) <= 5 else "heavy"),
+        "tasks": frontend_tasks,
+        "load": load,  # Deprecated
         "energy": energy
     }
     
     return {
-        "today": {
-            "date": today_view["date"],
-            "tasks": [backend_task_to_frontend(t) for t in today_view["tasks"]],
-            "load": today_view["load"],  # Deprecated
-            "energy": today_view["energy"]
-        },
+        "today": today_view,
         "week": await get_week_stats(current_user["id"]),
         "suggestions": (await get_suggestions(current_user["id"])).get("suggestions", []),
         "conflicts": await find_conflicts(user_id=current_user["id"]),
         "categories": await get_category_colors(current_user["id"]),
-        "pending": load_data().get("pending", {}).get(current_user["id"], {})
     }
 
 @app.get("/assistant/today")
@@ -1455,28 +1616,29 @@ async def assistant_today(
     
     tz = pytz.timezone("Europe/London")
     
-    # Get user's tasks only
-    user_tasks = await db_repo.get_tasks_by_user(current_user["id"])
-    
-    # If date provided, filter tasks for that date
-    if date:
-        date_tasks = [t for t in user_tasks if t.get("date") == date]
-    else:
-        # Default: use today
+    # If date provided, use it; otherwise use today
+    if not date:
         today = datetime.now(tz).strftime("%Y-%m-%d")
         date = today
-        date_tasks = [t for t in user_tasks if t.get("date") == date]
+    
+    # Get tasks for the specific date using the database query (more efficient)
+    date_tasks = await db_repo.get_tasks_by_date_and_user(date, current_user["id"])
+    
+    # Convert to frontend format first
+    frontend_tasks = [backend_task_to_frontend(t) for t in date_tasks]
     
     # Sort: tasks with time first (by time), then tasks without time
     tasks_with_time = sorted(
-        [t for t in date_tasks if t.get("time")],
+        [t for t in frontend_tasks if t.get("time")],
         key=lambda x: x.get("time", "")
     )
-    tasks_without_time = [t for t in date_tasks if not t.get("time")]
+    tasks_without_time = [t for t in frontend_tasks if not t.get("time")]
     sorted_tasks = tasks_with_time + tasks_without_time
     
-    # Calculate energy using weighted task load model
-    energy = calculate_energy(sorted_tasks)
+    # Calculate energy using weighted task load model (needs backend format)
+    # Convert back to backend format for energy calculation
+    backend_tasks_for_energy = date_tasks  # Already in backend format
+    energy = calculate_energy(backend_tasks_for_energy)
     
     # Legacy load calculation (deprecated)
     total_tasks = len(sorted_tasks)
@@ -1489,9 +1651,12 @@ async def assistant_today(
     else:
         load = "heavy"
     
+    if not sorted_tasks:
+        logger.warning(f"No tasks found for date {date} for user {current_user['id']}")
+    
     return {
         "date": date,
-        "tasks": [backend_task_to_frontend(t) for t in sorted_tasks],
+        "tasks": sorted_tasks,  # Already in frontend format
         "load": load,  # Deprecated, use energy.status instead
         "energy": energy
     }

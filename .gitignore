@@ -11,6 +11,7 @@ __pycache__/
 
 # Database files (contains sensitive user data)
 backend/app/db/data.json
+backend/app/db/data.json.backup
 *.db
 *.sqlite
 *.sqlite3
