@@ -360,16 +360,27 @@ export const api = {
     }),
 
   // --- Core AI Chat ---
-  chat: (message: string) =>
+  chat: (message: string, conversationHistory?: Array<{ role: string; content: string }>) =>
     request("/assistant/chat", {
       method: "POST",
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ 
+        message,
+        conversation_history: conversationHistory || []
+      }),
     }),
 
   confirmAction: () =>
     request("/assistant/confirm", {
       method: "POST",
     }),
+
+  getContextActions: (currentView?: string, selectedTaskId?: string, selectedDate?: string) => {
+    const params = new URLSearchParams();
+    if (currentView) params.append("current_view", currentView);
+    if (selectedTaskId) params.append("selected_task_id", selectedTaskId);
+    if (selectedDate) params.append("selected_date", selectedDate);
+    return request(`/assistant/context-actions?${params.toString()}`);
+  },
 
   // --- Categories ---
   getAllCategories: () => request("/categories"),

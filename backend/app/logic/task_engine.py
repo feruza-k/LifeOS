@@ -21,7 +21,34 @@ def parse_datetime(task):
 
     try:
         if isinstance(dt_str, str):
-            return tz.localize(datetime.strptime(dt_str, "%Y-%m-%d %H:%M"))
+            # Handle ISO format (with T) or space-separated format
+            if "T" in dt_str:
+                # ISO format: "2025-12-21T15:00:00" or "2025-12-21T15:00:00.000Z"
+                # Parse ISO format directly
+                try:
+                    # Remove timezone if present
+                    dt_str_clean = dt_str.split("+")[0].split("Z")[0]
+                    # Remove microseconds if present
+                    if "." in dt_str_clean:
+                        dt_str_clean = dt_str_clean.split(".")[0]
+                    # Parse ISO format
+                    dt = datetime.fromisoformat(dt_str_clean)
+                    return tz.localize(dt)
+                except ValueError:
+                    # Fallback: try to convert to space-separated format
+                    date_part = dt_str.split("T")[0]
+                    time_part = dt_str.split("T")[1].split("+")[0].split("Z")[0]
+                    if "." in time_part:
+                        time_part = time_part.split(".")[0]
+                    # Take only HH:MM:SS or HH:MM
+                    time_parts = time_part.split(":")
+                    if len(time_parts) >= 2:
+                        time_part = f"{time_parts[0]}:{time_parts[1]}"
+                    dt_str = f"{date_part} {time_part}"
+                    return tz.localize(datetime.strptime(dt_str, "%Y-%m-%d %H:%M"))
+            else:
+                # Space-separated format: "2025-12-21 15:00"
+                return tz.localize(datetime.strptime(dt_str, "%Y-%m-%d %H:%M"))
         return dt_str
     except Exception as e:
         task["error"] = f"Invalid datetime format: {dt_str}. Error: {str(e)}"

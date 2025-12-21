@@ -7,22 +7,31 @@ import { ConversationMessage } from "@/types/lifeos";
 export function useCoreAI() {
   const store = useLifeOSStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const sendMessage = useCallback(async (userMessage: string) => {
     // Add user message to conversation
     store.addMessage("user", userMessage);
     
     setIsLoading(true);
+    setError(null);
     
     try {
-      // Call backend assistant endpoint
-      const response = await api.chat(userMessage);
+      // Prepare conversation history (last 10 messages for context)
+      const conversationHistory = store.conversations
+        .slice(-10)
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
       
-      // Add assistant response
-      const actions = response.ui ? [response.ui] : undefined;
-      store.addMessage("assistant", response.assistant_response, actions);
+      // Call backend assistant endpoint with conversation history
+      const response = await api.chat(userMessage, conversationHistory);
       
-      // Handle UI actions from backend
+      // Add assistant response with UI action
+      store.addMessage("assistant", response.assistant_response, response.ui);
+      
+      // Handle UI actions from backend (non-confirmation actions)
       if (response.ui) {
         const uiAction = response.ui;
         
@@ -40,11 +49,59 @@ export function useCoreAI() {
           const currentDate = store.today?.date || new Date().toISOString().slice(0, 10);
           await store.loadToday(currentDate);
         }
-        // Other actions like "confirm_create", "confirm_reschedule" are handled by user confirmation
+        // "confirm_create" and "confirm_reschedule" are handled by confirmation UI
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to send message to SolAI:", error);
-      store.addMessage("assistant", "Sorry, I'm having trouble connecting right now. Please try again.");
+      let errorMessage = "Sorry, I'm having trouble connecting right now. Please try again.";
+      
+      if (error?.message) {
+        if (error.message.includes("OPENAI_API_KEY") || error.message.includes("API key")) {
+          errorMessage = "AI service is not configured. Please check backend settings.";
+        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "Cannot connect to the server. Please check your connection.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setError(errorMessage);
+      store.addMessage("assistant", errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [store]);
+
+  const confirmAction = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.confirmAction();
+      
+      // Add assistant response
+      store.addMessage("assistant", response.assistant_response, response.ui);
+      
+      // Handle UI actions
+      if (response.ui) {
+        const uiAction = response.ui;
+        
+        if (uiAction.action === "add_task" && uiAction.task) {
+          const taskDate = uiAction.task.date || new Date().toISOString().slice(0, 10);
+          await store.loadToday(taskDate);
+        } else if (uiAction.action === "update_task" || uiAction.action === "apply_reschedule") {
+          const currentDate = store.today?.date || new Date().toISOString().slice(0, 10);
+          await store.loadToday(currentDate);
+        } else if (uiAction.action === "refresh") {
+          const currentDate = store.today?.date || new Date().toISOString().slice(0, 10);
+          await store.loadToday(currentDate);
+        }
+      }
+    } catch (error: any) {
+      console.error("Failed to confirm action:", error);
+      const errorMessage = error?.message || "Sorry, I'm having trouble processing that. Please try again.";
+      setError(errorMessage);
+      store.addMessage("assistant", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +110,9 @@ export function useCoreAI() {
   return {
     messages: store.conversations,
     sendMessage,
+    confirmAction,
     isLoading,
+    error,
     clearHistory: store.clearConversations,
   };
 }

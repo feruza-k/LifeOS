@@ -20,7 +20,8 @@ from app.logic.suggestion_engine import get_suggestions
 from app.logic.categories import get_category_colors
 from app.logic.week_engine import get_tasks_in_range, get_week_stats
 from app.logic.reschedule_engine import generate_reschedule_suggestions
-from app.logic.conflict_engine import find_conflicts
+from app.logic.conflict_engine import find_conflicts, check_conflict_for_time, suggest_resolution
+from app.logic.context_engine import get_contextual_actions
 from app.logic.task_engine import get_all_tasks
 from app.logic.frontend_adapter import backend_task_to_frontend, frontend_task_to_backend
 from app.models.ui import AssistantReply
@@ -75,6 +76,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 class ChatRequest(BaseModel):
     message: str
+    conversation_history: Optional[List[Dict[str, str]]] = None  # [{"role": "user|assistant", "content": "..."}]
 
 class RepeatConfig(BaseModel):
     type: str  # "weekly", "period", "custom"
@@ -986,6 +988,108 @@ async def create_task(
                 else:
                     logger.warning(f"Could not map value '{frontend_value}' to any category UUID")
         
+        # Ensure end_datetime is set if endTime was provided (for proper conflict detection)
+        if task_dict.get("endTime") and backend_task.get("date") and backend_task.get("time"):
+            if not backend_task.get("end_datetime"):
+                backend_task["end_datetime"] = f"{backend_task['date']} {task_dict['endTime']}"
+        
+        # Proactive conflict check before creating task
+        if backend_task.get("date") and backend_task.get("time"):
+            # Ensure duration is calculated from endTime if provided
+            # frontend_task_to_backend should have calculated this, but double-check
+            duration = backend_task.get("duration_minutes")
+            if not duration and task_dict.get("endTime") and task_dict.get("time"):
+                # Calculate duration from time and endTime
+                try:
+                    start_hour, start_min = map(int, task_dict["time"].split(":"))
+                    end_hour, end_min = map(int, task_dict["endTime"].split(":"))
+                    start_total = start_hour * 60 + start_min
+                    end_total = end_hour * 60 + end_min
+                    duration = end_total - start_total
+                    if duration < 0:
+                        duration += 24 * 60  # Handle cross-day tasks
+                    # Update backend_task with calculated duration
+                    backend_task["duration_minutes"] = duration
+                except Exception as e:
+                    logger.warning(f"Failed to calculate duration from endTime: {e}")
+                    duration = 60  # Default fallback
+            elif not duration:
+                duration = 60  # Default duration
+            
+            # Only check conflicts for tasks with a specific time (not anytime tasks)
+            conflicts = []
+            if backend_task.get("time") and backend_task["time"] != "00:00":
+                conflicts = await check_conflict_for_time(
+                    date=backend_task["date"],
+                    time=backend_task["time"],
+                    duration_minutes=duration,
+                    user_id=current_user["id"],
+                    exclude_task_id=None  # New task, no ID yet
+                )
+            
+            if conflicts:
+                # Find alternative slot
+                suggestion = await suggest_resolution(
+                    date=backend_task["date"],
+                    preferred_time=backend_task["time"],
+                    duration_minutes=duration,
+                    user_id=current_user["id"]
+                )
+                
+                conflicting_task = conflicts[0]
+                # Get end time for the conflicting task
+                conflicting_end_time = conflicting_task.get("end_datetime")
+                if conflicting_end_time:
+                    # Extract time from datetime string
+                    if isinstance(conflicting_end_time, str):
+                        if "T" in conflicting_end_time:
+                            conflicting_end_time = conflicting_end_time.split("T")[1][:5]
+                        elif " " in conflicting_end_time:
+                            conflicting_end_time = conflicting_end_time.split(" ")[1][:5]
+                else:
+                    # Calculate from duration if available
+                    conflicting_duration = conflicting_task.get("duration_minutes", 60)
+                    conflicting_start = conflicting_task.get("time", "00:00")
+                    try:
+                        start_hour, start_min = map(int, conflicting_start.split(":"))
+                        end_total = (start_hour * 60 + start_min + conflicting_duration) % (24 * 60)
+                        end_hour = end_total // 60
+                        end_min = end_total % 60
+                        conflicting_end_time = f"{end_hour:02d}:{end_min:02d}"
+                    except:
+                        conflicting_end_time = None
+                
+                if suggestion.get("suggested_time"):
+                    return {
+                        "conflict": True,
+                        "conflicting_tasks": [{
+                            "id": conflicting_task.get("id"),
+                            "title": conflicting_task.get("title"),
+                            "time": conflicting_task.get("time"),
+                            "endTime": conflicting_end_time
+                        }],
+                        "suggested_alternative": {
+                            "time": suggestion["suggested_time"],
+                            "datetime": suggestion.get("suggested_datetime")
+                        },
+                        "message": f"This conflicts with '{conflicting_task.get('title')}'. I can schedule it at {suggestion['suggested_time']} instead.",
+                        "task_preview": backend_task
+                    }
+                else:
+                    return {
+                        "conflict": True,
+                        "conflicting_tasks": [{
+                            "id": conflicting_task.get("id"),
+                            "title": conflicting_task.get("title"),
+                            "time": conflicting_task.get("time"),
+                            "endTime": conflicting_end_time
+                        }],
+                        "suggested_alternative": None,
+                        "message": f"This conflicts with '{conflicting_task.get('title')}'. No free slots available on this day.",
+                        "task_preview": backend_task
+                    }
+        
+        # No conflict - create the task
         result = await db_repo.add_task_dict(backend_task)
         categories = await db_repo.get_categories(current_user["id"])
         category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
@@ -1163,6 +1267,75 @@ async def move_task(
     if result:
         return backend_task_to_frontend(result)
     return {"error": "Failed to move task"}
+
+@app.post("/tasks/{task_id}/resolve-conflict")
+async def resolve_task_conflict(
+    task_id: str,
+    resolution: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Resolve a task conflict by moving it to a new time (user-scoped)."""
+    # Validate request - extract required fields
+    new_date = resolution.get("new_date")
+    new_time = resolution.get("new_time")
+    new_datetime = resolution.get("new_datetime")
+    
+    if not new_date or not new_time:
+        raise HTTPException(status_code=400, detail="new_date and new_time are required")
+    
+    # Verify task belongs to user
+    task = await db_repo.get_task(task_id, current_user["id"])
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Check if new time has conflicts (excluding this task)
+    duration = task.get("duration_minutes", 60)
+    new_conflicts = await check_conflict_for_time(
+        date=new_date,
+        time=new_time,
+        duration_minutes=duration,
+        user_id=current_user["id"],
+        exclude_task_id=task_id
+    )
+    
+    if new_conflicts:
+        conflicting_task = new_conflicts[0]
+        return {
+            "error": "New time also has conflicts",
+            "conflicts": [{
+                "id": conflicting_task.get("id"),
+                "title": conflicting_task.get("title"),
+                "time": conflicting_task.get("time")
+            }],
+            "message": f"New time conflicts with '{conflicting_task.get('title')}'"
+        }
+    
+    # Update task with new time
+    final_datetime = new_datetime or f"{new_date} {new_time}"
+    updates = {
+        "date": new_date,
+        "time": new_time,
+        "datetime": final_datetime
+    }
+    
+    # Recalculate end_datetime if duration exists
+    if task.get("duration_minutes"):
+        from datetime import datetime, timedelta
+        start_dt = datetime.strptime(final_datetime, "%Y-%m-%d %H:%M")
+        end_dt = start_dt + timedelta(minutes=task["duration_minutes"])
+        updates["end_datetime"] = end_dt.strftime("%Y-%m-%d %H:%M")
+    
+    result = await db_repo.update_task(task_id, updates, current_user["id"])
+    if result:
+        categories = await db_repo.get_categories(current_user["id"])
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        return {
+            "success": True,
+            "task": backend_task_to_frontend(result, category_label_to_id),
+            "message": f"Task moved to {new_time}"
+        }
+    
+    raise HTTPException(status_code=500, detail="Failed to resolve conflict")
 
 # Notes Endpoints
 
@@ -1534,10 +1707,41 @@ async def tasks_conflicts(
 async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)):
     """Main SolAI chat endpoint (user-scoped)."""
     try:
-        reply = await generate_assistant_response(payload.message, current_user["id"])
+        # Day 21: Use intelligent assistant with conversation history
+        from app.ai.intelligent_assistant import generate_intelligent_response
+        from app.ai.assistant import generate_assistant_response as generate_rule_based
+        
+        # First, try intelligent assistant for natural responses
+        intelligent_reply = await generate_intelligent_response(
+            payload.message,
+            current_user["id"],
+            payload.conversation_history
+        )
+        
+        # For structured actions (create, reschedule), use rule-based logic for reliability
+        # But use intelligent assistant's natural response text
+        if intelligent_reply.get("ui") and intelligent_reply["ui"].get("action") in ["confirm_create", "apply_reschedule"]:
+            # Get the structured action from rule-based logic
+            rule_based_reply = await generate_rule_based(payload.message, current_user["id"])
+            if rule_based_reply.get("ui"):
+                # Use intelligent response text but rule-based UI action (more reliable)
+                return {
+                    "assistant_response": intelligent_reply.get("assistant_response", rule_based_reply.get("assistant_response", "Something went wrong.")),
+                    "ui": rule_based_reply.get("ui")
+                }
+        
+        # For non-action responses, use intelligent assistant
+        if intelligent_reply.get("assistant_response"):
+            return {
+                "assistant_response": intelligent_reply.get("assistant_response", "Something went wrong."),
+                "ui": intelligent_reply.get("ui")
+            }
+        
+        # Fallback to rule-based if intelligent assistant fails
+        rule_based_reply = await generate_rule_based(payload.message, current_user["id"])
         return {
-            "assistant_response": reply.get("assistant_response", "Something went wrong."),
-            "ui": reply.get("ui")
+            "assistant_response": rule_based_reply.get("assistant_response", "Something went wrong."),
+            "ui": rule_based_reply.get("ui")
         }
     except ValueError as e:
         if "OPENAI_API_KEY" in str(e):
@@ -1558,6 +1762,22 @@ async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_
 async def assistant_confirm(current_user: dict = Depends(get_current_user)):
     """Confirm pending action (equivalent to user saying 'yes', user-scoped)."""
     return await generate_assistant_response("yes", current_user["id"])
+
+@app.get("/assistant/context-actions")
+async def get_context_actions(
+    current_view: str = Query("today", description="Current view: today, calendar, task, week, month"),
+    selected_task_id: str | None = Query(None, description="ID of selected task (if any)"),
+    selected_date: str | None = Query(None, description="Selected date in YYYY-MM-DD format (if any)"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get context-aware actions for the assistant (user-scoped)."""
+    actions = await get_contextual_actions(
+        user_id=current_user["id"],
+        current_view=current_view,
+        selected_task_id=selected_task_id,
+        selected_date=selected_date
+    )
+    return {"actions": actions}
 
 @app.get("/assistant/bootstrap")
 async def assistant_bootstrap(current_user: dict = Depends(get_current_user)):

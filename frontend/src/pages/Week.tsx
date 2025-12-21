@@ -152,8 +152,11 @@ const Week = () => {
       <CoreAIFAB
         messages={coreAI.messages}
         onSendMessage={coreAI.sendMessage}
+        onConfirmAction={coreAI.confirmAction}
         isLoading={coreAI.isLoading}
         aiName={store.settings.coreAIName}
+        onClearHistory={coreAI.clearHistory}
+        currentView="week"
       />
     </div>
   );

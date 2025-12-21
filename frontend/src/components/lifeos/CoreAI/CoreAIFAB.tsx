@@ -1,67 +1,96 @@
-import { useState } from "react";
-import { Sparkles, X, MessageCircle, Maximize2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sparkles, X, MessageCircle, Maximize2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CoreAIChat } from "./CoreAIChat";
 import { ConversationMessage } from "@/types/lifeos";
-import { format } from "date-fns";
+import { formatMessageTime } from "@/utils/timeUtils";
+import { api } from "@/lib/api";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 interface CoreAIFABProps {
   messages: ConversationMessage[];
   onSendMessage: (message: string) => void;
+  onConfirmAction?: () => void;
   isLoading?: boolean;
   aiName?: string;
   notification?: string;
+  onClearHistory?: () => void;
+  currentView?: string;
+  selectedTaskId?: string;
+  selectedDate?: string;
 }
 
 export function CoreAIFAB({ 
   messages, 
-  onSendMessage, 
+  onSendMessage,
+  onConfirmAction,
   isLoading = false,
   aiName = "SolAI",
-  notification
+  notification,
+  onClearHistory,
+  currentView = "today",
+  selectedTaskId,
+  selectedDate
 }: CoreAIFABProps) {
-  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(!!notification);
+  const [contextActions, setContextActions] = useState<any[]>([]);
+
+  // Load context actions
+  useEffect(() => {
+    if (isOpen || isFullScreen) {
+      const loadContextActions = async () => {
+        try {
+          const actions = await api.getContextActions(currentView, selectedTaskId, selectedDate);
+          setContextActions(actions.actions || []);
+        } catch (error) {
+          console.error("Failed to load context actions:", error);
+        }
+      };
+      loadContextActions();
+    }
+  }, [isOpen, isFullScreen, currentView, selectedTaskId, selectedDate]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onOpen: () => !isOpen && !isFullScreen && setIsOpen(true),
+    onClose: () => (isOpen || isFullScreen) && (setIsOpen(false), setIsFullScreen(false)),
+  });
 
   const handleSendMessage = (message: string) => {
     onSendMessage(message);
   };
 
-  const openFullScreen = () => {
-    setIsQuickViewOpen(false);
-    setIsFullScreen(true);
-  };
-
   return (
     <>
-      <div className="fixed bottom-20 right-4 z-40">
-        {/* AI Tooltip */}
-        {showTooltip && !isQuickViewOpen && !isFullScreen && notification && (
-          <div 
-            className="absolute bottom-16 right-0 w-64 p-3 bg-card rounded-2xl shadow-card border border-border animate-scale-in"
-            style={{ animationDelay: "1s" }}
-          >
-            <button
-              onClick={() => setShowTooltip(false)}
-              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-muted flex items-center justify-center"
+      {/* FAB Button - Bottom right */}
+      {!isOpen && (
+        <div className="fixed bottom-20 right-4 z-40">
+          {/* Notification Tooltip */}
+          {showTooltip && notification && (
+            <div 
+              className="absolute bottom-16 right-0 w-64 p-3 bg-card rounded-2xl shadow-card border border-border/50 animate-scale-in mb-2"
             >
-              <X className="w-3 h-3 text-muted-foreground" />
-            </button>
-            <div className="flex items-start gap-2">
-              <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-              <p className="text-sm font-sans text-foreground leading-relaxed">
-                {notification}
-              </p>
+              <button
+                onClick={() => setShowTooltip(false)}
+                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+              >
+                <X className="w-3 h-3 text-muted-foreground" />
+              </button>
+              <div className="flex items-start gap-2">
+                <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <p className="text-sm font-sans text-foreground leading-relaxed">
+                  {notification}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* FAB Button */}
-        {!isQuickViewOpen && !isFullScreen && (
+          {/* FAB Button */}
           <button
             onClick={() => {
-              setIsQuickViewOpen(true);
+              setIsOpen(true);
               setShowTooltip(false);
             }}
             className={cn(
@@ -71,132 +100,199 @@ export function CoreAIFAB({
           >
             <Sparkles className="w-6 h-6 text-primary-foreground" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Quick View Panel - Notion-style vertical */}
-      {isQuickViewOpen && (
-        <div className="fixed bottom-20 right-4 z-50 w-80 bg-card rounded-2xl shadow-card border border-border animate-scale-in max-h-[70vh] flex flex-col">
-          {/* Quick View Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="font-serif font-semibold text-foreground">{aiName}</h2>
-                <p className="text-xs font-sans text-muted-foreground">Your personal assistant</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={openFullScreen}
-                className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
-              >
-                <Maximize2 className="w-4 h-4 text-muted-foreground" />
-              </button>
-              <button
-                onClick={() => setIsQuickViewOpen(false)}
-                className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-
-          {/* Quick View Content */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px]">
-            {messages.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground font-sans mb-4">
-                  Hey! How can I help you today?
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { emoji: "✨", label: "What should I focus on?" },
-                    { emoji: "📊", label: "Show my progress" },
-                    { emoji: "📋", label: "Add a task" },
-                  ].map((action, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSendMessage(action.label)}
-                      className="w-full p-3 text-left text-sm font-sans bg-muted rounded-xl hover:bg-accent transition-colors flex items-center gap-2"
-                    >
-                      <span>{action.emoji}</span>
-                      <span className="text-foreground">{action.label}</span>
-                    </button>
-                  ))}
+      {/* Bottom Sheet - Mobile-first design */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-foreground/20 backdrop-blur-sm"
+            onClick={() => setIsOpen(false)}
+          />
+          
+          {/* Bottom Sheet */}
+          <div className="relative w-full max-w-lg bg-card rounded-t-3xl shadow-card animate-slide-up overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Contextual Info Panel - Show when there are notifications or important info */}
+            {notification && (
+              <div className="p-4 bg-primary/5 border-b border-primary/10">
+                <div className="flex items-start gap-2">
+                  <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm font-sans text-foreground leading-relaxed flex-1">
+                    {notification}
+                  </p>
                 </div>
               </div>
-            ) : (
-              messages.slice(-3).map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex",
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  )}
+            )}
+            
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-serif font-semibold text-foreground">{aiName}</h2>
+                  <p className="text-xs font-sans text-muted-foreground">Your personal assistant</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setIsFullScreen(true);
+                  }}
+                  className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+                  title="Open full screen"
                 >
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl p-3 font-sans text-sm",
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-muted text-foreground rounded-bl-md"
-                    )}
+                  <Maximize2 className="w-4 h-4 text-muted-foreground" />
+                </button>
+                {messages.length > 0 && onClearHistory && (
+                  <button
+                    onClick={onClearHistory}
+                    className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+                    title="Clear conversation"
                   >
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                    <p className={cn(
-                      "text-[10px] mt-1",
-                      msg.role === "user" ? "text-primary-foreground/60" : "text-muted-foreground"
-                    )}>
-                      {format(new Date(msg.timestamp), "h:mm a")}
-                    </p>
+                    <Trash2 className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="w-9 h-9 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+
+            {/* Messages - Card-based design */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px]">
+              {messages.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="font-serif text-lg font-semibold text-foreground mb-2">
+                    Hey there! I'm {aiName}
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-sans max-w-xs mx-auto mb-6">
+                    I can help you manage tasks, set goals, track your progress, and more. What would you like to do?
+                  </p>
+                  
+                  {/* Context-aware quick actions */}
+                  <div className="space-y-2 max-w-sm mx-auto">
+                    {contextActions.length > 0 ? (
+                      contextActions.slice(0, 3).map((action) => (
+                        <button
+                          key={action.id}
+                          onClick={() => handleSendMessage(action.label)}
+                          className="w-full p-3 text-left text-sm font-sans bg-muted/50 rounded-xl hover:bg-muted transition-colors border border-border/30"
+                        >
+                          <span className="text-foreground">{action.label}</span>
+                        </button>
+                      ))
+                    ) : (
+                      [
+                        { label: "What should I focus on today?" },
+                        { label: "Show my progress this week" },
+                        { label: "Add a new task" },
+                      ].map((action, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSendMessage(action.label)}
+                          className="w-full p-3 text-left text-sm font-sans bg-muted/50 rounded-xl hover:bg-muted transition-colors border border-border/30"
+                        >
+                          <span className="text-foreground">{action.label}</span>
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ) : (
+                <>
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "flex",
+                        msg.role === "user" ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl p-4 font-sans text-sm border",
+                          msg.role === "user"
+                            ? "bg-primary/10 text-foreground border-primary/20"
+                            : "bg-card text-foreground border-border/30 shadow-soft"
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-card rounded-2xl p-4 border border-border/30 shadow-soft">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                          <span className="text-xs font-sans text-muted-foreground">Thinking...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
-          {/* Quick View Input */}
-          <div className="p-3 border-t border-border shrink-0">
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                const input = e.currentTarget.querySelector('input');
-                if (input?.value.trim()) {
-                  handleSendMessage(input.value.trim());
-                  input.value = '';
-                }
-              }}
-              className="flex gap-2"
-            >
-              <input
-                type="text"
-                placeholder="Ask me anything..."
-                disabled={isLoading}
-                className="flex-1 py-2.5 px-4 bg-muted rounded-xl text-foreground font-sans text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center"
+            {/* Input */}
+            <div className="p-4 border-t border-border/50 shrink-0">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const input = e.currentTarget.querySelector('input');
+                  if (input?.value.trim()) {
+                    handleSendMessage(input.value.trim());
+                    input.value = '';
+                  }
+                }}
+                className="flex gap-2"
               >
-                <Sparkles className="w-4 h-4" />
-              </button>
-            </form>
+                <input
+                  type="text"
+                  placeholder="Ask me anything..."
+                  disabled={isLoading}
+                  className="flex-1 py-3 px-4 bg-muted/50 rounded-xl text-foreground font-sans text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-border/30"
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Full Chat View */}
+      {/* Full Screen View - ChatGPT/Gemini style */}
       <CoreAIChat
         isOpen={isFullScreen}
-        onClose={() => setIsFullScreen(false)}
+        onClose={() => {
+          setIsFullScreen(false);
+          setIsOpen(false);
+        }}
         messages={messages}
         onSendMessage={handleSendMessage}
+        onConfirmAction={onConfirmAction}
         isLoading={isLoading}
         aiName={aiName}
+        onClearHistory={onClearHistory}
+        currentView={currentView}
+        selectedTaskId={selectedTaskId}
+        selectedDate={selectedDate}
       />
     </>
   );

@@ -66,13 +66,19 @@ export interface UserSettings {
   theme: "light" | "dark" | "system";
 }
 
+export interface UIAction {
+  action: "confirm_create" | "confirm_reschedule" | "add_task" | "apply_reschedule" | "update_task" | "refresh";
+  task_id?: string;
+  task_preview?: any;
+  task?: any;
+  new_time?: string;
+  options?: string[];
+}
+
 export interface ConversationMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: string;
-  actions?: {
-    type: "add_task" | "move_task" | "delete_task" | "set_focus" | "add_reminder";
-    data: any;
-  }[];
+  ui?: UIAction;
 }

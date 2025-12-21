@@ -259,7 +259,8 @@ class DatabaseRepo:
                 if task_dict.get("date") and task_dict.get("time"):
                     datetime_str = f"{task_dict['date']} {task_dict['time']}"
                 elif task_dict.get("date"):
-                    # For tasks without time, use date at midnight (00:00)
+                    # For tasks without time (anytime tasks), use date at midnight (00:00)
+                    # This is required by the database schema, but we'll mark time=None to indicate it's "anytime"
                     datetime_str = f"{task_dict['date']} 00:00"
                 else:
                     raise ValueError("Task must have date or datetime")

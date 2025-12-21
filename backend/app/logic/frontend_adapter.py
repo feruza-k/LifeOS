@@ -250,12 +250,11 @@ def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "ev
     category = value_to_category.get(frontend_value, "personal")
     
     # Build datetime from date and time
+    # IMPORTANT: Only set datetime if time is provided. Anytime tasks (no time) should have datetime=None
     datetime_str = None
     if frontend_task.get("date") and frontend_task.get("time"):
         datetime_str = f"{frontend_task['date']} {frontend_task['time']}"
-    elif frontend_task.get("date"):
-        # For tasks without time, use midnight (00:00)
-        datetime_str = f"{frontend_task['date']} 00:00"
+    # Do NOT set datetime to 00:00 for anytime tasks - leave it as None
 
     # Extract time explicitly
     task_time = frontend_task.get("time")

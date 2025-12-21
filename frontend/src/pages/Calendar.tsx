@@ -305,20 +305,24 @@ const CalendarPage = () => {
                 const monthEnd = endOfMonth(currentMonth);
                 await store.loadTasksForDateRange(monthStart, monthEnd);
               }}
-              onAddTask={async (taskData) => {
-                await store.addTask({
-                  title: taskData.title,
-                  time: taskData.time,
-                  endTime: taskData.endTime,
-                  value: taskData.value,
-                  date: taskData.date,
-                  completed: false,
-                });
-                // Reload tasks for current month
-                const monthStart = startOfMonth(currentMonth);
-                const monthEnd = endOfMonth(currentMonth);
-                await store.loadTasksForDateRange(monthStart, monthEnd);
-              }}
+                  onAddTask={async (taskData) => {
+                    const result = await store.addTask({
+                      title: taskData.title,
+                      time: taskData.time,
+                      endTime: taskData.endTime,
+                      value: taskData.value,
+                      date: taskData.date,
+                      completed: false,
+                    });
+                    // If conflict, the modal will handle it - don't reload
+                    if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
+                      return; // Let AddTaskModal handle the conflict dialog
+                    }
+                    // Reload tasks for current month
+                    const monthStart = startOfMonth(currentMonth);
+                    const monthEnd = endOfMonth(currentMonth);
+                    await store.loadTasksForDateRange(monthStart, monthEnd);
+                  }}
             />
           </div>
         )}
@@ -420,7 +424,7 @@ const CalendarPage = () => {
           onClose={() => setShowAddTaskModal(false)}
           date={format(selectedDate, "yyyy-MM-dd")}
           onAdd={async (taskData) => {
-            await store.addTask({
+            const result = await store.addTask({
               title: taskData.title,
               time: taskData.time,
               endTime: taskData.endTime,
@@ -429,11 +433,17 @@ const CalendarPage = () => {
               completed: false,
               repeat: taskData.repeat,
             });
+            // If conflict, the modal will handle it - don't close modal, don't reload
+            if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
+              return result; // Return conflict so AddTaskModal knows to keep modal open
+            }
+            // Only close modal and reload if task was successfully created
             setShowAddTaskModal(false);
-            // Reload tasks for current month
+            // Reload tasks for current month to ensure new task appears
             const monthStart = startOfMonth(currentMonth);
             const monthEnd = endOfMonth(currentMonth);
             await store.loadTasksForDateRange(monthStart, monthEnd);
+            return result;
           }}
         />
       )}
@@ -441,9 +451,13 @@ const CalendarPage = () => {
       <BottomNav />
       <CoreAIFAB 
         messages={coreAI.messages} 
-        onSendMessage={coreAI.sendMessage} 
+        onSendMessage={coreAI.sendMessage}
+        onConfirmAction={coreAI.confirmAction}
         isLoading={coreAI.isLoading} 
-        aiName={store.settings.coreAIName} 
+        aiName={store.settings.coreAIName}
+        onClearHistory={coreAI.clearHistory}
+        currentView="calendar"
+        selectedDate={selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined}
       />
     </div>
   );

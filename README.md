@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 18, 2025
+**Current Date:** December 21, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -27,6 +27,7 @@
   - [Day 18: Authentication Hardening & Production Readiness](#day-18-authentication-hardening--production-readiness-dec-18-2025)
   - [Day 19: PostgreSQL Migration & Async Backend Refactor](#day-19-postgresql-migration--async-backend-refactor-dec-19-2025)
   - [Day 20: Closing the PostgreSQL Migration](#day-20-closing-the-postgresql-migration-dec-20-2025)
+  - [Day 21: Assistant Intelligence Foundation](#day-21-assistant-intelligence-foundation-dec-21-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1481,7 +1482,7 @@ After the initial migration, there were still small remnants of the old JSON wor
 - Removed one-time migration scripts and temporary fixes
 - Fixed a few migration-related bugs that only showed up once everything was database-backed
 
-At this point, LifeOS no longer has two mental models. There is one source of truth, and it’s the database.
+At this point, LifeOS no longer has two mental models. There is one source of truth, and it's the database.
 
 #### **Current Status**
 
@@ -1491,11 +1492,60 @@ At this point, LifeOS no longer has two mental models. There is one source of tr
 - Old migration scripts removed or archived
 - App runs consistently across sessions and restarts
 
+---
+
+### **Day 21: Assistant Intelligence Foundation (Dec 21, 2025)**
+
+Today I moved the LifeOS assistant from a rule-based command parser toward something that actually feels conversational. After finishing the PostgreSQL migration, the foundation was finally stable enough to focus on what the app is really about: the assistant itself.
+
+This is also the day I formally named the assistant **SolAI**, from *Sol*, meaning light, clarity, and grounding.  
+SolAI is the quiet intelligence at the center of LifeOS - a personal assistant designed to help you stay organised, balanced, and intentional. Not something that demands attention, but something that supports it.
+
+#### **What I Did**
+
+- **Introduced an LLM-powered assistant module** (`intelligent_assistant.py`) that:
+  - Generates natural responses instead of template strings
+  - Maintains short-term conversation context (last 10 messages)
+  - Pulls real user context automatically (tasks, schedule, conflicts, energy)
+  - Uses a system prompt to anchor SolAI’s calm, intentional tone
+
+- **Added conversation memory**
+  - Backend now accepts conversation history
+  - Frontend sends the last 10 messages with each request
+  - Enables real follow-up questions instead of one-off commands
+
+- **Kept a hybrid architecture**
+  - Language and reasoning handled by the LLM
+  - Task creation, rescheduling, and updates remain rule-based
+  - Natural conversation without sacrificing reliability
+
+- **Fixed conflict detection for anytime tasks**
+  - Tasks without a specific time were incorrectly treated as conflicts
+  - Conflict checks now ignore anytime tasks
+  - Scheduling behaviour now matches real user expectations
+
+#### **Current Status**
+
+- SolAI can hold context-aware conversations
+- Follow-up questions feel natural
+- Responses reflect the user’s actual day and workload
+- Critical task operations remain predictable and safe
+- Conflict detection behaves correctly across task types
+
+#### **Reflection**
+
+This felt like a real shift in the project.  
+Until now, the assistant was useful, but mechanical. Today was about giving it presence and intention.
+
+What matters to me isn’t making SolAI sound impressive, but making it feel trustworthy. Something you can open every day without friction. Something that helps you think more clearly rather than overwhelming you with suggestions or automation.
+
+There’s still a lot to refine, but for the first time, SolAI feels aligned with what LifeOS is meant to be: calm, supportive, and quietly capable.
+
+---
 
 ## **Next Steps**
 
-- Focus fully on the assistant’s behaviour and reliability
-- Make sure intent → action → result is predictable and correct
-- Stop expanding features until the assistant does the basics well
-- Build trust in the system before adding more surface area
+- Refine conversational depth and prioritisation
+- Introduce gentle, context-aware suggestions
+- Begin shaping personalisation based on long-term patterns
 

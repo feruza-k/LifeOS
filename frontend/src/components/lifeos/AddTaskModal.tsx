@@ -4,17 +4,26 @@ import { Input } from "@/components/ui/input";
 import { ValueType } from "./ValueTag";
 import { Task } from "./TaskItem";
 import { cn } from "@/lib/utils";
-import { X, Calendar, Clock, Tag, Repeat, CalendarDays, Calendar as CalendarIcon } from "lucide-react";
+import { X, Calendar, Clock, Tag, Repeat, CalendarDays, Calendar as CalendarIcon, AlertTriangle } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, parseISO, isToday, isTomorrow } from "date-fns";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { TimePicker } from "./TimePicker";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface AddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (task: { title: string; time?: string; endTime?: string; value: ValueType; date: string; repeat?: RepeatConfig }) => void;
+  onAdd: (task: { title: string; time?: string; endTime?: string; value: ValueType; date: string; repeat?: RepeatConfig }) => Promise<any>;
   date: string;
   task?: Task | null; // For editing
   initialTime?: string; // For quick add from week view
@@ -65,6 +74,12 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showRepeatPicker, setShowRepeatPicker] = useState(false);
+  const [conflictInfo, setConflictInfo] = useState<{
+    message: string;
+    conflictingTasks: Array<{ id: string; title: string; time: string; endTime?: string }>;
+    suggestedAlternative: { time: string; datetime?: string } | null;
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Load task data when editing or when modal opens
   useEffect(() => {
@@ -162,11 +177,12 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
     return format(date, "MMM d");
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) {
       e.preventDefault();
     }
     if (!title.trim()) return;
+    if (isSubmitting) return;
 
     const repeatConfig: RepeatConfig | undefined = repeatType !== "none" ? {
       type: repeatType,
@@ -185,20 +201,60 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
         value: category,
         ...(repeatConfig && { repeat: repeatConfig }),
       });
+      resetForm();
+      onClose();
     } else {
-      // Adding new task
-      onAdd({
-        title: title.trim(),
-        time: isScheduled ? startTime : undefined,
-        endTime: isScheduled ? (endTime || calculateEndTime(startTime, duration)) : undefined,
-        value: category,
-        date: format(taskDate, "yyyy-MM-dd"),
-        repeat: repeatConfig,
-      });
+      // Adding new task - check for conflicts
+      setIsSubmitting(true);
+      try {
+        const result = await onAdd({
+          title: title.trim(),
+          time: isScheduled ? startTime : undefined,
+          endTime: isScheduled ? (endTime || calculateEndTime(startTime, duration)) : undefined,
+          value: category,
+          date: format(taskDate, "yyyy-MM-dd"),
+          repeat: repeatConfig,
+        });
+        
+        // Check if result is a conflict response
+        if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
+          // Show conflict message inline - keep modal open with all entered data
+          setConflictInfo({
+            message: result.message || "This time conflicts with an existing task.",
+            conflictingTasks: result.conflicting_tasks || [],
+            suggestedAlternative: result.suggested_alternative || null,
+          });
+          setIsSubmitting(false);
+          // Don't close modal or reset form - let user adjust time
+          // Return the conflict result so caller knows not to close modal
+          return result;
+        }
+        
+        // Success - clear any conflict info, reset and close
+        setConflictInfo(null);
+        resetForm();
+        onClose();
+        return result;
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to add task. Please try again.");
+        setIsSubmitting(false);
+      }
     }
+  };
 
-    resetForm();
-    onClose();
+  const handleUseSuggestedTime = () => {
+    if (!conflictInfo || !conflictInfo.suggestedAlternative) return;
+    
+    // Update the form with suggested time
+    const suggestedTime = conflictInfo.suggestedAlternative.time;
+    setStartTime(suggestedTime);
+    
+    // Calculate end time based on duration
+    const calculatedEnd = calculateEndTime(suggestedTime, duration);
+    setEndTime(calculatedEnd);
+    
+    // Clear conflict info
+    setConflictInfo(null);
   };
 
   const resetForm = () => {
@@ -335,10 +391,12 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
                   <button
                     type="button"
                     className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center transition-all",
-                      startTime
-                        ? "bg-primary/10 text-primary border border-primary/20"
-                        : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                      "w-10 h-10 rounded-lg flex items-center justify-center transition-all border",
+                      conflictInfo 
+                        ? "border-destructive bg-destructive/5" 
+                        : startTime
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border-border"
                     )}
                   >
                     <Clock className="w-4 h-4" />
@@ -355,6 +413,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
                           value={startTime}
                           onChange={(time) => {
                             setStartTime(time);
+                            setConflictInfo(null); // Clear conflict when time changes
                             if (time && !endTime) {
                               setEndTime(calculateEndTime(time, duration));
                             }
@@ -368,7 +427,10 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
                         </label>
                         <TimePicker
                           value={endTime}
-                          onChange={setEndTime}
+                          onChange={(time) => {
+                            setEndTime(time);
+                            setConflictInfo(null); // Clear conflict when time changes
+                          }}
                           className="w-28"
                         />
                       </div>
@@ -671,12 +733,74 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
             type="button"
             onClick={() => handleSubmit()}
             className="flex-1 rounded-xl bg-primary text-primary-foreground font-sans"
-            disabled={!title.trim()}
+            disabled={!title.trim() || isSubmitting}
           >
-            Add Task
+            {isSubmitting ? "Adding..." : "Add Task"}
           </Button>
         </div>
       </div>
+
+      {/* Conflict Dialog */}
+      <Dialog open={!!conflictInfo} onOpenChange={(open) => {
+        if (!open) {
+          setConflictInfo(null);
+        }
+      }}>
+        <DialogContent className="max-w-sm w-[calc(100%-3rem)] rounded-3xl p-0 overflow-hidden [&>button]:w-8 [&>button]:h-8 [&>button]:rounded-full [&>button]:bg-muted [&>button]:flex [&>button]:items-center [&>button]:justify-center [&>button]:hover:bg-muted/80 [&>button]:transition-colors [&>button]:right-4 [&>button]:top-4 [&>button]:opacity-100">
+          <div className="p-6">
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-primary" />
+                </div>
+                <DialogTitle className="font-sans text-lg font-semibold">
+                  Time Conflict
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-left pt-2">
+                {conflictInfo && conflictInfo.conflictingTasks.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-sans text-foreground leading-relaxed">
+                      This time conflicts with an existing task.
+                    </p>
+                    <div className="bg-muted/50 rounded-xl p-3 border border-border">
+                      <p className="text-sm font-sans text-foreground">
+                        <span className="font-medium">"{conflictInfo.conflictingTasks[0].title}"</span> is already scheduled from{" "}
+                        <span className="font-medium text-primary">
+                          {conflictInfo.conflictingTasks[0].time}
+                          {conflictInfo.conflictingTasks[0].endTime && ` - ${conflictInfo.conflictingTasks[0].endTime}`}
+                        </span>
+                        .
+                      </p>
+                    </div>
+                    <p className="text-sm font-sans text-muted-foreground">
+                      Please adjust the time above and try again.
+                    </p>
+                    {conflictInfo.suggestedAlternative && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleUseSuggestedTime();
+                            setConflictInfo(null);
+                          }}
+                          className="text-sm font-sans font-medium text-primary hover:text-primary/80 transition-colors"
+                        >
+                          Use {conflictInfo.suggestedAlternative.time} instead →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm font-sans text-foreground">
+                    {conflictInfo?.message || "This time conflicts with an existing task. Please choose a different time."}
+                  </p>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -15,6 +15,7 @@ interface LifeOSStore {
   };
   categories: Category[];
   conversations: any[];
+  chatHistory: Array<{ id: string; title: string; messages: any[]; date: string }>;
   
   // Methods
   loadBootstrap: () => Promise<void>;
@@ -44,8 +45,11 @@ interface LifeOSStore {
     mood?: string
   ) => Promise<void>;
   setCurrentMonthFocus: (title: string, description?: string) => Promise<void>;
-  addMessage: (role: "user" | "assistant", content: string, actions?: any[]) => any;
+  addMessage: (role: "user" | "assistant", content: string, ui?: any) => any;
   clearConversations: () => void;
+  saveChatToHistory: (title: string) => void;
+  loadChatFromHistory: (chatId: string) => void;
+  deleteChatFromHistory: (chatId: string) => void;
   // Category management
   loadCategories: () => Promise<void>;
   addCategory: (label: string, color: string) => Promise<void>;
@@ -128,9 +132,16 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
 
   addTask: async (task) => {
     try {
-      const created = await api.createTask(task);
-      // Ensure date is in YYYY-MM-DD format for calendar filtering
-      // The backend returns date as ISO string, but ensure it's in the right format
+      const response = await api.createTask(task);
+      
+      // Check if backend returned a conflict response
+      if (response && response.conflict === true) {
+        // Return conflict response so caller can handle it (show dialog, etc.)
+        return response;
+      }
+      
+      // Normal task creation - ensure date is in YYYY-MM-DD format
+      const created = response;
       if (created) {
         if (!created.date && task.date) {
           created.date = typeof task.date === 'string' ? task.date : task.date.toISOString().slice(0, 10);
@@ -140,6 +151,7 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
           created.date = created.date.split('T')[0];
         }
       }
+      
       // Add to store.tasks immediately for calendar views
       const existingTasks = get().tasks;
       const taskExists = existingTasks.some(t => t.id === created.id);
@@ -409,22 +421,118 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
 
   // -------- CORE AI / CONVERSATIONS -------- //
   
-  conversations: [],
+  conversations: (() => {
+    // Load from localStorage on init
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("lifeos_conversations");
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error("Failed to load conversations from localStorage:", e);
+      }
+    }
+    return [];
+  })(),
   
-  addMessage: (role: "user" | "assistant", content: string, actions?: any[]) => {
+  chatHistory: (() => {
+    // Load chat history (separate conversations) from localStorage
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("lifeos_chat_history");
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error("Failed to load chat history from localStorage:", e);
+      }
+    }
+    return [];
+  })(),
+  
+  addMessage: (role: "user" | "assistant", content: string, ui?: any) => {
     const msg = {
       id: Date.now().toString(),
       role,
       content,
       timestamp: new Date().toISOString(),
-      actions,
+      ...(ui && { ui }),
     };
-    set({ conversations: [...get().conversations, msg] });
+    const updated = [...get().conversations, msg];
+    set({ conversations: updated });
+    
+    // Persist to localStorage
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("lifeos_conversations", JSON.stringify(updated));
+      } catch (e) {
+        console.error("Failed to save conversations to localStorage:", e);
+      }
+    }
+    
     return msg;
   },
   
   clearConversations: () => {
     set({ conversations: [] });
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("lifeos_conversations");
+      } catch (e) {
+        console.error("Failed to clear conversations from localStorage:", e);
+      }
+    }
+  },
+  
+  saveChatToHistory: (title: string) => {
+    const currentChat = get().conversations;
+    if (currentChat.length === 0) return;
+    
+    const chatEntry = {
+      id: Date.now().toString(),
+      title,
+      messages: [...currentChat],
+      date: new Date().toISOString(),
+    };
+    
+    const history = [...get().chatHistory, chatEntry];
+    set({ chatHistory: history });
+    
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("lifeos_chat_history", JSON.stringify(history));
+      } catch (e) {
+        console.error("Failed to save chat history:", e);
+      }
+    }
+  },
+  
+  loadChatFromHistory: (chatId: string) => {
+    const chat = get().chatHistory.find(c => c.id === chatId);
+    if (chat) {
+      set({ conversations: chat.messages });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("lifeos_conversations", JSON.stringify(chat.messages));
+        } catch (e) {
+          console.error("Failed to load chat:", e);
+        }
+      }
+    }
+  },
+  
+  deleteChatFromHistory: (chatId: string) => {
+    const history = get().chatHistory.filter(c => c.id !== chatId);
+    set({ chatHistory: history });
+    
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("lifeos_chat_history", JSON.stringify(history));
+      } catch (e) {
+        console.error("Failed to delete chat:", e);
+      }
+    }
   },
 
   // -------- CATEGORIES -------- //

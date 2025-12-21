@@ -20,7 +20,7 @@ interface WeekScheduleViewProps {
   categories: Category[];
   onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   onDeleteTask?: (id: string) => void;
-  onAddTask?: (task: { title: string; time?: string; endTime?: string; value: ValueType; date: string }) => void;
+  onAddTask?: (task: { title: string; time?: string; endTime?: string; value: ValueType; date: string }) => Promise<any>;
 }
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
@@ -395,14 +395,20 @@ export function WeekScheduleView({
           }}
           date={quickAddTime.date}
           initialTime={quickAddTime.time}
-          onAdd={(newTask) => {
-            onAddTask({
-              title: newTask.title,
-              time: newTask.time,
-              endTime: newTask.endTime,
-              value: newTask.value,
-              date: newTask.date,
-            });
+          onAdd={async (newTask) => {
+            if (onAddTask) {
+              const result = await onAddTask({
+                title: newTask.title,
+                time: newTask.time,
+                endTime: newTask.endTime,
+                value: newTask.value,
+                date: newTask.date,
+              });
+              // If conflict, the modal will handle it - don't close
+              if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
+                return result; // Return conflict to AddTaskModal
+              }
+            }
             setQuickAddTime(null);
           }}
         />

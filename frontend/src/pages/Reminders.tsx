@@ -674,6 +674,14 @@ export default function Reminders() {
       )}
 
       <BottomNav />
-      <CoreAIFAB messages={coreAI.messages} onSendMessage={coreAI.sendMessage} isLoading={coreAI.isLoading} aiName={store.settings.coreAIName} />
+      <CoreAIFAB 
+        messages={coreAI.messages} 
+        onSendMessage={coreAI.sendMessage}
+        onConfirmAction={coreAI.confirmAction}
+        isLoading={coreAI.isLoading} 
+        aiName={store.settings.coreAIName}
+        onClearHistory={coreAI.clearHistory}
+        currentView="reminders"
+      />
     </div>;
 }

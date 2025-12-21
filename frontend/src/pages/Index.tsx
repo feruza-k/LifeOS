@@ -158,7 +158,7 @@ const Index = () => {
 
   const handleAddTask = async (task: { title: string; time?: string; endTime?: string; value: any; date: string; repeat?: any }) => {
     try {
-      await store.addTask({
+      const result = await store.addTask({
         title: task.title,
         time: task.time,
         endTime: task.endTime,
@@ -167,8 +167,15 @@ const Index = () => {
         completed: false,
         repeat: task.repeat,
       });
+      // If conflict, return it so AddTaskModal can handle it (keep modal open)
+      if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
+        return result; // Return conflict so modal stays open
+      }
+      // Task created successfully - modal will close automatically
+      return result;
     } catch (error: any) {
       toast.error(error?.message || "Failed to add task. Please try again.");
+      throw error; // Re-throw so AddTaskModal can handle it
     }
   };
 
@@ -308,8 +315,12 @@ const Index = () => {
       <CoreAIFAB
         messages={coreAI.messages}
         onSendMessage={coreAI.sendMessage}
+        onConfirmAction={coreAI.confirmAction}
         isLoading={coreAI.isLoading}
         aiName={store.settings.coreAIName}
+        onClearHistory={coreAI.clearHistory}
+        currentView="today"
+        selectedDate={format(selectedDate, "yyyy-MM-dd")}
       />
       
       <CheckInModal
