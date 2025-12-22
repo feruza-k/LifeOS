@@ -1100,6 +1100,10 @@ async def create_task(
     created_tasks = []
     base_date = datetime.strptime(task_data.date, "%Y-%m-%d")
     
+    # Get categories mapping for converting tasks to frontend format
+    categories = await db_repo.get_categories(current_user["id"])
+    category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+    
     if repeat_config["type"] == "weekly":
         # Create tasks for selected weekdays (next 52 weeks)
         if repeat_config.get("weekDays"):

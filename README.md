@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 21, 2025
+**Current Date:** December 22, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -28,6 +28,7 @@
   - [Day 19: PostgreSQL Migration & Async Backend Refactor](#day-19-postgresql-migration--async-backend-refactor-dec-19-2025)
   - [Day 20: Closing the PostgreSQL Migration](#day-20-closing-the-postgresql-migration-dec-20-2025)
   - [Day 21: Assistant Intelligence Foundation](#day-21-assistant-intelligence-foundation-dec-21-2025)
+  - [Day 22: Deep Context Awareness & Progress Insights](#day-22-deep-context-awareness--progress-insights-dec-22-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1494,7 +1495,7 @@ At this point, LifeOS no longer has two mental models. There is one source of tr
 
 ---
 
-### **Day 21: Assistant Intelligence Foundation (Dec 21, 2025)**
+### **Day 21**: Assistant Intelligence Foundation (Dec 21, 2025)
 
 Today I moved the LifeOS assistant from a rule-based command parser toward something that actually feels conversational. After finishing the PostgreSQL migration, the foundation was finally stable enough to focus on what the app is really about: the assistant itself.
 
@@ -1539,13 +1540,102 @@ Until now, the assistant was useful, but mechanical. Today was about giving it p
 
 What matters to me isn’t making SolAI sound impressive, but making it feel trustworthy. Something you can open every day without friction. Something that helps you think more clearly rather than overwhelming you with suggestions or automation.
 
-There’s still a lot to refine, but for the first time, SolAI feels aligned with what LifeOS is meant to be: calm, supportive, and quietly capable.
+There's still a lot to refine, but for the first time, SolAI feels aligned with what LifeOS is meant to be: calm, supportive, and quietly capable.
+
+---
+
+### **Day 22**: Deep Context Awareness & Progress Insights (Dec 22, 2025)
+
+Yesterday SolAI learned to have conversations. Today it learned to see patterns.
+
+The problem I kept running into was that SolAI could only see what was already on screen — today's tasks, upcoming schedule, conflicts. It was helpful, but not insightful. It couldn't answer "How am I doing?" because it didn't know what "doing well" meant for me specifically.
+
+So I built a system that looks back, not just forward.
+
+#### **What I Did**
+
+- **Created a historical context engine** (`_get_historical_context()`)
+  - Fetches tasks from the past 30 days, not just today
+  - Uses a dual-query strategy: gets tasks from the past month OR tasks scheduled for last week (even if created today)
+  - This handles the case where someone adds tasks retroactively — SolAI still sees them
+  - Merges everything intelligently, avoiding duplicates by tracking task IDs
+
+- **Built a pattern analysis module** (`pattern_analyzer.py`)
+  - Analyzes completion rates across time periods
+  - Identifies time preferences (when tasks are actually scheduled)
+  - Tracks category usage and scheduling style (anytime vs scheduled)
+  - Generates insights only when patterns are meaningful (e.g., only highlights categories if they're 30%+ of tasks)
+  - Prioritizes insights by importance — completion rates matter more than minor preferences
+
+- **Added weekly summary generation**
+  - When you ask "How did my last week go?", SolAI now builds a detailed breakdown
+  - Groups tasks by day with completion stats
+  - Shows the actual date range and day names
+  - Handles edge cases gracefully (no data, limited data, etc.)
+
+- **Enhanced the system prompt architecture**
+  - Now includes three new context sections:
+    - Historical summary (past 30 days stats)
+    - Patterns and insights (from the analyzer)
+    - Last week summary (detailed breakdown)
+  - Instructions emphasize meaningful insights over raw numbers
+  - Tells SolAI to focus on trends and comparisons, not just listing tasks
+
+- **Made responses more concise**
+  - Updated instructions to aim for 2-4 sentences for most responses
+  - Pattern insights are limited to top 3-4 most meaningful
+  - Weekly summaries are formatted more compactly
+  - Progress questions focus on insights, not exhaustive lists
+
+#### **Technical Details**
+
+The pattern analysis runs server-side using Python's `defaultdict` for efficient time distribution tracking. Completion rates are calculated with proper null handling, and insights are filtered by significance thresholds to avoid noise.
+
+The historical context gathering uses SQLAlchemy queries with `OR` conditions to ensure comprehensive coverage:
+
+```python
+tasks_query = select(Task).where(
+    and_(
+        Task.user_id == UUID(user_id),
+        or_(
+            Task.date >= cutoff_date,  # Past 30 days
+            and_(Task.date >= week_start, Task.date <= week_end)  # Last week
+        )
+    )
+)
+```
+
+This dual-query approach means SolAI sees tasks scheduled for last week even if they were added today — important for retroactive planning.
+
+Context merging happens with set-based deduplication, preserving all task metadata while avoiding duplicates. The weekly summary builder filters by date range and groups by day, keeping output concise to prevent token overflow.
+
+#### **Current Status**
+
+- SolAI can answer "How did my last week go?" with specific data
+- Identifies patterns in completion rates, time preferences, and category focus
+- Provides insights that go beyond what's visible in today's view
+- Compares current performance to historical patterns
+- Responses are more concise and focused on meaningful insights
+
+#### **Reflection**
+
+This was a shift from reactive to proactive intelligence.
+
+Before today, SolAI could help you manage what's in front of you. Now it can help you understand how you're actually doing — not just today, but over time. It can spot patterns you might not notice yourself, like "you complete morning tasks at 85% but evening tasks at 40%."
+
+The technical challenge was balancing comprehensiveness with efficiency. I didn't want to load everything into every request, so I limited historical data to 30 days and weekly summaries to 7 days. The pattern analysis runs server-side to keep the frontend responsive.
+
+What I'm most excited about is that this foundation enables something bigger: SolAI can now learn from your patterns and provide personalized insights. Not generic productivity advice, but observations specific to how you actually work.
+
+The assistant feels less like a tool and more like a quiet observer who understands your rhythm.
 
 ---
 
 ## **Next Steps**
 
-- Refine conversational depth and prioritisation
-- Introduce gentle, context-aware suggestions
-- Begin shaping personalisation based on long-term patterns
+- Expand context awareness to include notes, diary entries, and photos
+- Implement long-term memory extraction (insight-based, not chat logs)
+- Refine pattern analysis to identify trends and improvements over time
+- Add proactive suggestions based on learned patterns
+- Begin shaping personalisation based on long-term behavioral patterns
 
