@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
-import { X, CheckCircle2, Circle, ArrowRight, PartyPopper, Calendar, PenLine } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, CheckCircle2, Circle, ArrowRight, PartyPopper, Calendar, PenLine, Camera, Image, Trash2 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { Task } from "@/types/lifeos";
 import { ValueTag } from "./ValueTag";
 import { cn } from "@/lib/utils";
 import Confetti from "./Confetti";
 import { Textarea } from "@/components/ui/textarea";
+import { api } from "@/lib/api";
 
 interface CheckInModalProps {
   isOpen: boolean;
@@ -14,7 +15,14 @@ interface CheckInModalProps {
   tasks: Task[];
   onToggleTask: (id: string) => void;
   onMoveTask: (id: string, newDate: Date) => void;
-  onComplete: (completedIds: string[], incompleteIds: string[], movedTasks: { taskId: string; newDate: string }[], note?: string, mood?: string) => void;
+  onComplete: (completedIds: string[], incompleteIds: string[], movedTasks: { taskId: string; newDate: string }[], note?: string, mood?: string, photo?: { filename: string; uploadedAt: string } | null) => void;
+  existingCheckIn?: {
+    mood?: string;
+    note?: string;
+    completedTaskIds?: string[];
+    incompleteTaskIds?: string[];
+  };
+  existingPhoto?: { filename: string; uploadedAt: string } | null;
 }
 
 export function CheckInModal({ 
@@ -24,13 +32,19 @@ export function CheckInModal({
   tasks, 
   onToggleTask,
   onMoveTask,
-  onComplete 
+  onComplete,
+  existingCheckIn,
+  existingPhoto
 }: CheckInModalProps) {
   const [step, setStep] = useState<"review" | "incomplete" | "reflection" | "celebration">("review");
   const [showConfetti, setShowConfetti] = useState(false);
   const [movedTasks, setMovedTasks] = useState<{ taskId: string; newDate: string }[]>([]);
   const [dailyNote, setDailyNote] = useState("");
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [checkInPhoto, setCheckInPhoto] = useState<{ filename: string; uploadedAt: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showFullImage, setShowFullImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const moodEmojis = [
     { emoji: "😊", label: "Great" },
@@ -42,15 +56,39 @@ export function CheckInModal({
   const completedTasks = tasks.filter(t => t.completed);
   const incompleteTasks = tasks.filter(t => !t.completed);
   const allCompleted = incompleteTasks.length === 0;
+  const hasTasks = tasks.length > 0;
 
   useEffect(() => {
     if (isOpen) {
       setStep("review");
       setMovedTasks([]);
+      // Pre-populate with existing check-in data if available
+      setDailyNote(existingCheckIn?.note || "");
+      setSelectedMood(existingCheckIn?.mood || null);
+      setCheckInPhoto(existingPhoto || null);
+    } else {
+      // Reset when closed
+      setStep("review");
+      setMovedTasks([]);
       setDailyNote("");
       setSelectedMood(null);
+      setCheckInPhoto(null);
+      setShowConfetti(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+  
+  // Update fields when existing data changes (but only if modal is open)
+  useEffect(() => {
+    if (isOpen && existingCheckIn) {
+      setDailyNote(existingCheckIn.note || "");
+      setSelectedMood(existingCheckIn.mood || null);
+    }
+    if (isOpen && existingPhoto) {
+      setCheckInPhoto(existingPhoto);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, existingCheckIn?.note, existingCheckIn?.mood, existingPhoto]);
 
   if (!isOpen) return null;
 
@@ -62,7 +100,8 @@ export function CheckInModal({
 
   const handleContinue = () => {
     if (step === "review") {
-      if (allCompleted) {
+      // If no tasks or all completed, go straight to reflection
+      if (!hasTasks || allCompleted) {
         setStep("reflection");
       } else {
         setStep("incomplete");
@@ -72,7 +111,7 @@ export function CheckInModal({
     } else if (step === "reflection") {
       const completedIds = completedTasks.map(t => t.id);
       const incompleteIds = incompleteTasks.filter(t => !movedTasks.find(m => m.taskId === t.id)).map(t => t.id);
-      onComplete(completedIds, incompleteIds, movedTasks, dailyNote, selectedMood || undefined);
+      onComplete(completedIds, incompleteIds, movedTasks, dailyNote, selectedMood || undefined, checkInPhoto);
       setStep("celebration");
       setShowConfetti(true);
     } else {
@@ -87,7 +126,7 @@ export function CheckInModal({
         className="absolute inset-0 bg-foreground/20 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg bg-card rounded-t-3xl shadow-card animate-slide-up overflow-hidden max-h-[85vh] flex flex-col">
+      <div className="relative w-full max-w-lg bg-card rounded-t-3xl shadow-card animate-slide-up overflow-hidden h-[65vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
@@ -119,13 +158,13 @@ export function CheckInModal({
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto flex-1">
+        <div className="p-4 overflow-y-auto flex-1 min-h-0">
           {step === "review" && (
             <div className="space-y-3">
               <p className="text-sm font-sans text-muted-foreground mb-4">
-                Review your tasks and mark what you've completed.
+                {hasTasks ? "Review your tasks and mark what you've completed." : "No tasks for today. Ready to reflect?"}
               </p>
-              {tasks.map(task => (
+              {hasTasks ? tasks.map(task => (
                 <button
                   key={task.id}
                   onClick={() => onToggleTask(task.id)}
@@ -159,7 +198,11 @@ export function CheckInModal({
                   </div>
                   <ValueTag value={task.value} size="sm" />
                 </button>
-              ))}
+              )) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="text-sm font-sans">No tasks to review</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -261,6 +304,104 @@ export function CheckInModal({
                 onChange={(e) => setDailyNote(e.target.value)}
                 className="min-h-[100px] resize-none bg-muted/50 border-0 focus-visible:ring-primary/30"
               />
+
+              {/* Optional Photo Upload */}
+              <div className="space-y-2">
+                <p className="text-xs font-sans text-muted-foreground">Optional: Add a photo</p>
+                {checkInPhoto ? (
+                  <div className="relative group">
+                    <div className="relative w-full h-64 rounded-xl overflow-hidden bg-muted/30">
+                      <img
+                        src={`${api.getPhotoUrl(checkInPhoto.filename)}?date=${format(date, "yyyy-MM-dd")}`}
+                        alt="Check-in photo"
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setShowFullImage(true)}
+                      />
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation(); // Prevent triggering image click
+                          if (!confirm("Are you sure you want to delete this photo?")) {
+                            return;
+                          }
+                          try {
+                            const dateStr = format(date, "yyyy-MM-dd");
+                            await api.deletePhoto(checkInPhoto.filename, dateStr);
+                            setCheckInPhoto(null);
+                            // Reset file input so user can add a new photo
+                            if (fileInputRef.current) {
+                              fileInputRef.current.value = "";
+                            }
+                            // Also update the note to remove photo reference immediately
+                            // The note will be saved when check-in is completed, but we update it now too
+                            try {
+                              await api.saveNote({
+                                date: dateStr,
+                                content: dailyNote || "",
+                                photo: null,
+                              });
+                            } catch (noteError) {
+                              console.error("Failed to update note after photo deletion:", noteError);
+                              // Don't show error to user - photo is deleted, note will sync on check-in completion
+                            }
+                          } catch (error) {
+                            console.error("Failed to delete photo:", error);
+                            alert("Failed to delete photo. Please try again.");
+                          }
+                        }}
+                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-destructive/90 text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:scale-105"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 p-4 rounded-xl bg-muted/50 hover:bg-muted border-2 border-dashed border-border/30 cursor-pointer transition-colors">
+                    <Camera className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-sans text-muted-foreground">Add photo</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        if (!file.type.startsWith("image/")) {
+                          alert("Please select an image file");
+                          return;
+                        }
+                        
+                        if (file.size > 10 * 1024 * 1024) {
+                          alert("Image size must be less than 10MB");
+                          return;
+                        }
+                        
+                        setIsUploading(true);
+                        try {
+                          const dateStr = format(date, "yyyy-MM-dd");
+                          const result = await api.uploadPhoto(file, dateStr);
+                          setCheckInPhoto({
+                            filename: result.filename,
+                            uploadedAt: result.uploadedAt
+                          });
+                        } catch (error) {
+                          console.error("Failed to upload photo:", error);
+                          alert("Failed to upload photo. Please try again.");
+                        } finally {
+                          setIsUploading(false);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+                {isUploading && (
+                  <p className="text-xs text-muted-foreground text-center">Uploading...</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -279,6 +420,27 @@ export function CheckInModal({
             </div>
           )}
         </div>
+
+        {/* Full Screen Image Modal */}
+        {showFullImage && checkInPhoto && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setShowFullImage(false)}
+          >
+            <button
+              onClick={() => setShowFullImage(false)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={`${api.getPhotoUrl(checkInPhoto.filename)}?date=${format(date, "yyyy-MM-dd")}`}
+              alt="Check-in photo"
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
 
         {/* Actions */}
         <div className="p-4 border-t border-border shrink-0">

@@ -29,17 +29,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing session on mount (tokens in httpOnly cookies)
   useEffect(() => {
-    api.getCurrentUser()
-      .then((userData: User) => {
-        setUser(userData);
-        setIsAuthenticated(true);
-      })
-      .catch((error) => {
-        // No valid session - this is expected if user is not logged in
+    let cancelled = false;
+    
+    // Add timeout to prevent hanging on mobile if backend is unreachable
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        console.warn("Auth check timeout - backend may be unreachable");
+        setLoading(false);
         setUser(null);
         setIsAuthenticated(false);
+      }
+    }, 10000); // 10 second timeout
+
+    api.getCurrentUser()
+      .then((userData: User) => {
+        if (!cancelled) {
+          clearTimeout(timeoutId);
+          setUser(userData);
+          setIsAuthenticated(true);
+          setLoading(false);
+        }
       })
-      .finally(() => setLoading(false));
+      .catch((error) => {
+        if (!cancelled) {
+          clearTimeout(timeoutId);
+          // No valid session - this is expected if user is not logged in
+          console.log("No valid session:", error);
+          setUser(null);
+          setIsAuthenticated(false);
+          setLoading(false);
+        }
+      });
+    
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { format, isSameDay, parseISO } from "date-fns";
-import { Settings, Bell } from "lucide-react";
 import { Header } from "@/components/lifeos/Header";
+import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
 import { HorizontalDayStrip } from "@/components/lifeos/HorizontalDayStrip";
 import { BalanceScoreCard } from "@/components/lifeos/BalanceScoreCard";
 import { TaskList } from "@/components/lifeos/TaskList";
@@ -18,6 +18,7 @@ import { useCoreAI } from "@/hooks/useCoreAI";
 import { Task } from "@/components/lifeos/TaskItem";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 
 
@@ -27,12 +28,48 @@ const Index = () => {
   const [showSetFocus, setShowSetFocus] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showDayStrip, setShowDayStrip] = useState(true);
-  const [animateBell, setAnimateBell] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [existingCheckIn, setExistingCheckIn] = useState<any>(null);
+  const [existingPhoto, setExistingPhoto] = useState<{ filename: string; uploadedAt: string } | null>(null);
+  const [showSideMenu, setShowSideMenu] = useState(false);
   
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
+
+  // Load existing check-in and photo when modal opens
+  useEffect(() => {
+    if (showCheckIn) {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      let cancelled = false;
+      
+      Promise.all([
+        api.getCheckIn(dateStr).catch(() => null),
+        store.loadNote(dateStr).catch(() => null)
+      ]).then(([checkIn, note]) => {
+        if (!cancelled) {
+          setExistingCheckIn(checkIn || null);
+          // Load photo from note if it exists
+          if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
+            setExistingPhoto(note.photo);
+          } else if (note && note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+            setExistingPhoto(note.photos[0]);
+          } else {
+            setExistingPhoto(null);
+          }
+        }
+      });
+      
+      return () => {
+        cancelled = true;
+      };
+    } else {
+      // Reset when modal closes
+      setExistingCheckIn(null);
+      setExistingPhoto(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCheckIn, selectedDate]);
 
     // Load initial data once
     useEffect(() => {
@@ -117,44 +154,6 @@ const Index = () => {
 
   const energyStatus = mapEnergyStatus(store.today?.energy?.status);
 
-  const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
-  
-  const showReminders = (store.reminders || []).filter(r => {
-    if (r.type !== "show") return false;
-    if (r.visible === false) return false;
-    if (!r.dueDate) return false;
-    
-    try {
-      // Normalize date format - handle both ISO with time and date-only formats
-      let reminderDateOnly = r.dueDate;
-      if (typeof reminderDateOnly === 'string') {
-        if (reminderDateOnly.includes('T')) {
-          reminderDateOnly = reminderDateOnly.split('T')[0];
-        } else if (reminderDateOnly.includes(' ')) {
-          reminderDateOnly = reminderDateOnly.split(' ')[0];
-        }
-        // Ensure it's exactly YYYY-MM-DD
-        if (reminderDateOnly.length > 10) {
-          reminderDateOnly = reminderDateOnly.substring(0, 10);
-        }
-      }
-      return reminderDateOnly === selectedDateStr;
-    } catch (error) {
-      console.error("Error filtering reminder:", error, r);
-      return false;
-    }
-  });
-
-  // Animate bell for first 5 seconds when reminders are present
-  useEffect(() => {
-    if (showReminders.length > 0 && !loading) {
-      setAnimateBell(true);
-      const timer = setTimeout(() => {
-        setAnimateBell(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showReminders.length, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddTask = async (task: { title: string; time?: string; endTime?: string; value: any; date: string; repeat?: any }) => {
     try {
@@ -223,22 +222,12 @@ const Index = () => {
         LifeOS, powered by SolAI
       </p>
 
-      <div className="flex items-center justify-between px-4">
+      <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
+      
+      <div className="flex items-center gap-3 px-4">
+        <SideMenuButton onClick={() => setShowSideMenu(true)} />
         <div className="flex-1">
           <Header onTitleClick={() => setShowDayStrip(!showDayStrip)} />
-        </div>
-        <div className="flex items-center gap-2">
-        <Link to="/reminders" className="relative w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-            <Bell className="w-4 h-4 text-muted-foreground" />
-            {store.reminders.filter(r => r.visible).length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
-                {store.reminders.filter(r => r.visible).length}
-              </span>
-            )}
-          </Link>
-          <Link to="/settings" className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-            <Settings className="w-4 h-4 text-muted-foreground" />
-          </Link>
         </div>
       </div>
       {showDayStrip && (
@@ -249,34 +238,6 @@ const Index = () => {
             setShowDayStrip(false);
           }} 
         />
-      )}
-      
-      {/* Show Reminders - displayed before Energy Status */}
-      {showReminders.length > 0 && (
-        <div className="mt-4 px-4">
-          <div className="space-y-3">
-            {showReminders.map((reminder) => (
-              <div
-                key={reminder.id}
-                className="flex items-start gap-3"
-              >
-                <Bell 
-                  className={cn(
-                    "w-5 h-5 flex-shrink-0 mt-0.5 text-primary",
-                    animateBell && "animate-bell-ring"
-                  )} 
-                  style={{ fill: 'currentColor', strokeWidth: 1.5 }} 
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-sans font-medium text-foreground text-base">{reminder.title}</p>
-                  {reminder.note && (
-                    <p className="text-sm text-muted-foreground mt-1">{reminder.note}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
       
       <div className="mt-4">
@@ -325,15 +286,30 @@ const Index = () => {
       
       <CheckInModal
         isOpen={showCheckIn}
-        onClose={() => setShowCheckIn(false)}
+        onClose={() => {
+          setShowCheckIn(false);
+          setExistingCheckIn(null);
+        }}
         date={selectedDate}
         tasks={todayTasks}
         onToggleTask={store.toggleTask}
         onMoveTask={store.moveTask}
-        onComplete={(completedIds, incompleteIds, movedTasks, note, mood) => {
-          store.saveCheckIn(selectedDate, completedIds, incompleteIds, movedTasks, note, mood);
+        onComplete={async (completedIds, incompleteIds, movedTasks, note, mood, photo) => {
+          await store.saveCheckIn(selectedDate, completedIds, incompleteIds, movedTasks, note, mood);
+          // Also save note with photo if provided (photos are stored with notes, not check-ins)
+          if (photo || note) {
+            await store.saveNote({
+              date: format(selectedDate, "yyyy-MM-dd"),
+              content: note || "",
+              photo: photo || null,
+            });
+          }
           setShowCheckIn(false);
+          setExistingCheckIn(null);
+          setExistingPhoto(null);
         }}
+        existingCheckIn={existingCheckIn}
+        existingPhoto={existingPhoto}
       />
       
       

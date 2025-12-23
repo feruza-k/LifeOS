@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 22, 2025
+**Current Date:** December 23, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -29,6 +29,7 @@
   - [Day 20: Closing the PostgreSQL Migration](#day-20-closing-the-postgresql-migration-dec-20-2025)
   - [Day 21: Assistant Intelligence Foundation](#day-21-assistant-intelligence-foundation-dec-21-2025)
   - [Day 22: Deep Context Awareness & Progress Insights](#day-22-deep-context-awareness--progress-insights-dec-22-2025)
+  - [Day 23: Memory Foundation](#day-23-memory-foundation-dec-23-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1631,11 +1632,57 @@ The assistant feels less like a tool and more like a quiet observer who understa
 
 ---
 
-## **Next Steps**
+### **Day 23**: Memory Foundation (Dec 23, 2025)
 
-- Expand context awareness to include notes, diary entries, and photos
-- Implement long-term memory extraction (insight-based, not chat logs)
-- Refine pattern analysis to identify trends and improvements over time
-- Add proactive suggestions based on learned patterns
-- Begin shaping personalisation based on long-term behavioral patterns
+Today I laid the groundwork for something I've been thinking about for a while: how SolAI should remember things about me over time, not just what I said in the last conversation.
+
+The challenge was building a memory system that feels intentional and respectful, not like surveillance. I didn't want SolAI to remember everything — I wanted it to remember what actually matters, with clear boundaries and high confidence.
+
+#### **What I Built**
+
+I created a complete memory foundation with four core components:
+
+**1. Memory Taxonomy**  
+Defined four types of memories SolAI can store:
+- **Preferences** (0.75 confidence threshold) — things I like or prefer
+- **Constraints** (0.85 threshold) — hard boundaries I can't cross
+- **Patterns** (0.70 threshold) — behaviors observed over time
+- **Values** (0.80 threshold) — core principles I prioritize
+
+Each type has clear examples, signals that indicate it, and explicit rules about what NOT to store. This isn't just categorization — it's a framework for what deserves to be remembered.
+
+**2. Memory Guardrails**  
+Built validation rules that ensure only high-quality memories get stored:
+- Content validation (length, format)
+- Confidence thresholds specific to each memory type
+- Security checks that block sensitive information
+- Temporal validation (rejects temporary preferences)
+- Type validation (ensures content actually matches the claimed type)
+
+The system is designed to forget aggressively — if something doesn't meet the threshold, it doesn't get stored. This keeps the memory layer clean and trustworthy.
+
+**3. Memory Repository**  
+Created retrieval methods that can find relevant memories when needed:
+- Get top N most relevant memories (by confidence + recency)
+- Filter by type, source, or confidence level
+- Bridge between memory candidates and actual storage
+
+Importantly, this is retrieval-only right now. Memories aren't automatically injected into conversations yet — that comes later when I'm confident the extraction and validation work properly.
+
+**4. Memory Candidate System**  
+Built a candidate model that represents potential memories before they're persisted. Candidates can be created from conversations, pattern analysis, or explicit user input, but they must pass validation before storage.
+
+This separation between "potential memory" and "stored memory" gives me control over what actually gets remembered, even when extraction becomes automated.
+
+
+The foundation is there, but the automation comes later. Right now, it's about having the structure, guardrails, and retrieval rules in place so that when I do add extraction, it has clear boundaries to work within.
+
+#### **Reflection**
+
+This was a quiet but important day. Memory is one of those features that can easily become invasive if not designed carefully. By starting with the structure and guardrails instead of the automation, I'm making sure SolAI's memory will be intentional, transparent, and respectful.
+
+---
+
+## **Next Steps:**
+Implement LLM-based memory extraction from conversations and integrate top memories into SolAI's context. Build a UI for viewing and managing stored memories.
 

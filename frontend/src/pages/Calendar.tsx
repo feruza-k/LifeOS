@@ -369,6 +369,22 @@ const CalendarPage = () => {
             });
             setNotes(prev => ({ ...prev, [dateStr]: content }));
           }}
+          onUpdateCheckIn={async (updates) => {
+            if (!selectedDate) return;
+            const dateStr = format(selectedDate, "yyyy-MM-dd");
+            const currentCheckIn = checkIns[dateStr] || {};
+            const updatedCheckIn = {
+              ...currentCheckIn,
+              date: dateStr,
+              ...updates,
+            };
+            try {
+              await api.saveCheckIn(updatedCheckIn);
+              setCheckIns(prev => ({ ...prev, [dateStr]: updatedCheckIn }));
+            } catch (error) {
+              console.error("Failed to update check-in:", error);
+            }
+          }}
           onDateChange={async (newDate) => {
             setSelectedDate(newDate);
             // Load note and check-in for new date

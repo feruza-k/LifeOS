@@ -88,7 +88,7 @@ async def get_scheduled_blocks(
             continue
 
         task_date = start_dt.date()
-        
+
         # Filter by optional date range
         if start_date and task_date < start_date:
             continue

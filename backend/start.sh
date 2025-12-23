@@ -38,4 +38,5 @@ echo ""
 echo "Press Ctrl+C to stop"
 echo ""
 
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Use the Python from the current environment to ensure correct interpreter
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

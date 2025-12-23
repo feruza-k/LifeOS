@@ -6,21 +6,19 @@ from sqlalchemy import select, and_, or_, update
 from db.session import AsyncSessionLocal
 from db.repositories.task import TaskRepository
 from db.repositories.note import NoteRepository
+from db.repositories.global_note import GlobalNoteRepository
 from db.repositories.checkin import CheckinRepository
 from db.repositories.memory import MemoryRepository
 from db.models import (
-    User, Category, Task, Note, Checkin, Reminder,
+    User, Category, Task, Note, GlobalNote, Checkin, Reminder,
     DiaryEntry, Memory, MonthlyFocus, AuditLog, PendingAction
 )
 
 class DatabaseRepo:
-    """Database repository adapter - provides similar interface to old JSON repo."""
-    
     async def _get_session(self) -> AsyncSession:
         return AsyncSessionLocal()
     
     def _user_to_dict(self, user: User) -> Dict:
-        """Convert User model to dict format."""
         return {
             "id": str(user.id),
             "email": user.email,
@@ -40,7 +38,6 @@ class DatabaseRepo:
         }
     
     def _task_to_dict(self, task: Task) -> Dict:
-        """Convert Task model to dict format."""
         return {
             "id": str(task.id),
             "user_id": str(task.user_id),
@@ -48,7 +45,6 @@ class DatabaseRepo:
             "title": task.title,
             "datetime": task.datetime.isoformat() if task.datetime else None,
             "date": task.date.isoformat() if task.date else (task.datetime.date().isoformat() if task.datetime else None),
-            # Only set time if it's not midnight (00:00) - midnight indicates an "anytime" task
             "time": task.datetime.strftime("%H:%M") if task.datetime and task.datetime.strftime("%H:%M") != "00:00" else None,
             "end_datetime": task.end_datetime.isoformat() if task.end_datetime else None,
             "duration_minutes": task.duration_minutes,
@@ -66,7 +62,6 @@ class DatabaseRepo:
         }
     
     def _note_to_dict(self, note: Note) -> Dict:
-        """Convert Note model to dict format."""
         photo = None
         if note.photo_filename:
             photo = {
@@ -84,7 +79,6 @@ class DatabaseRepo:
         }
     
     def _checkin_to_dict(self, checkin: Checkin) -> Dict:
-        """Convert Checkin model to dict format."""
         return {
             "id": str(checkin.id),
             "user_id": str(checkin.user_id),
@@ -98,7 +92,6 @@ class DatabaseRepo:
         }
     
     async def get_user_by_email(self, email: str) -> Optional[Dict]:
-        """Get user by email address (case-insensitive)."""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(User).where(User.email == email.lower().strip())
@@ -109,7 +102,6 @@ class DatabaseRepo:
             return None
     
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
-        """Get user by ID."""
         async with AsyncSessionLocal() as session:
             user = await session.get(User, UUID(user_id))
             if user:
@@ -117,7 +109,6 @@ class DatabaseRepo:
             return None
     
     async def create_user(self, email: str, hashed_password: str, username: str = None, verification_token: str = None) -> Dict:
-        """Create a new user."""
         async with AsyncSessionLocal() as session:
             user = User(
                 email=email.lower().strip(),
@@ -132,7 +123,6 @@ class DatabaseRepo:
             return self._user_to_dict(user)
     
     async def update_user(self, user_id: str, updates: dict) -> Optional[Dict]:
-        """Update user fields."""
         async with AsyncSessionLocal() as session:
             user = await session.get(User, UUID(user_id))
             if not user:
@@ -150,11 +140,9 @@ class DatabaseRepo:
             
             for key, value in updates.items():
                 if hasattr(user, key):
-                    # Convert ISO string to datetime for timestamp fields
                     if key in datetime_fields and value is not None:
                         if isinstance(value, str):
                             try:
-                                # Handle timezone-aware strings (Z or +00:00)
                                 if value.endswith('Z'):
                                     value = datetime.fromisoformat(value.replace('Z', '+00:00'))
                                 else:
@@ -169,7 +157,6 @@ class DatabaseRepo:
             return self._user_to_dict(user)
     
     async def get_user_by_verification_token(self, token: str) -> Optional[Dict]:
-        """Get user by verification token."""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(User).where(User.verification_token == token)
@@ -182,7 +169,6 @@ class DatabaseRepo:
             return None
     
     async def get_user_by_reset_token(self, token: str) -> Optional[Dict]:
-        """Get user by password reset token."""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(User).where(User.reset_token == token)
@@ -195,14 +181,12 @@ class DatabaseRepo:
             return None
     
     async def get_tasks_by_user(self, user_id: str) -> List[Dict]:
-        """Get all tasks for a user."""
         async with AsyncSessionLocal() as session:
             repo = TaskRepository(session)
             tasks = await repo.list_by_user(UUID(user_id))
             return [self._task_to_dict(t) for t in tasks]
     
     async def get_tasks_by_date_range(self, user_id: str, start_date: date, end_date: date) -> List[Dict]:
-        """Get tasks for a user within a date range."""
         async with AsyncSessionLocal() as session:
             repo = TaskRepository(session)
             tasks = await repo.get_by_user_and_date_range(UUID(user_id), start_date, end_date)
@@ -221,9 +205,7 @@ class DatabaseRepo:
                         elif hasattr(dt_str, 'date'):
                             task_dict["date"] = dt_str.date().isoformat()
                     elif t.datetime:
-                        # Direct access to model attribute
                         task_dict["date"] = t.datetime.date().isoformat()
-                # Ensure date is in YYYY-MM-DD format
                 if task_dict.get("date"):
                     date_str = task_dict["date"]
                     if isinstance(date_str, str) and len(date_str) > 10:
@@ -232,7 +214,6 @@ class DatabaseRepo:
             return task_dicts
     
     async def get_tasks_by_date_and_user(self, date_str: str, user_id: str) -> List[Dict]:
-        """Get tasks for a specific date and user."""
         async with AsyncSessionLocal() as session:
             repo = TaskRepository(session)
             task_date = date.fromisoformat(date_str)
@@ -240,7 +221,6 @@ class DatabaseRepo:
             return [self._task_to_dict(t) for t in tasks]
     
     async def get_task(self, task_id: str, user_id: str) -> Optional[Dict]:
-        """Get a task by ID (user-scoped)."""
         async with AsyncSessionLocal() as session:
             repo = TaskRepository(session)
             task = await repo.get_by_id(UUID(task_id), UUID(user_id))
@@ -312,13 +292,11 @@ class DatabaseRepo:
             return self._task_to_dict(task)
     
     async def update_task(self, task_id: str, updates: dict, user_id: str) -> Optional[Dict]:
-        """Update a task by ID (user-scoped)."""
         async with AsyncSessionLocal() as session:
             repo = TaskRepository(session)
             
             db_updates = {}
             
-            # Handle datetime updates - can come as "datetime" or as "date" + "time"
             if "datetime" in updates:
                 if isinstance(updates["datetime"], str):
                     db_updates["datetime"] = datetime.fromisoformat(updates["datetime"].replace('Z', '+00:00'))
@@ -328,7 +306,6 @@ class DatabaseRepo:
                 datetime_str = f"{updates['date']} {updates['time']}"
                 db_updates["datetime"] = datetime.fromisoformat(datetime_str)
             elif "date" in updates:
-                # If only date is provided, use existing time or default to start of day
                 existing_task = await repo.get_by_id(UUID(task_id), UUID(user_id))
                 if existing_task:
                     existing_datetime = existing_task.datetime
@@ -370,7 +347,6 @@ class DatabaseRepo:
             return None
     
     async def delete_task(self, task_id: str, user_id: str) -> bool:
-        """Delete a task by ID (user-scoped)."""
         async with AsyncSessionLocal() as session:
             repo = TaskRepository(session)
             success = await repo.delete(UUID(task_id), UUID(user_id))
@@ -379,8 +355,6 @@ class DatabaseRepo:
             return success
     
     async def update_tasks_category(self, old_category_id: str, new_category_id: str, user_id: str) -> int:
-        """Update all tasks for a user that reference old_category_id to use new_category_id.
-        Returns the number of tasks updated."""
         async with AsyncSessionLocal() as session:
             from sqlalchemy import update
             repo = TaskRepository(session)
@@ -412,7 +386,6 @@ class DatabaseRepo:
             return None
     
     async def get_note(self, date_str: str, user_id: str) -> Optional[Dict]:
-        """Get note for a specific date (user-scoped)."""
         async with AsyncSessionLocal() as session:
             repo = NoteRepository(session)
             note_date = date.fromisoformat(date_str)
@@ -422,7 +395,6 @@ class DatabaseRepo:
             return None
     
     async def save_note(self, note_dict: dict, user_id: str) -> Dict:
-        """Save or update a note (requires user_id)."""
         async with AsyncSessionLocal() as session:
             repo = NoteRepository(session)
             note_date = date.fromisoformat(note_dict.get("date"))
@@ -440,7 +412,6 @@ class DatabaseRepo:
                     photo_filename = note_dict["photo"]
             
             note_data = {
-                "user_id": UUID(user_id),
                 "date": note_date,
                 "content": note_dict.get("content", ""),
                 "photo_filename": photo_filename,
@@ -450,14 +421,14 @@ class DatabaseRepo:
             if existing:
                 note = await repo.update(existing.id, UUID(user_id), **note_data)
             else:
-                note = await repo.create(**note_data)
+                # For create, we need user_id in the data
+                note = await repo.create(user_id=UUID(user_id), **note_data)
             
             await session.commit()
             await session.refresh(note)
             return self._note_to_dict(note)
     
     async def get_checkin(self, date_str: str, user_id: str) -> Optional[Dict]:
-        """Get check-in for a specific date (user-scoped)."""
         async with AsyncSessionLocal() as session:
             repo = CheckinRepository(session)
             checkin_date = date.fromisoformat(date_str)
@@ -467,7 +438,6 @@ class DatabaseRepo:
             return None
     
     async def save_checkin(self, checkin_dict: dict, user_id: str) -> Dict:
-        """Save or update a check-in."""
         async with AsyncSessionLocal() as session:
             repo = CheckinRepository(session)
             checkin_date = date.fromisoformat(checkin_dict.get("date"))
@@ -478,7 +448,6 @@ class DatabaseRepo:
             incomplete_ids = [UUID(uid) for uid in checkin_dict.get("incompleteTaskIds", []) if uid]
             
             checkin_data = {
-                "user_id": UUID(user_id),
                 "date": checkin_date,
                 "completed_task_ids": completed_ids,
                 "incomplete_task_ids": incomplete_ids,
@@ -490,14 +459,70 @@ class DatabaseRepo:
             if existing:
                 checkin = await repo.update(existing.id, UUID(user_id), **checkin_data)
             else:
-                checkin = await repo.create(**checkin_data)
+                # For create, we need user_id in the data
+                checkin = await repo.create(user_id=UUID(user_id), **checkin_data)
             
             await session.commit()
             await session.refresh(checkin)
             return self._checkin_to_dict(checkin)
     
+    def _global_note_to_dict(self, note: GlobalNote) -> Dict:
+        return {
+            "id": str(note.id),
+            "user_id": str(note.user_id),
+            "content": note.content,
+            "created_at": note.created_at.isoformat() if note.created_at else None,
+            "updated_at": note.updated_at.isoformat() if note.updated_at else None,
+        }
+    
+    async def get_global_notes(self, user_id: str) -> List[Dict]:
+        async with AsyncSessionLocal() as session:
+            repo = GlobalNoteRepository(session)
+            notes = await repo.list_by_user_ordered(UUID(user_id))
+            return [self._global_note_to_dict(note) for note in notes]
+    
+    async def get_global_note(self, note_id: str, user_id: str) -> Optional[Dict]:
+        async with AsyncSessionLocal() as session:
+            repo = GlobalNoteRepository(session)
+            note = await repo.get_by_id(UUID(note_id), UUID(user_id))
+            if note:
+                return self._global_note_to_dict(note)
+            return None
+    
+    async def create_global_note(self, note_dict: dict, user_id: str) -> Dict:
+        async with AsyncSessionLocal() as session:
+            repo = GlobalNoteRepository(session)
+            note_data = {
+                "content": note_dict.get("content", ""),
+            }
+            note = await repo.create(user_id=UUID(user_id), **note_data)
+            await session.commit()
+            await session.refresh(note)
+            return self._global_note_to_dict(note)
+    
+    async def update_global_note(self, note_id: str, note_dict: dict, user_id: str) -> Optional[Dict]:
+        async with AsyncSessionLocal() as session:
+            repo = GlobalNoteRepository(session)
+            note = await repo.get_by_id(UUID(note_id), UUID(user_id))
+            if not note:
+                return None
+            
+            note_data = {
+                "content": note_dict.get("content", note.content),
+            }
+            updated_note = await repo.update(note.id, UUID(user_id), **note_data)
+            await session.commit()
+            await session.refresh(updated_note)
+            return self._global_note_to_dict(updated_note)
+    
+    async def delete_global_note(self, note_id: str, user_id: str) -> bool:
+        async with AsyncSessionLocal() as session:
+            repo = GlobalNoteRepository(session)
+            success = await repo.delete(UUID(note_id), UUID(user_id))
+            await session.commit()
+            return success
+    
     async def get_reminders(self, user_id: str) -> List[Dict]:
-        """Get all reminders for a user."""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(Reminder).where(Reminder.user_id == UUID(user_id))
@@ -519,7 +544,6 @@ class DatabaseRepo:
             } for r in reminders]
     
     async def add_reminder(self, reminder_dict: dict, user_id: str) -> Dict:
-        """Add a reminder."""
         async with AsyncSessionLocal() as session:
             reminder = Reminder(
                 user_id=UUID(user_id),
@@ -550,7 +574,6 @@ class DatabaseRepo:
             }
     
     async def update_reminder(self, reminder_id: str, updates: dict, user_id: str) -> Optional[Dict]:
-        """Update a reminder."""
         async with AsyncSessionLocal() as session:
             reminder = await session.get(Reminder, UUID(reminder_id))
             if not reminder or str(reminder.user_id) != user_id:
@@ -582,7 +605,6 @@ class DatabaseRepo:
             }
     
     async def delete_reminder(self, reminder_id: str, user_id: str) -> bool:
-        """Delete a reminder."""
         async with AsyncSessionLocal() as session:
             reminder = await session.get(Reminder, UUID(reminder_id))
             if not reminder or str(reminder.user_id) != user_id:
@@ -592,7 +614,6 @@ class DatabaseRepo:
             return True
     
     async def get_monthly_focus(self, month: str, user_id: str) -> Optional[Dict]:
-        """Get monthly focus for a specific month."""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(MonthlyFocus).where(
@@ -613,7 +634,6 @@ class DatabaseRepo:
             return None
     
     async def save_monthly_focus(self, focus_dict: dict, user_id: str) -> Dict:
-        """Save or update monthly focus."""
         async with AsyncSessionLocal() as session:
             existing = await session.execute(
                 select(MonthlyFocus).where(
@@ -650,7 +670,6 @@ class DatabaseRepo:
             }
     
     async def get_categories(self, user_id: Optional[str] = None) -> List[Dict]:
-        """Get categories: global (user_id IS NULL) + user-specific if user_id provided."""
         async with AsyncSessionLocal() as session:
             if user_id:
                 # Return global categories (user_id IS NULL) + user's specific categories
@@ -687,7 +706,6 @@ class DatabaseRepo:
             return unique_categories
     
     async def get_category(self, category_id: str) -> Optional[Dict]:
-        """Get a category by ID."""
         async with AsyncSessionLocal() as session:
             category = await session.get(Category, UUID(category_id))
             if category:
@@ -700,7 +718,6 @@ class DatabaseRepo:
             return None
     
     async def add_category(self, category_dict: dict) -> Dict:
-        """Add a new category."""
         async with AsyncSessionLocal() as session:
             category = Category(
                 label=category_dict.get("label", ""),
@@ -718,7 +735,6 @@ class DatabaseRepo:
             }
     
     async def update_category(self, category_id: str, updates: dict) -> Optional[Dict]:
-        """Update a category."""
         async with AsyncSessionLocal() as session:
             category = await session.get(Category, UUID(category_id))
             if not category:
@@ -741,7 +757,6 @@ class DatabaseRepo:
             }
     
     async def delete_category(self, category_id: str) -> bool:
-        """Delete a category."""
         async with AsyncSessionLocal() as session:
             category = await session.get(Category, UUID(category_id))
             if not category:
@@ -750,12 +765,7 @@ class DatabaseRepo:
             await session.commit()
             return True
     
-    # -----------------------------
-    # Pending Actions
-    # -----------------------------
-    
     async def create_pending_action(self, action_type: str, action_data: dict, user_id: str) -> Dict:
-        """Create a pending action for a user."""
         async with AsyncSessionLocal() as session:
             pending_action = PendingAction(
                 user_id=UUID(user_id),
@@ -774,7 +784,6 @@ class DatabaseRepo:
             }
     
     async def get_pending_action(self, user_id: str) -> Optional[Dict]:
-        """Get the current pending action for a user (most recent)."""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PendingAction)
@@ -805,12 +814,7 @@ class DatabaseRepo:
             await session.commit()
             return True
     
-    # -----------------------------
-    # Diary Entries
-    # -----------------------------
-    
     async def add_diary_entry(self, diary_dict: dict, user_id: str) -> Dict:
-        """Add a diary entry."""
         async with AsyncSessionLocal() as session:
             diary_entry = DiaryEntry(
                 user_id=UUID(user_id),
@@ -828,12 +832,7 @@ class DatabaseRepo:
                 "created_at": diary_entry.created_at.isoformat() if diary_entry.created_at else None,
             }
     
-    # -----------------------------
-    # Memories
-    # -----------------------------
-    
     async def add_memory(self, memory_dict: dict, user_id: str) -> Dict:
-        """Add a memory."""
         async with AsyncSessionLocal() as session:
             memory = Memory(
                 user_id=UUID(user_id),
@@ -857,21 +856,12 @@ class DatabaseRepo:
     # -----------------------------
     
     async def delete_user_account(self, user_id: str) -> bool:
-        """Delete a user account and all associated data.
-        
-        Note: Due to CASCADE foreign keys, deleting the user will automatically
-        delete all related data (tasks, notes, checkins, reminders, etc.).
-        We just need to delete the user record.
-        """
         async with AsyncSessionLocal() as session:
             user = await session.get(User, UUID(user_id))
             if not user:
                 return False
             
-            # Clear pending actions explicitly (if not CASCADE)
             await self.clear_pending_action(user_id)
-            
-            # Delete the user (CASCADE will handle the rest)
             await session.delete(user)
             await session.commit()
             return True

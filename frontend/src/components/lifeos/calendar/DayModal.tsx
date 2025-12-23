@@ -25,6 +25,7 @@ interface DayModalProps {
   onDateChange?: (date: Date) => void;
   onAddTask?: (date: Date) => void;
   onPhotoChange?: (photo: { filename: string; uploadedAt: string } | null) => void;
+  onUpdateCheckIn?: (checkIn: { note?: string; mood?: string }) => Promise<void>;
 }
 
 type TabType = "tasks" | "photo-notes";
@@ -42,7 +43,8 @@ export function DayModal({
   onSaveNote,
   onDateChange,
   onAddTask,
-  onPhotoChange
+  onPhotoChange,
+  onUpdateCheckIn
 }: DayModalProps) {
   const store = useLifeOSStore();
   // Safely check if date is valid (before hooks)
@@ -66,20 +68,25 @@ export function DayModal({
     }
   }, [isFuture, activeTab]);
   
-  // Note content (separate from check-in note which is shown in check-in section)
-  const [noteContent, setNoteContent] = useState(note);
+  // Merged note content: prefer check-in reflection, fallback to regular note
+  const getMergedNoteContent = () => {
+    return checkIn?.note || note || "";
+  };
+  
+  const [noteContent, setNoteContent] = useState(getMergedNoteContent());
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [dayPhoto, setDayPhoto] = useState<{ filename: string; uploadedAt: string } | null>(photo);
   const [isUploading, setIsUploading] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Update note content when note prop changes (but not when editing)
+  // Update note content when note or checkIn prop changes (but not when editing)
   useEffect(() => {
     if (!isEditingNote) {
-      setNoteContent(note);
+      setNoteContent(getMergedNoteContent());
     }
-  }, [note, isEditingNote]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note, checkIn?.note, isEditingNote]);
 
   // Update photo when photo prop changes
   useEffect(() => {
@@ -89,8 +96,13 @@ export function DayModal({
   // Only show photo-notes tab for past and today, not for future days
   const tabs: TabType[] = isFuture ? ["tasks"] : ["tasks", "photo-notes"];
 
-  const handleSaveNote = () => {
-    onSaveNote(noteContent);
+  const handleSaveNote = async () => {
+    // If there's a check-in reflection, update it; otherwise save as regular note
+    if (checkIn?.note && onUpdateCheckIn) {
+      await onUpdateCheckIn({ note: noteContent, mood: checkIn.mood });
+    } else {
+      onSaveNote(noteContent);
+    }
     setIsEditingNote(false);
   };
 
@@ -432,30 +444,14 @@ export function DayModal({
                 )}
               </div>
 
-              {/* Notes Section */}
+              {/* Notes Section - Smart merged display */}
               <div className="space-y-4">
-                {/* Check-in info */}
-                {checkIn && (checkIn.mood || checkIn.note) && (
-                  <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-4 border border-primary/10">
-                    {checkIn.mood && (
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="text-3xl">{checkIn.mood}</span>
-                        <span className="text-xs font-sans text-muted-foreground font-medium">Daily check-in</span>
-                      </div>
-                    )}
-                    {checkIn.note && (
-                      <div className="mt-3 pt-3 border-t border-primary/20">
-                        <p className="text-xs font-sans font-semibold text-foreground mb-2 uppercase tracking-wide">Reflection</p>
-                        <p className="text-sm font-sans text-foreground/90 whitespace-pre-wrap leading-relaxed">
-                          {checkIn.note}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Notes */}
-                <div className="bg-muted/30 rounded-2xl p-4 border border-border/20">
+                <div className={cn(
+                  "rounded-2xl p-4 border transition-colors",
+                  checkIn?.mood || checkIn?.note 
+                    ? "bg-gradient-to-br from-primary/5 to-primary/10 border-primary/10" 
+                    : "bg-muted/30 border-border/20"
+                )}>
                   {isEditingNote ? (
                     <div className="space-y-3">
                       <textarea
@@ -468,7 +464,7 @@ export function DayModal({
                       <div className="flex gap-2">
                         <button
                           onClick={() => {
-                            setNoteContent(note);
+                            setNoteContent(getMergedNoteContent());
                             setIsEditingNote(false);
                           }}
                           className="flex-1 py-2.5 rounded-xl bg-muted/50 hover:bg-muted text-foreground font-sans text-sm font-medium transition-colors"
@@ -485,28 +481,45 @@ export function DayModal({
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {/* Mood indicator - subtle, only if mood exists */}
+                      {checkIn?.mood && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl">{checkIn.mood}</span>
+                          {checkIn.note && (
+                            <span className="text-[10px] font-sans text-muted-foreground/60 font-medium">Reflection</span>
+                          )}
+                        </div>
+                      )}
+                      
                       {noteContent ? (
-                        <div className="min-h-[80px]">
+                        <div className="min-h-[60px]">
                           <p className="text-sm font-sans text-foreground whitespace-pre-wrap leading-relaxed">
                             {noteContent}
                           </p>
+                          {/* Show regular note separately if both exist */}
+                          {checkIn?.note && note && checkIn.note !== note && (
+                            <div className="mt-4 pt-4 border-t border-border/20">
+                              <p className="text-xs font-sans font-medium text-muted-foreground/70 mb-2">Additional note</p>
+                              <p className="text-sm font-sans text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                                {note}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                          <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-                            <Edit3 className="w-5 h-5 text-muted-foreground/50" />
-                          </div>
+                        <div className="py-4 text-center">
                           <p className="text-muted-foreground font-sans text-sm">
-                            No notes yet
+                            No reflection yet
                           </p>
                         </div>
                       )}
+                      
                       <button
                         onClick={() => setIsEditingNote(true)}
-                        className="w-full py-2.5 rounded-xl bg-muted/50 hover:bg-muted text-foreground font-sans text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-border/30"
+                        className="w-full py-2 rounded-xl bg-muted/50 hover:bg-muted text-foreground font-sans text-sm font-medium transition-colors flex items-center justify-center gap-2"
                       >
                         <Edit3 className="w-4 h-4" />
-                        {noteContent ? "Edit Note" : "Add Note"}
+                        {noteContent ? "Edit Reflection" : "Add Reflection"}
                       </button>
                     </div>
                   )}

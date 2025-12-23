@@ -39,7 +39,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 load_dotenv()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # Allow localhost and common network IPs for development
-default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173"
+default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://10.0.45.240:8080,http://10.0.45.240:5173"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
@@ -224,11 +224,7 @@ async def get_all(current_user: dict = Depends(get_current_user)):
 
 @app.post("/clear")
 async def clear_data(current_user: dict = Depends(get_current_user)):
-    """Clear all user tasks and pending actions. Development use only.
-    
-    WARNING: This will delete all tasks and pending actions for the authenticated user.
-    To fully delete account, use DELETE /auth/account
-    """
+    """Clear all user tasks and pending actions. Development use only."""
     user_id = current_user["id"]
     
     tasks = await db_repo.get_tasks_by_date_range(user_id, date(2000, 1, 1), date(2100, 12, 31))
@@ -1423,9 +1419,6 @@ async def delete_photo_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a photo file and remove its reference from the note (user-scoped)."""
-    if not photo_exists(filename):
-        raise HTTPException(status_code=404, detail="Photo not found")
-    
     # Get note to verify ownership
     note = await db_repo.get_note(date, current_user["id"])
     if not note:
@@ -1439,12 +1432,23 @@ async def delete_photo_endpoint(
         photo_matches = any(p.get("filename") == filename for p in note["photos"])
     
     if not photo_matches:
-        raise HTTPException(status_code=403, detail="Photo not found in your notes")
+        # Photo not in note - might already be deleted, return success anyway
+        # Try to delete file if it exists, but don't fail if it doesn't
+        try:
+            if photo_exists(filename):
+                delete_photo(filename)
+        except:
+            pass
+        return {"message": "Photo reference removed"}
     
-    # Delete the file
-    delete_photo(filename)
+    # Delete the file (don't fail if file doesn't exist - might have been manually deleted)
+    try:
+        if photo_exists(filename):
+            delete_photo(filename)
+    except Exception as e:
+        logger.warning(f"Photo file {filename} not found or already deleted: {e}")
     
-    # Remove photo reference from note
+    # Remove photo reference from note (always do this, even if file deletion failed)
     if "photo" in note and note["photo"] and note["photo"].get("filename") == filename:
         note["photo"] = None
         await db_repo.save_note(note, current_user["id"])
@@ -1453,7 +1457,7 @@ async def delete_photo_endpoint(
         note["photos"] = [p for p in note["photos"] if p.get("filename") != filename]
         await db_repo.save_note(note, current_user["id"])
     
-    return {"success": True, "message": "Photo deleted"}
+    return {"message": "Photo deleted successfully"}
 
 # Check-ins Endpoints
 
@@ -1476,6 +1480,59 @@ async def save_checkin(
     """Save or update a check-in (user-scoped)."""
     result = await db_repo.save_checkin(checkin_data.model_dump(exclude_none=True), current_user["id"])
     return result
+
+# Global Notes Endpoints
+
+@app.get("/global-notes")
+async def get_global_notes(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all global notes for the current user, ordered by most recently updated."""
+    notes = await db_repo.get_global_notes(current_user["id"])
+    return notes
+
+@app.get("/global-notes/{note_id}")
+async def get_global_note(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific global note by ID."""
+    note = await db_repo.get_global_note(note_id, current_user["id"])
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note
+
+@app.post("/global-notes")
+async def create_global_note(
+    note_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new global note."""
+    result = await db_repo.create_global_note(note_data, current_user["id"])
+    return result
+
+@app.put("/global-notes/{note_id}")
+async def update_global_note(
+    note_id: str,
+    note_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an existing global note."""
+    result = await db_repo.update_global_note(note_id, note_data, current_user["id"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return result
+
+@app.delete("/global-notes/{note_id}")
+async def delete_global_note(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a global note."""
+    success = await db_repo.delete_global_note(note_id, current_user["id"])
+    if not success:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return {"message": "Note deleted successfully"}
 
 # Reminders Endpoints (separate from task reminders)
 

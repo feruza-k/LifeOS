@@ -298,7 +298,12 @@ export const api = {
       const res = await fetch(url, {
         method: "POST",
         body: formData,
+        credentials: "include", // Include cookies (httpOnly tokens) for authentication
       });
+      
+      if (res.status === 401) {
+        throw new Error("Unauthorized - please log in again");
+      }
       
       if (!res.ok) {
         const errorText = await res.text();
@@ -357,6 +362,28 @@ export const api = {
     request("/monthly-focus", {
       method: "POST",
       body: JSON.stringify(focus),
+    }),
+
+  // --- Global Notes ---
+  getGlobalNotes: () => request("/global-notes"),
+
+  getGlobalNote: (noteId: string) => request(`/global-notes/${noteId}`),
+
+  createGlobalNote: (note: { content: string }) =>
+    request("/global-notes", {
+      method: "POST",
+      body: JSON.stringify(note),
+    }),
+
+  updateGlobalNote: (noteId: string, note: { content: string }) =>
+    request(`/global-notes/${noteId}`, {
+      method: "PUT",
+      body: JSON.stringify(note),
+    }),
+
+  deleteGlobalNote: (noteId: string) =>
+    request(`/global-notes/${noteId}`, {
+      method: "DELETE",
     }),
 
   // --- Core AI Chat ---

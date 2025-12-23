@@ -3,6 +3,7 @@ from .category import Category
 from .task import Task
 from .checkin import Checkin
 from .note import Note
+from .global_note import GlobalNote
 from .reminder import Reminder
 from .diary_entry import DiaryEntry
 from .memory import Memory
@@ -16,6 +17,7 @@ __all__ = [
     "Task",
     "Checkin",
     "Note",
+    "GlobalNote",
     "Reminder",
     "DiaryEntry",
     "Memory",

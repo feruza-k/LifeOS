@@ -203,6 +203,25 @@ CREATE INDEX idx_monthly_focus_user_id ON monthly_focus(user_id);
 CREATE INDEX idx_monthly_focus_month ON monthly_focus(month);
 CREATE INDEX idx_monthly_focus_user_month ON monthly_focus(user_id, month);
 
+-- Global notes table (free-form notes not tied to specific dates)
+CREATE TABLE global_notes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX idx_global_notes_user_id ON global_notes(user_id);
+CREATE INDEX idx_global_notes_updated_at ON global_notes(updated_at DESC);
+CREATE INDEX idx_global_notes_user_updated ON global_notes(user_id, updated_at DESC);
+
+-- Trigger to update updated_at for global_notes
+CREATE TRIGGER update_global_notes_updated_at
+    BEFORE UPDATE ON global_notes
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================================================
 -- AUDIT & SYSTEM TABLES
 -- ============================================================================
@@ -313,6 +332,7 @@ COMMENT ON TABLE reminders IS 'Standalone reminders (separate from tasks). due_d
 COMMENT ON TABLE diary_entries IS 'Free-form emotional journaling - feelings, thoughts, unstructured reflection. Distinct from notes (factual) and checkins (structured).';
 COMMENT ON TABLE memories IS 'Long-term personal preferences and memories';
 COMMENT ON TABLE monthly_focus IS 'Monthly goals and focus areas';
+COMMENT ON TABLE global_notes IS 'Free-form notes not tied to specific dates - thoughts, ideas, planning, "second brain"';
 COMMENT ON TABLE audit_logs IS 'Authentication and security event audit trail';
 COMMENT ON TABLE pending_actions IS 'Pending user confirmations for assistant actions';
 

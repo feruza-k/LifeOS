@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Calendar from "./pages/Calendar";
 import Explore from "./pages/Explore";
+import Notes from "./pages/Notes";
 import Reminders from "./pages/Reminders";
 import Settings from "./pages/Settings";
 import Categories from "./pages/Categories";
@@ -93,6 +94,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Explore />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notes"
+          element={
+            <ProtectedRoute>
+              <Notes />
             </ProtectedRoute>
           }
         />

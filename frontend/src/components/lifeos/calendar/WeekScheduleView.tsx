@@ -398,12 +398,12 @@ export function WeekScheduleView({
           onAdd={async (newTask) => {
             if (onAddTask) {
               const result = await onAddTask({
-                title: newTask.title,
-                time: newTask.time,
-                endTime: newTask.endTime,
-                value: newTask.value,
-                date: newTask.date,
-              });
+              title: newTask.title,
+              time: newTask.time,
+              endTime: newTask.endTime,
+              value: newTask.value,
+              date: newTask.date,
+            });
               // If conflict, the modal will handle it - don't close
               if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
                 return result; // Return conflict to AddTaskModal
