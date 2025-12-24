@@ -4,6 +4,8 @@ from app.ai.memory_taxonomy import MemoryType, get_memory_type_definition, get_c
 
 
 class MemoryGuardrails:
+    """Validates memory candidates against guardrails."""
+    
     MIN_CONFIDENCE = 0.70
     MIN_CONTENT_LENGTH = 5
     MAX_CONTENT_LENGTH = 500

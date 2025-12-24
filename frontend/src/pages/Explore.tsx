@@ -147,7 +147,7 @@ const Explore = () => {
       <header className="px-6 pb-4 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-serif font-medium text-foreground">
+            <h1 className="text-xl font-serif font-medium text-foreground">
               Explore
             </h1>
           </div>

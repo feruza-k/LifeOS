@@ -153,10 +153,17 @@ Patterns and insights:
 Last week summary (for "how did my last week go" queries):
 {last_week_summary if last_week_summary else "No data available for last week"}
 
+Context awareness (for behavior adaptation - use subtly, never mention):
+{_format_context_signals_for_prompt(user_context.get("context_signals", {}))}
+
 When responding:
-- Be concise and direct - aim for 2-4 sentences for most responses, only expand when specifically asked for details
-- Use the user's FULL context (current + historical + patterns) to give relevant advice
-- Provide insights that go beyond what's obvious from today's view
+- Be BRIEF and concise - aim for 1-2 sentences for most responses, only expand when specifically asked for details or complex analysis
+- Mobile-friendly: Keep responses short and scannable - users are often on phones
+- Use the user's FULL context (current + historical + patterns + context signals) to give relevant advice, but express it concisely
+- Adapt your tone and suggestions based on context signals: reduce pressure when user is overloaded, be gentler during strained periods, align with expressed themes
+- NEVER mention that you're analyzing notes, reflections, or patterns - these signals exist only for your internal reasoning
+- Provide insights that go beyond what's obvious from today's view, but keep them brief
+- Default to brevity: If unsure whether to expand, choose the shorter response
 - For progress questions ("How am I doing?", "How did my last week go?"):
   * Focus on meaningful insights: trends, improvements, patterns, not just raw numbers
   * Highlight what's working well and what could be improved
@@ -274,6 +281,15 @@ def _build_notes_summary(historical: Dict[str, Any], today: datetime) -> str:
         return "None"
     
     return " | ".join(parts)
+
+
+def _format_context_signals_for_prompt(context_signals: Dict[str, Any]) -> str:
+    """
+    Format context signals for system prompt.
+    Returns 2-3 sentences max - background context only, never mentioned to user.
+    """
+    from app.ai.context_service import format_context_signals_for_prompt
+    return format_context_signals_for_prompt(context_signals)
 
 
 def _build_weekly_summary(historical: Dict[str, Any], today: datetime, today_tasks: Optional[List[Dict]] = None) -> str:
@@ -402,13 +418,10 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
     now = datetime.now(tz)
     today_str = now.strftime("%Y-%m-%d")
     
-    # Get today's tasks
     today_tasks_raw = await db_repo.get_tasks_by_date_and_user(today_str, user_id)
-    # Convert to frontend format for consistency
     from app.logic.frontend_adapter import backend_task_to_frontend
     today_tasks = [backend_task_to_frontend(t) for t in today_tasks_raw]
     
-    # Get upcoming tasks (next 7 days)
     upcoming_tasks = []
     for i in range(1, 8):
         date_str = (now + timedelta(days=i)).strftime("%Y-%m-%d")
@@ -416,13 +429,10 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
         tasks = [backend_task_to_frontend(t) for t in tasks_raw[:3]]  # Limit per day
         upcoming_tasks.extend(tasks)
     
-    # Get conflicts
     conflicts = await find_conflicts(user_id=user_id)
     
-    # Get today's energy/load
     try:
         from app.logic.today_engine import calculate_energy
-        # Convert tasks to format expected by calculate_energy (needs backend format)
         formatted_tasks = []
         for task in today_tasks_raw:
             formatted_task = {
@@ -436,19 +446,14 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
         logger.error(f"Error calculating energy: {e}")
         energy = {"status": "unknown", "effectiveLoad": 0}
     
-    # Get categories
     categories = await db_repo.get_categories(user_id)
     
-    # Get historical data for pattern analysis
-    # Wrap in try/except to prevent failures from breaking the assistant
     try:
         historical_context = await _get_historical_context(user_id)
         
-        # Also get tasks scheduled for last week (even if created today)
-        # This ensures we capture tasks the user might have added retroactively
         from datetime import date
-        week_end = now.date() - timedelta(days=1)  # Yesterday
-        week_start = week_end - timedelta(days=6)  # 7 days ago
+        week_end = now.date() - timedelta(days=1)
+        week_start = week_end - timedelta(days=6)
         
         last_week_tasks_raw = await db_repo.get_tasks_by_date_range(
             user_id, 
@@ -456,10 +461,8 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
             week_end
         )
         
-        # Convert to frontend format
         last_week_tasks = [backend_task_to_frontend(t) for t in last_week_tasks_raw]
         
-        # Merge with historical tasks (avoid duplicates)
         if "all_tasks" not in historical_context:
             historical_context["all_tasks"] = []
         
@@ -480,7 +483,6 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
             "reminders": []
         }
     
-    # Analyze patterns
     try:
         from app.ai.pattern_analyzer import (
             analyze_task_patterns,
@@ -504,6 +506,17 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
         notes_diary = {}
         pattern_summary = ""
     
+    # Get context signals (weekly cached, foundation only)
+    try:
+        from app.ai.context_service import get_or_compute_context_signals
+        context_signals = await get_or_compute_context_signals(user_id, force_refresh=False)
+    except Exception as e:
+        logger.error(f"Error getting context signals: {e}", exc_info=True)
+        context_signals = {
+            "signals": {"sentiment": "neutral", "themes": []},
+            "drift": {"overload": False, "disengagement": False, "avoidance": False}
+        }
+    
     return {
         "tasks_today": today_tasks,
         "upcoming_tasks": upcoming_tasks,
@@ -517,7 +530,8 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
             "checkins": checkin_patterns,
             "notes_diary": notes_diary,
             "summary": pattern_summary
-        }
+        },
+        "context_signals": context_signals
     }
 
 
@@ -763,10 +777,20 @@ async def generate_intelligent_response(
                     "new_time": action_data.get("new_time")
                 }
             elif action == "suggest":
-                ui = {
-                    "action": "suggest",
-                    "suggestions": action_data.get("suggestions", [])
-                }
+                # "suggest" is just conversational - no UI action needed
+                ui = None
+        
+        # Memory extraction (fails silently)
+        try:
+            await _extract_and_store_memory(
+                user_message=user_message,
+                assistant_response=assistant_response,
+                user_id=user_id,
+                user_context=user_context
+            )
+        except Exception as e:
+            # Fail silently - never block assistant responses
+            logger.debug(f"Memory extraction failed (silent): {e}")
         
         return {
             "assistant_response": assistant_response,
@@ -802,4 +826,59 @@ async def generate_intelligent_response(
                 "assistant_response": "I'm having trouble processing that. Could you try rephrasing your question?",
                 "ui": None
             }
+
+
+async def _extract_and_store_memory(
+    user_message: str,
+    assistant_response: str,
+    user_id: str,
+    user_context: Dict[str, Any]
+) -> None:
+    """Extract and store memory from conversation. Fails silently."""
+    from uuid import UUID
+    from db.session import AsyncSessionLocal
+    from db.repositories.memory import MemoryRepository
+    from app.ai.memory_extractor import extract_memory_candidates
+    
+    try:
+        logger.info(f"[Memory Extraction] Starting extraction for user {user_id}")
+        candidates = extract_memory_candidates(
+            user_message=user_message,
+            assistant_response=assistant_response,
+            context=user_context
+        )
+        
+        if not candidates:
+            logger.info(f"[Memory Extraction] No candidate extracted from: '{user_message[:50]}...'")
+            return  # No candidate extracted
+        
+        candidate = candidates[0]
+        logger.info(f"[Memory Extraction] Candidate extracted: {candidate.memory_type.value} - '{candidate.content[:50]}...' (confidence: {candidate.confidence:.2f})")
+        
+        from app.ai.memory_policy import validate_memory_candidate
+        is_valid, errors = validate_memory_candidate(candidate)
+        
+        if not is_valid:
+            logger.info(
+                f"[Memory Extraction] Candidate REJECTED for user {user_id}: "
+                f"'{candidate.content[:50]}...' "
+                f"Errors: {', '.join(errors)}"
+            )
+            return
+        async with AsyncSessionLocal() as session:
+            repo = MemoryRepository(session)
+            memory = await repo.create_from_candidate(
+                user_id=UUID(user_id),
+                candidate=candidate
+            )
+            await session.commit()
+            
+            logger.info(
+                f"[Memory Extraction] ✅ Memory STORED for user {user_id}: "
+                f"{candidate.memory_type.value} - '{candidate.content[:50]}...' "
+                f"(confidence: {candidate.confidence:.2f})"
+            )
+    
+    except Exception as e:
+        logger.error(f"[Memory Extraction] ❌ Extraction/storage failed: {e}", exc_info=True)
 

@@ -201,7 +201,7 @@ const CalendarPage = () => {
       {/* Header with Month */}
       <header className="px-4 pb-2 pt-4 animate-fade-in">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-xl font-sans font-bold text-foreground">
+          <h1 className="text-lg font-sans font-bold text-foreground">
             {format(currentMonth, "MMM yyyy")}
           </h1>
           

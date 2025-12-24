@@ -10,6 +10,7 @@ from .memory import Memory
 from .monthly_focus import MonthlyFocus
 from .audit_log import AuditLog
 from .pending_action import PendingAction
+from .context_signal import ContextSignal
 
 __all__ = [
     "User",
@@ -24,5 +25,6 @@ __all__ = [
     "MonthlyFocus",
     "AuditLog",
     "PendingAction",
+    "ContextSignal",
 ]
 

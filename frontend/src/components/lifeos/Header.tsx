@@ -46,7 +46,7 @@ export function Header({ onTitleClick }: HeaderProps) {
       <h1 
         onClick={onTitleClick}
         className={cn(
-          "text-2xl text-foreground mt-1 font-sans font-semibold",
+          "text-xl text-foreground mt-1 font-sans font-semibold",
           onTitleClick && "cursor-pointer hover:opacity-80 transition-opacity"
         )}
       >

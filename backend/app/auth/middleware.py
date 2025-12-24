@@ -13,6 +13,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
         
+        # Skip security headers for docs endpoints (Swagger UI needs to load external resources)
+        if request.url.path.startswith("/docs") or request.url.path.startswith("/redoc") or request.url.path.startswith("/openapi.json"):
+            return await call_next(request)
+        
         response = await call_next(request)
         
         is_production = os.getenv("ENVIRONMENT", "development") == "production"

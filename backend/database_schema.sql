@@ -174,17 +174,29 @@ CREATE TABLE diary_entries (
 CREATE INDEX idx_diary_user_id ON diary_entries(user_id);
 CREATE INDEX idx_diary_created_at ON diary_entries(created_at);
 
--- Memories table (long-term personal preferences)
+-- Memories table (long-term personal preferences and extracted memories)
 CREATE TABLE memories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
+    content TEXT NOT NULL,
+    memory_type VARCHAR(20) NOT NULL CHECK (memory_type IN ('preference', 'constraint', 'pattern', 'value')),
+    confidence NUMERIC(3, 2) NOT NULL CHECK (confidence >= 0.00 AND confidence <= 1.00),
+    source VARCHAR(50) NOT NULL DEFAULT 'conversation' CHECK (source IN ('conversation', 'pattern_analysis', 'explicit', 'user_import')),
+    extra_data JSONB,
     category VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_memories_user_id ON memories(user_id);
+CREATE INDEX idx_memories_memory_type ON memories(memory_type);
+CREATE INDEX idx_memories_user_type ON memories(user_id, memory_type);
+
+-- Trigger to update updated_at for memories
+CREATE TRIGGER update_memories_updated_at
+    BEFORE UPDATE ON memories
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
 -- Monthly focus table (monthly goals/focus areas)
 CREATE TABLE monthly_focus (
@@ -219,6 +231,27 @@ CREATE INDEX idx_global_notes_user_updated ON global_notes(user_id, updated_at D
 -- Trigger to update updated_at for global_notes
 CREATE TRIGGER update_global_notes_updated_at
     BEFORE UPDATE ON global_notes
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Context Signals table (weekly cached signals for SolAI behavior adaptation)
+CREATE TABLE context_signals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    week_start DATE NOT NULL,
+    signals_json JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE(user_id, week_start)
+);
+
+CREATE INDEX idx_context_signals_user_id ON context_signals(user_id);
+CREATE INDEX idx_context_signals_week_start ON context_signals(week_start DESC);
+CREATE INDEX idx_context_signals_user_week ON context_signals(user_id, week_start DESC);
+
+-- Trigger to update updated_at for context_signals
+CREATE TRIGGER update_context_signals_updated_at
+    BEFORE UPDATE ON context_signals
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

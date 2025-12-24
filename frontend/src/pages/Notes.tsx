@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isYesterday } from "date-fns";
-import { Plus, ArrowLeft, FileText, Trash2, Search, X, CheckCircle2, Clock } from "lucide-react";
+import { Plus, ArrowLeft, FileText, Trash2, Search, X, CheckCircle2, Clock, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
+import { BottomNav } from "@/components/lifeos/BottomNav";
 import { RichTextEditor } from "@/components/lifeos/RichTextEditor";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface GlobalNote {
   id: string;
+  title?: string;
   content: string;
   created_at: string;
   updated_at: string;
@@ -58,12 +60,27 @@ export default function Notes() {
   };
 
   const getNotePreview = (content: string) => {
-    const cleaned = content
-      .replace(/^- \[ \] /gm, "")
-      .replace(/^- /gm, "")
+    if (!content) return "No content";
+    
+    // Strip HTML tags (safe for SSR)
+    let text = content;
+    if (typeof document !== "undefined") {
+      const div = document.createElement("div");
+      div.innerHTML = content;
+      text = div.textContent || div.innerText || "";
+    } else {
+      // Fallback: simple regex to remove HTML tags
+      text = content.replace(/<[^>]*>/g, "");
+    }
+    
+    // Clean up list markers and formatting
+    const cleaned = text
+      .replace(/^[•○]\s*/gm, "")
+      .replace(/^\d+\.\s*/gm, "")
       .trim();
+    
     const firstLine = cleaned.split("\n")[0] || "";
-    return firstLine.length > 80 ? firstLine.substring(0, 80) + "..." : firstLine || "Empty note";
+    return firstLine.length > 100 ? firstLine.substring(0, 100) + "..." : firstLine || "No content";
   };
 
   const formatNoteDate = (dateString: string) => {
@@ -81,6 +98,7 @@ export default function Notes() {
     if (!searchQuery.trim()) return notes;
     const query = searchQuery.toLowerCase();
     return notes.filter(note => 
+      (note.title || "").toLowerCase().includes(query) ||
       note.content.toLowerCase().includes(query)
     );
   }, [notes, searchQuery]);
@@ -91,11 +109,11 @@ export default function Notes() {
       <NoteEditor
         note={note || null}
         onBack={() => setSelectedNoteId(null)}
-        onSave={async (content) => {
+        onSave={async (title, content) => {
           if (note) {
-            await api.updateGlobalNote(note.id, { content });
+            await api.updateGlobalNote(note.id, { title, content });
           } else {
-            const newNote = await api.createGlobalNote({ content });
+            const newNote = await api.createGlobalNote({ title, content });
             setNotes([newNote, ...notes]);
             setSelectedNoteId(newNote.id);
           }
@@ -107,66 +125,71 @@ export default function Notes() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-20">
       <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
       
-      <div className="px-4 pt-4 pb-4 border-b border-border">
-        <div className="flex items-center gap-3 mb-3">
-          <SideMenuButton onClick={() => setShowSideMenu(true)} />
-          <div className="flex-1">
-            <h1 className="text-2xl font-serif font-semibold text-foreground">Notes</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Thoughts & ideas</p>
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3 mb-3">
+            <SideMenuButton onClick={() => setShowSideMenu(true)} />
+            <div className="flex-1">
+              <h1 className="text-2xl font-sans font-semibold text-foreground">Notes</h1>
+              <p className="text-sm text-muted-foreground mt-1">Your thoughts & ideas</p>
+            </div>
+            <Button
+              onClick={() => setSelectedNoteId("new")}
+              size="lg"
+              className="rounded-full gap-2 h-11 px-5"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="font-sans font-medium">New</span>
+            </Button>
           </div>
-          <Button
-            onClick={() => setSelectedNoteId("new")}
-            size="sm"
-            className="rounded-full gap-1"
-          >
-            <Plus className="w-4 h-4" />
-            New
-          </Button>
+          
+          {/* Search */}
+          {notes.length > 0 && (
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search notes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-11 pr-11 h-12 text-base bg-muted/30 border-border/30 rounded-xl"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        
-        {notes.length > 0 && (
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-9 h-9 bg-muted/30 border-border/20"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      <div className="p-4">
+      {/* Notes List */}
+      <div className="px-4 py-6">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
           </div>
         ) : filteredNotes.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="text-center py-20">
             {searchQuery ? (
               <>
-                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-muted-foreground/50" />
+                <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
+                  <Search className="w-10 h-10 text-muted-foreground/50" />
                 </div>
-                <p className="text-muted-foreground font-sans mb-2">No notes found</p>
-                <p className="text-sm text-muted-foreground/70 mb-4">Try a different search term</p>
+                <p className="text-lg text-muted-foreground font-sans mb-2">No notes found</p>
+                <p className="text-base text-muted-foreground/70 mb-6">Try a different search term</p>
                 <Button
                   onClick={() => setSearchQuery("")}
                   variant="outline"
-                  size="sm"
+                  size="lg"
                   className="rounded-full"
                 >
                   Clear search
@@ -174,44 +197,48 @@ export default function Notes() {
               </>
             ) : (
               <>
-                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                  <FileText className="w-8 h-8 text-muted-foreground/50" />
+                <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
+                  <FileText className="w-10 h-10 text-muted-foreground/50" />
                 </div>
-                <p className="text-muted-foreground font-sans mb-4">No notes yet</p>
+                <p className="text-xl text-foreground font-sans font-medium mb-2">No notes yet</p>
+                <p className="text-base text-muted-foreground mb-8">Start capturing your thoughts and ideas</p>
                 <Button
                   onClick={() => setSelectedNoteId("new")}
-                  variant="outline"
-                  className="rounded-full"
+                  size="lg"
+                  className="rounded-full gap-2"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="w-5 h-5" />
                   Create your first note
                 </Button>
               </>
             )}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {filteredNotes.map((note) => (
               <button
                 key={note.id}
                 onClick={() => setSelectedNoteId(note.id)}
-                className="w-full text-left p-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/20 transition-colors group"
+                className="w-full text-left p-5 rounded-2xl bg-card hover:bg-muted/50 border border-border/30 transition-all group shadow-sm hover:shadow-md"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <p className="font-sans text-foreground text-sm whitespace-pre-wrap line-clamp-2 mb-1.5">
+                    <h3 className="text-base font-sans font-semibold text-foreground mb-2 line-clamp-1">
+                      {note.title || "Untitled Note"}
+                    </h3>
+                    <p className="text-sm font-sans text-muted-foreground whitespace-pre-wrap line-clamp-2 mb-3 leading-relaxed">
                       {getNotePreview(note.content)}
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
                       <span>{formatNoteDate(note.updated_at)}</span>
                     </div>
                   </div>
                   <button
                     onClick={(e) => handleDeleteNote(note.id, e)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg hover:bg-destructive/10 text-destructive shrink-0"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-xl hover:bg-destructive/10 text-destructive shrink-0"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </button>
@@ -220,15 +247,18 @@ export default function Notes() {
         )}
       </div>
 
+      {/* Floating New Note Button */}
       {notes.length > 0 && (
         <button
           onClick={() => setSelectedNoteId("new")}
-          className="fixed bottom-24 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors flex items-center justify-center z-30"
+          className="fixed bottom-28 right-6 w-16 h-16 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all hover:scale-105 flex items-center justify-center z-30"
           aria-label="New note"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-7 h-7" />
         </button>
       )}
+
+      <BottomNav />
     </div>
   );
 }
@@ -236,11 +266,12 @@ export default function Notes() {
 interface NoteEditorProps {
   note: GlobalNote | null;
   onBack: () => void;
-  onSave: (content: string) => Promise<void>;
+  onSave: (title: string, content: string) => Promise<void>;
   onDelete?: () => Promise<void>;
 }
 
 function NoteEditor({ note, onBack, onSave, onDelete }: NoteEditorProps) {
+  const [title, setTitle] = useState(note?.title || "");
   const [content, setContent] = useState(note?.content || "");
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -249,31 +280,64 @@ function NoteEditor({ note, onBack, onSave, onDelete }: NoteEditorProps) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
+    setTitle(note?.title || "");
     setContent(note?.content || "");
     setHasUnsavedChanges(false);
     setLastSaved(note ? new Date(note.updated_at) : null);
   }, [note]);
 
+  const handleSave = async () => {
+    if (isSaving) return;
+    
+    setIsSaving(true);
+    try {
+      await onSave(title.trim() || "Untitled Note", content);
+      setLastSaved(new Date());
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error("Failed to save note:", error);
+      alert("Failed to save note. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
-    setHasUnsavedChanges(newContent !== (note?.content || ""));
+    setHasUnsavedChanges(
+      newContent !== (note?.content || "") || 
+      title.trim() !== (note?.title || "").trim()
+    );
     
     if (saveTimeout) {
       clearTimeout(saveTimeout);
     }
     
-    setIsSaving(true);
     const timeout = setTimeout(async () => {
-      try {
-        await onSave(newContent);
-        setLastSaved(new Date());
-        setHasUnsavedChanges(false);
-      } catch (error) {
-        console.error("Failed to save note:", error);
-      } finally {
-        setIsSaving(false);
+      if (!isSaving) {
+        await handleSave();
       }
-    }, 1500);
+    }, 2000);
+    
+    setSaveTimeout(timeout);
+  };
+
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
+    setHasUnsavedChanges(
+      newTitle.trim() !== (note?.title || "").trim() || 
+      content !== (note?.content || "")
+    );
+    
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+    
+    const timeout = setTimeout(async () => {
+      if (!isSaving) {
+        await handleSave();
+      }
+    }, 2000);
     
     setSaveTimeout(timeout);
   };
@@ -300,39 +364,46 @@ function NoteEditor({ note, onBack, onSave, onDelete }: NoteEditorProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col pb-20">
       <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
       
-      <div className="px-4 pt-4 pb-3 border-b border-border shrink-0">
-        <div className="flex items-center gap-3 mb-2">
-          <SideMenuButton onClick={() => setShowSideMenu(true)} />
-          <Button
-            onClick={onBack}
-            variant="ghost"
-            size="icon"
-            className="rounded-full hover:bg-muted"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <p className="text-sm font-sans font-medium text-foreground">
-              {note ? "Edit Note" : "New Note"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isSaving ? (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                <span>Saving...</span>
-              </div>
-            ) : lastSaved && !hasUnsavedChanges ? (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <CheckCircle2 className="w-3 h-3 text-primary" />
-                <span>{formatLastSaved()}</span>
-              </div>
-            ) : hasUnsavedChanges ? (
-              <span className="text-xs text-muted-foreground">Unsaved changes</span>
-            ) : null}
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 shrink-0">
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3 mb-3">
+            <SideMenuButton onClick={() => setShowSideMenu(true)} />
+            <Button
+              onClick={onBack}
+              variant="ghost"
+              size="icon"
+              className="rounded-full hover:bg-muted h-10 w-10"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1 flex items-center gap-3">
+              {isSaving ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </div>
+              ) : lastSaved && !hasUnsavedChanges ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <span>{formatLastSaved()}</span>
+                </div>
+              ) : hasUnsavedChanges ? (
+                <span className="text-sm text-muted-foreground">Unsaved changes</span>
+              ) : null}
+            </div>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || !hasUnsavedChanges}
+              size="sm"
+              className="rounded-full gap-2 h-9"
+            >
+              <Save className="w-4 h-4" />
+              <span className="font-sans font-medium">Save</span>
+            </Button>
             {onDelete && (
               <Button
                 onClick={async () => {
@@ -343,29 +414,36 @@ function NoteEditor({ note, onBack, onSave, onDelete }: NoteEditorProps) {
                 }}
                 variant="ghost"
                 size="icon"
-                className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10 h-10 w-10"
               >
                 <Trash2 className="w-5 h-5" />
               </Button>
             )}
           </div>
-        </div>
-        
-        <div className="flex items-center gap-4 text-xs text-muted-foreground/60 px-2">
-          <span>Tip: Type <kbd className="px-1 py-0.5 bg-muted/50 rounded text-[10px]">-</kbd> for bullets, <kbd className="px-1 py-0.5 bg-muted/50 rounded text-[10px]">- [ ]</kbd> for checkboxes</span>
+          
+          {/* Title Input */}
+          <Input
+            type="text"
+            placeholder="Note title..."
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            className="text-lg font-sans font-semibold h-11 border-0 bg-transparent focus-visible:ring-0 px-0 placeholder:text-muted-foreground/50"
+          />
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
+      {/* Rich Text Editor */}
+      <div className="flex-1 min-h-0 px-4 py-6">
         <RichTextEditor
           content={content}
           onChange={handleContentChange}
-          placeholder="Start writing... Use - for bullets, - [ ] for checkboxes"
-          autoFocus
-          className="h-full"
+          placeholder="Start writing your thoughts..."
+          autoFocus={!note}
+          className="h-full min-h-[400px]"
         />
       </div>
+
+      <BottomNav />
     </div>
   );
 }
-

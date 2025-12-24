@@ -12,17 +12,21 @@ const getBaseURL = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  const NETWORK_IP = "192.168.1.5";
-  
   // In development, use Vite proxy (same-origin) for cookies to work
   // Vite proxy rewrites /api/* to http://localhost:8000/*
   if (isDev && !isMobileDevice()) {
     return "/api"; // Use proxy - same origin as frontend
   }
   
-  // For mobile or production, use direct backend URL
+  // For mobile, detect the hostname and use port 8000 for backend
   if (isMobileDevice() || !isDev) {
-    return `http://${NETWORK_IP}:8000`;
+    const hostname = window.location.hostname;
+    // If accessing from network IP, use that IP for backend
+    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+      return `http://${hostname}:8000`;
+    }
+    // Fallback to common network IPs
+    return `http://192.168.1.11:8000`;
   }
   
   return `http://localhost:8000`;

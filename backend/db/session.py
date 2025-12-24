@@ -35,9 +35,12 @@ else:
     # asyncpg will use this to disable statement caching
     connect_args = {
         "server_settings": {
-            "application_name": "lifeos_backend"
+            "application_name": "lifeos_backend",
         },
         "statement_cache_size": 0,  # Disable prepared statements for pgbouncer compatibility
+        "command_timeout": 30,  # 30 seconds for query execution
+        "timeout": 10,  # 10 seconds connection timeout
+        "ssl": "require",  # Supabase requires SSL connections
     }
     
     if is_pooler or FORCE_DISABLE_PREPARED_STATEMENTS:

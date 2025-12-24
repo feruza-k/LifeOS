@@ -9,9 +9,10 @@ from db.repositories.note import NoteRepository
 from db.repositories.global_note import GlobalNoteRepository
 from db.repositories.checkin import CheckinRepository
 from db.repositories.memory import MemoryRepository
+from db.repositories.context_signal import ContextSignalRepository
 from db.models import (
     User, Category, Task, Note, GlobalNote, Checkin, Reminder,
-    DiaryEntry, Memory, MonthlyFocus, AuditLog, PendingAction
+    DiaryEntry, Memory, MonthlyFocus, AuditLog, PendingAction, ContextSignal
 )
 
 class DatabaseRepo:
@@ -470,6 +471,7 @@ class DatabaseRepo:
         return {
             "id": str(note.id),
             "user_id": str(note.user_id),
+            "title": note.title or "Untitled Note",
             "content": note.content,
             "created_at": note.created_at.isoformat() if note.created_at else None,
             "updated_at": note.updated_at.isoformat() if note.updated_at else None,
@@ -493,6 +495,7 @@ class DatabaseRepo:
         async with AsyncSessionLocal() as session:
             repo = GlobalNoteRepository(session)
             note_data = {
+                "title": note_dict.get("title"),
                 "content": note_dict.get("content", ""),
             }
             note = await repo.create(user_id=UUID(user_id), **note_data)
@@ -508,6 +511,7 @@ class DatabaseRepo:
                 return None
             
             note_data = {
+                "title": note_dict.get("title", note.title),
                 "content": note_dict.get("content", note.content),
             }
             updated_note = await repo.update(note.id, UUID(user_id), **note_data)
@@ -521,6 +525,39 @@ class DatabaseRepo:
             success = await repo.delete(UUID(note_id), UUID(user_id))
             await session.commit()
             return success
+    
+    def _context_signal_to_dict(self, signal: ContextSignal) -> Dict:
+        return {
+            "id": str(signal.id),
+            "user_id": str(signal.user_id),
+            "week_start": signal.week_start.isoformat() if signal.week_start else None,
+            "signals_json": signal.signals_json,
+            "created_at": signal.created_at.isoformat() if signal.created_at else None,
+            "updated_at": signal.updated_at.isoformat() if signal.updated_at else None,
+        }
+    
+    async def get_context_signal(self, user_id: str, week_start: date) -> Optional[Dict]:
+        """Get context signal for a specific week."""
+        async with AsyncSessionLocal() as session:
+            repo = ContextSignalRepository(session)
+            signal = await repo.get_by_user_and_week(UUID(user_id), week_start)
+            if signal:
+                return self._context_signal_to_dict(signal)
+            return None
+    
+    async def get_recent_context_signals(self, user_id: str, limit: int = 4) -> List[Dict]:
+        """Get recent context signals for drift detection."""
+        async with AsyncSessionLocal() as session:
+            repo = ContextSignalRepository(session)
+            signals = await repo.get_recent_signals(UUID(user_id), limit)
+            return [self._context_signal_to_dict(s) for s in signals]
+    
+    async def upsert_context_signal(self, user_id: str, week_start: date, signals_json: dict) -> Dict:
+        """Create or update context signal for a week."""
+        async with AsyncSessionLocal() as session:
+            repo = ContextSignalRepository(session)
+            signal = await repo.upsert_signal(UUID(user_id), week_start, signals_json)
+            return self._context_signal_to_dict(signal)
     
     async def get_reminders(self, user_id: str) -> List[Dict]:
         async with AsyncSessionLocal() as session:

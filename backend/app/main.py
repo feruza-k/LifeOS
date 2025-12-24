@@ -39,7 +39,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 load_dotenv()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # Allow localhost and common network IPs for development
-default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://10.0.45.240:8080,http://10.0.45.240:5173"
+default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
@@ -1533,6 +1533,27 @@ async def delete_global_note(
     if not success:
         raise HTTPException(status_code=404, detail="Note not found")
     return {"message": "Note deleted successfully"}
+
+# Context Signals Endpoints (Foundation Only - No UI)
+@app.post("/context-signals/refresh")
+async def refresh_context_signals_endpoint(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Force refresh context signals for current week.
+    Signals are automatically computed weekly - this endpoint is for testing/debugging only.
+    """
+    try:
+        from app.ai.context_service import get_or_compute_context_signals
+        signals = await get_or_compute_context_signals(current_user["id"], force_refresh=True)
+        return {
+            "week_start": signals.get("week_start"),
+            "cached": signals.get("cached", False),
+            "message": "Context signals refreshed"
+        }
+    except Exception as e:
+        logger.error(f"Error refreshing context signals: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to refresh context signals")
 
 # Reminders Endpoints (separate from task reminders)
 

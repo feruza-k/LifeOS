@@ -369,13 +369,13 @@ export const api = {
 
   getGlobalNote: (noteId: string) => request(`/global-notes/${noteId}`),
 
-  createGlobalNote: (note: { content: string }) =>
+  createGlobalNote: (note: { title?: string; content: string }) =>
     request("/global-notes", {
       method: "POST",
       body: JSON.stringify(note),
     }),
 
-  updateGlobalNote: (noteId: string, note: { content: string }) =>
+  updateGlobalNote: (noteId: string, note: { title?: string; content: string }) =>
     request(`/global-notes/${noteId}`, {
       method: "PUT",
       body: JSON.stringify(note),
