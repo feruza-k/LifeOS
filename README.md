@@ -1686,87 +1686,47 @@ This was a quiet but important day. Memory is one of those features that can eas
 
 ### **Day 24**: Context Awareness Signals & Memory Extraction (Dec 24, 2025)
 
-Today I finished two major pieces: context awareness signals for behavior adaptation, and LLM-based memory extraction. Both are foundation-only — no UI, no user-facing features, just the intelligence layer working quietly in the background.
+Today I finished two major pieces: context awareness signals for behavior adaptation, and LLM-based memory extraction. Both are foundation-only - no UI, no user-facing features, just the intelligence layer working quietly in the background.
 
 #### **Context Awareness Signals**
 
-I built a system that extracts abstract signals from Notes and Reflections to help SolAI adapt its behavior over time. The key insight: SolAI should notice drift, adapt tone, and reduce pressure when ignored — all without ever announcing the analysis.
+I built a system that extracts abstract signals from Notes and Reflections to help SolAI adapt its behavior over time. SolAI should notice when I'm overloaded, adapt its tone, and reduce pressure when I ignore suggestions — all without announcing the analysis.
 
-**What I Built:**
+I extract sentiment (positive/neutral/strained) and recurring themes like work pressure, health/energy, focus/distraction, and relationships using simple keyword-based analysis. The system also detects drift: overload, disengagement, and avoidance. These are silent flags for SolAI's reasoning.
 
-**1. Signal Extraction**
-- Extracts sentiment (positive/neutral/strained) from Notes + Reflections
-- Identifies recurring themes: work pressure, health/energy, focus/distraction, relationships
-- Uses simple keyword-based analysis (no external dependencies)
-- Weekly caching — signals computed once per week, not per request
+I use photo existence as a signal too — frequent weekend photos suggest meaningful weekends, photo-heavy days mean avoiding scheduling pressure afterward.
 
-**2. Drift Detection**
-Detects silent flags for assistant reasoning:
-- **Overload**: Too many tasks + strained sentiment
-- **Disengagement**: Low completion + neutral/flat tone
-- **Avoidance**: Repeated reschedules + negative tone
-
-**3. Photo Context**
-Uses photo existence (not content analysis) as a signal:
-- Frequent weekend photos → weekends are meaningful
-- Photo-heavy days → avoid scheduling pressure afterward
-
-**4. Assistant Integration**
-Signals feed into SolAI's system prompt as background context. SolAI adapts:
-- Tone becomes gentler during strained periods
-- Suggestions reduce when user ignores them
-- Pressure decreases during overload
-- Actions align with expressed themes
-
-All of this happens silently. The user never sees "I analyzed your notes" — SolAI just feels different week to week.
+All of this feeds into SolAI's system prompt as background context. SolAI adapts its tone, reduces suggestions when ignored, and decreases pressure during overload — all silently. I cache signals weekly to keep things efficient and ensure behavior adapts gradually.
 
 #### **Memory Extraction**
 
-I implemented LLM-based memory extraction that quietly identifies potential long-term memories from conversations.
+I implemented LLM-based memory extraction that quietly identifies potential long-term memories from conversations. The LLM analyzes the user message, assistant response, and context signals, then outputs structured JSON with `should_store`, `memory_type`, `content`, and `confidence`.
 
-**What I Built:**
+The rules are strict: extract at most one per turn, prefer explicit statements, don't infer from assistant suggestions. I use context signals to down-weight temporary stress — if I'm having a bad week, that shouldn't become a permanent memory.
 
-**1. LLM Extraction Engine**
-- Analyzes user message + assistant response + context signals
-- Outputs structured JSON: `should_store`, `memory_type`, `content`, `confidence`
-- Rules: Extract at most one per turn, prefer explicit statements, don't infer from assistant suggestions
-- Uses context signals to down-weight temporary stress as memories
+The extraction runs after the assistant response, converts to a `MemoryCandidate`, runs through `MemoryPolicy` validation, and persists only if valid. It fails silently — never blocks responses. I also updated the `memories` table schema to support this.
 
-**2. Validation & Persistence**
-- Converts LLM output → `MemoryCandidate`
-- Runs through `MemoryPolicy` validation
-- Persists via `MemoryRepository` only if valid
-- Logs rejected candidates (developer visibility only)
+#### **Testing**
 
-**3. Integration**
-- Triggers after assistant response
-- Fails silently — never blocks responses
-- No UI changes, no announcements
-- Memories stored for future use (not used yet)
-
-**4. Database Migration**
-Updated the `memories` table schema to support the new system:
-- Added `content`, `memory_type`, `confidence`, `source`, `extra_data` columns
-- Migrated from old `text` column to new structure
-- Added check constraints and indexes
-
-#### **Testing Results**
-
-The system is working! I tested with:
+I tested with a few examples:
 - "I prefer workouts in the mornings" → ✅ Stored as preference (confidence: 0.80)
 - "I prioritize family time over work" → ✅ Stored as value (confidence: 0.85)
 - "Today I want to focus on emails" → ✅ Correctly rejected (temporary)
 
+The system is working. It's conservative by design — most conversations won't produce memories. Only explicit, high-confidence statements get stored.
+
 #### **Reflection**
 
-This is identity learning, not behavior control. SolAI is quietly building a model of who I am — my preferences, constraints, values, and patterns. This foundation will enable better suggestions, context-aware behavior adaptation, and more personalized assistance over time.
-
-The system is conservative by design. Most conversations won't produce memories. Only explicit, high-confidence statements get stored. This ensures the memory bank stays sparse, clean, and trustworthy.
+This is identity learning, not behavior control. SolAI is quietly building a model of who I am — preferences, constraints, values, patterns. The system forgets aggressively — if something doesn't meet the threshold, it doesn't get stored. This keeps the memory bank sparse, clean, and trustworthy.
 
 I also made SolAI more concise — responses are now 1-2 sentences by default, especially important for mobile users.
 
 ---
 
 ## **Next Steps:**
-Integrate stored memories into SolAI's system prompt for behavior adaptation. Build Explore screen summaries using context signals. Add UI for viewing and managing memories.
+
+- Begin **selective memory injection** into SolAI’s system prompt (read-only, low-volume)
+- Use context signals to power **gentle Explore insights** (high-level, non-intrusive)
+- Add a minimal UI for **viewing and managing stored memories**
+- Continue refining adaptation logic before introducing any agent behavior
 
