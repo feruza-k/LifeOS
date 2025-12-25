@@ -128,9 +128,9 @@ export default function Auth() {
       setIsLoading(true);
       try {
         await signup(email, password, confirmPassword, username || undefined);
-        toast.success("Account created! Please verify your email.");
-        await refreshUser();
-        // Will redirect to verify-email via ProtectedRoute
+        toast.success("Account created! Please check your email to verify your account.");
+        // Navigate to verify-email page
+        navigate("/verify-email", { replace: true });
       } catch (error: any) {
         const errorMessage = error?.message || "Something went wrong. Please try again.";
         try {

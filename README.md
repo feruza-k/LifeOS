@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 23, 2025
+**Current Date:** December 25, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -31,6 +31,7 @@
   - [Day 22: Deep Context Awareness & Progress Insights](#day-22-deep-context-awareness--progress-insights-dec-22-2025)
   - [Day 23: Memory Foundation](#day-23-memory-foundation-dec-23-2025)
   - [Day 24: Context Awareness Signals & Memory Extraction](#day-24-context-awareness-signals--memory-extraction-dec-24-2025)
+  - [Day 25: Selective Memory Injection & Memory-Informed Behavior](#day-25-selective-memory-injection--memory-informed-behavior-dec-25-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1723,10 +1724,36 @@ I also made SolAI more concise — responses are now 1-2 sentences by default, e
 
 ---
 
+### **Day 25**: Selective Memory Injection & Memory-Informed Behavior (Dec 25, 2025)
+
+Today I closed the loop on memory: SolAI now uses stored memories to shape its behavior, but silently. No mentions, no announcements — memories just make the assistant feel more aligned.
+
+#### **Selective Memory Injection**
+
+I built relevance-based memory retrieval that finds the top 3-5 memories related to the current conversation. The system extracts keywords from the user's message, scores memories by keyword matches × confidence × recency, and injects only the most relevant ones into the system prompt.
+
+The key is selectivity — not all memories, just the ones that actually matter for this conversation. If you're talking about workouts, it finds workout-related preferences. If you're scheduling, it finds scheduling constraints. Fallback to top memories by confidence if no keywords match.
+
+#### **Memory-Informed Behavior**
+
+Memories now shape SolAI's judgment without being mentioned. I categorized memories by type and gave each type specific behavioral guidance:
+
+- **Preferences** bias suggestions — if you prefer morning workouts, SolAI suggests morning times naturally
+- **Constraints** limit proposals — if you can't work after 6pm, SolAI never suggests evening tasks
+- **Values** influence tone — if you value work-life balance, SolAI is gentler about overload
+- **Patterns** inform defaults — but user intent always overrides
+
+The system prompt includes clear instructions: use preferences to bias, use constraints to limit, use values to shape tone. But never mention memories explicitly — they simply make SolAI feel more aligned with you.
+
+#### **Reflection**
+
+This is the subtle part. Memories don't control behavior — they inform it. If you explicitly want something that conflicts with a memory, your intent wins. Memories are hints, not rules.
+
+The assistant should feel understood, not managed. When you say "schedule a workout" and SolAI suggests morning times because it knows you prefer mornings, it should feel natural — like the assistant just gets you, not like it's following a script.
+
+---
+
 ## **Next Steps:**
 
-- Begin **selective memory injection** into SolAI’s system prompt (read-only, low-volume)
-- Use context signals to power **gentle Explore insights** (high-level, non-intrusive)
-- Add a minimal UI for **viewing and managing stored memories**
-- Continue refining adaptation logic before introducing any agent behavior
+Build user-facing features that leverage the memory and context foundation: weekly reflections, morning briefings, goal alignment, and habit reinforcement. Continue refining SolAI's personality to feel more like a trusted executive assistant.
 

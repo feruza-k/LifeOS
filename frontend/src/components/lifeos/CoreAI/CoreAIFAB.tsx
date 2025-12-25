@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Sparkles, X, MessageCircle, Maximize2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CoreAIChat } from "./CoreAIChat";
+import { ConfirmationCard } from "./ConfirmationCard";
 import { ConversationMessage } from "@/types/lifeos";
 import { formatMessageTime } from "@/utils/timeUtils";
 import { api } from "@/lib/api";
@@ -212,23 +213,43 @@ export function CoreAIFAB({
               ) : (
                 <>
                   {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={cn(
-                        "flex",
-                        msg.role === "user" ? "justify-end" : "justify-start"
-                      )}
-                    >
+                    <div key={msg.id} className="space-y-1.5">
                       <div
                         className={cn(
-                          "max-w-[85%] rounded-2xl p-4 font-sans text-sm border",
-                          msg.role === "user"
-                            ? "bg-primary/10 text-foreground border-primary/20"
-                            : "bg-card text-foreground border-border/30 shadow-soft"
+                          "flex",
+                          msg.role === "user" ? "justify-end" : "justify-start"
                         )}
                       >
-                        <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                        <div
+                          className={cn(
+                            "max-w-[85%] rounded-xl px-3 py-2.5 font-sans text-sm border",
+                            msg.role === "user"
+                              ? "bg-primary/10 text-foreground border-primary/20"
+                              : "bg-card text-foreground border-border/30 shadow-soft"
+                          )}
+                        >
+                          <p className="whitespace-pre-wrap leading-normal">{msg.content}</p>
+                        </div>
                       </div>
+                      
+                      {/* Render confirmation UI if present */}
+                      {msg.role === "assistant" && msg.ui && (
+                        <div className="flex justify-start">
+                          {(msg.ui.action === "confirm_create" || msg.ui.action === "confirm_reschedule") && onConfirmAction && (
+                            <ConfirmationCard
+                              message="" // Don't repeat the message
+                              preview={msg.ui.task_preview || (msg.ui.task_id ? { id: msg.ui.task_id } : undefined)}
+                              onConfirm={onConfirmAction}
+                              onCancel={() => {
+                                if (handleSendMessage) {
+                                  handleSendMessage("no");
+                                }
+                              }}
+                              isLoading={isLoading}
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {isLoading && (

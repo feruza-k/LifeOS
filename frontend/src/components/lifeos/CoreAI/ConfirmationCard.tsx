@@ -17,25 +17,28 @@ export function ConfirmationCard({
   isLoading = false 
 }: ConfirmationCardProps) {
   return (
-    <div className="bg-card border border-border/30 rounded-2xl p-4 space-y-3 mt-2 shadow-soft">
-      <p className="text-sm font-sans text-foreground leading-relaxed">{message}</p>
+    <div className="bg-card border border-border/30 rounded-xl px-3 py-2.5 space-y-2.5 mt-1.5 shadow-soft">
+      {/* Only show message if it's different from what's already in the chat bubble */}
+      {message && message.trim() && (
+        <p className="text-sm font-sans text-foreground leading-normal">{message}</p>
+      )}
       
       {preview && (
-        <div className="bg-muted/50 rounded-xl p-3 border border-border/30">
+        <div className="bg-muted/50 rounded-lg px-2.5 py-2 border border-border/30">
           {preview.title && (
-            <p className="text-sm font-sans font-medium text-foreground mb-1">
+            <p className="text-sm font-sans font-medium text-foreground mb-0.5">
               {preview.title}
             </p>
           )}
           {preview.date && (
-            <p className="text-xs font-sans text-muted-foreground">
+            <p className="text-xs font-sans text-muted-foreground leading-tight">
               {preview.time ? `${preview.date} at ${preview.time}` : preview.date}
             </p>
           )}
         </div>
       )}
       
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-2 pt-0.5">
         <button
           onClick={onConfirm}
           disabled={isLoading}

@@ -169,4 +169,53 @@ class MemoryRepository(BaseRepository[Memory]):
         
         result = await self.session.execute(query)
         return list(result.scalars().all())
+    
+    async def get_relevant_memories(
+        self,
+        user_id: UUID,
+        conversation_context: str,
+        limit: int = 5
+    ) -> List[Memory]:
+        """Get memories relevant to the conversation context using keyword matching."""
+        import re
+        from datetime import datetime
+        
+        # Extract keywords from conversation
+        words = re.findall(r'\b\w+\b', conversation_context.lower())
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'}
+        keywords = [w for w in words if len(w) > 3 and w not in stop_words]
+        
+        if not keywords:
+            return await self.get_top_memories(user_id, limit=limit)
+        
+        # Get all memories for the user
+        query = select(Memory).where(Memory.user_id == user_id)
+        result = await self.session.execute(query)
+        all_memories = list(result.scalars().all())
+        
+        # Score memories by keyword matches
+        scored = []
+        for memory in all_memories:
+            content_lower = memory.content.lower()
+            matches = sum(1 for keyword in keywords if keyword in content_lower)
+            if matches > 0:
+                recency_days = (datetime.utcnow() - memory.created_at).days if memory.created_at else 365
+                recency_factor = max(0.5, 1.0 - (recency_days / 365.0))
+                score = matches * float(memory.confidence) * recency_factor
+                scored.append((score, memory))
+        
+        # Sort by score and return top N
+        scored.sort(key=lambda x: x[0], reverse=True)
+        result_memories = [memory for _, memory in scored[:limit]]
+        
+        # Log for debugging (can be removed later)
+        import logging
+        logger = logging.getLogger(__name__)
+        if result_memories:
+            logger.debug(
+                f"[Memory Retrieval] Found {len(result_memories)} relevant memories "
+                f"(keywords: {keywords[:5]})"
+            )
+        
+        return result_memories
 

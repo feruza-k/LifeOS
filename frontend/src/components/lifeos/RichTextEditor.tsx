@@ -4,7 +4,8 @@ import {
   Italic, 
   List, 
   Circle, 
-  Highlighter
+  Highlighter,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,11 +25,11 @@ interface RichTextEditorProps {
 }
 
 const HIGHLIGHT_COLORS = [
-  { name: "Yellow", value: "#fef08a", label: "Yellow" },
-  { name: "Green", value: "#bbf7d0", label: "Green" },
-  { name: "Blue", value: "#bfdbfe", label: "Blue" },
-  { name: "Pink", value: "#fce7f3", label: "Pink" },
-  { name: "Orange", value: "#fed7aa", label: "Orange" },
+  { value: "#F4D6E4" }, // Soft Rose (matches app's Dusty Rose)
+  { value: "#C7DED5" }, // Muted Sage (matches app's sage green)
+  { value: "#C9DCEB" }, // Pale Sky (matches app's blue)
+  { value: "#E8D8BF" }, // Creamy Peach (warm, matches app's aesthetic)
+  { value: null, isRemove: true }, // Remove highlight option
 ];
 
 export function RichTextEditor({ 
@@ -202,7 +203,7 @@ export function RichTextEditor({
     }
   }, [restoreSelection, saveSelection]);
 
-  const applyHighlight = useCallback((color: string) => {
+  const removeHighlight = useCallback(() => {
     if (!editorRef.current) return;
     
     // Close dropdown
@@ -211,99 +212,221 @@ export function RichTextEditor({
     // Focus editor
     editorRef.current.focus();
     
-    // Restore saved selection
-    if (selectionRef.current) {
+    // Restore selection
+    setTimeout(() => {
+      if (!editorRef.current) return;
+      
       const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
+      let range: Range | null = null;
+      
+      // Try to restore saved selection
+      if (selectionRef.current && editorRef.current.contains(selectionRef.current.commonAncestorContainer)) {
         try {
-          selection.addRange(selectionRef.current);
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(selectionRef.current);
+            range = selectionRef.current;
+          }
         } catch (err) {
           // Selection might be invalid
         }
       }
-    }
-    
-    // Get current selection
-    const selection = window.getSelection();
-    let range: Range | null = null;
-    
-    if (selection && selection.rangeCount > 0) {
-      range = selection.getRangeAt(0);
-    }
-    
-    // If we have a valid selection, highlight it
-    if (range && !range.collapsed) {
-      try {
-        const selectedText = range.toString();
-        if (selectedText) {
-          const span = document.createElement("span");
-          span.style.backgroundColor = color;
-          span.style.padding = "0 2px";
-          span.style.borderRadius = "3px";
-          
-          try {
-            range.surroundContents(span);
-          } catch (e) {
-            try {
-              const contents = range.extractContents();
-              span.appendChild(contents);
-              range.insertNode(span);
-            } catch (e2) {
-              range.deleteContents();
-              const html = `<span style="background-color: ${color}; padding: 0 2px; border-radius: 3px;">${selectedText}</span>`;
-              const fragment = document.createRange().createContextualFragment(html);
-              range.insertNode(fragment);
-            }
-          }
-          
-          handleInput();
-          saveSelection();
+      
+      // If no saved selection, try current selection
+      if (!range && selection && selection.rangeCount > 0) {
+        range = selection.getRangeAt(0);
+        if (!editorRef.current.contains(range.commonAncestorContainer)) {
+          range = null;
         }
-      } catch (error) {
-        console.error("Failed to apply highlight:", error);
       }
-    } else {
-      // No selection - try to select word at cursor
-      try {
-        document.execCommand("selectWord", false);
-        const newSel = window.getSelection();
-        if (newSel && newSel.rangeCount > 0) {
-          const newRange = newSel.getRangeAt(0);
-          if (!newRange.collapsed) {
-            // We have a word selected, highlight it
-            const selectedText = newRange.toString();
-            if (selectedText) {
-              const span = document.createElement("span");
-              span.style.backgroundColor = color;
-              span.style.padding = "0 2px";
-              span.style.borderRadius = "3px";
+      
+      // If we have a valid selection, remove highlights
+      if (range) {
+        if (range.collapsed) {
+          // If collapsed (cursor), find and remove highlight from the containing element
+          const container = range.commonAncestorContainer;
+          let element = container.nodeType === Node.TEXT_NODE 
+            ? container.parentElement 
+            : container as Element;
+          
+          // Walk up to find highlighted span
+          while (element && element !== editorRef.current) {
+            if (element.tagName === 'SPAN' && element.getAttribute('style')?.includes('background-color')) {
+              // Remove the span but keep its contents
+              const parent = element.parentNode;
+              if (parent) {
+                while (element.firstChild) {
+                  parent.insertBefore(element.firstChild, element);
+                }
+                parent.removeChild(element);
+              }
+              handleInput();
+              saveSelection();
+              editorRef.current.focus();
+              return;
+            }
+            element = element.parentElement;
+          }
+        } else {
+          // If we have a selection, remove highlights within it
+          try {
+            // Get all highlighted spans in the editor
+            const allHighlights = editorRef.current.querySelectorAll('span[style*="background-color"]');
+            
+            allHighlights.forEach((el) => {
+              const elRange = document.createRange();
+              elRange.selectNodeContents(el);
               
+              // Check if this element intersects with our selection
+              if (range && (range.intersectsNode(el) || range.containsNode(el, true))) {
+                // Remove the span but keep its contents
+                const parent = el.parentNode;
+                if (parent) {
+                  while (el.firstChild) {
+                    parent.insertBefore(el.firstChild, el);
+                  }
+                  parent.removeChild(el);
+                }
+              }
+            });
+            
+            handleInput();
+            saveSelection();
+            editorRef.current.focus();
+          } catch (error) {
+            console.error("Failed to remove highlight:", error);
+          }
+        }
+      }
+    }, 100);
+  }, [saveSelection, handleInput]);
+
+  const applyHighlight = useCallback((color: string | null) => {
+    // If color is null, remove highlight instead
+    if (color === null) {
+      removeHighlight();
+      return;
+    }
+    if (!editorRef.current) return;
+    
+    // Close dropdown
+    setHighlightDropdownOpen(false);
+    
+    // Focus editor immediately
+    editorRef.current.focus();
+    
+    // Restore selection after a brief delay to ensure dropdown closes
+    setTimeout(() => {
+      if (!editorRef.current) return;
+      
+      const selection = window.getSelection();
+      let range: Range | null = null;
+      
+      // Try to restore saved selection first
+      if (selectionRef.current && editorRef.current.contains(selectionRef.current.commonAncestorContainer)) {
+        try {
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(selectionRef.current);
+            range = selectionRef.current;
+          }
+        } catch (err) {
+          // Selection might be invalid, continue to try current selection
+        }
+      }
+      
+      // If no saved selection or it failed, try current selection
+      if (!range && selection && selection.rangeCount > 0) {
+        range = selection.getRangeAt(0);
+        if (!editorRef.current.contains(range.commonAncestorContainer)) {
+          range = null;
+        }
+      }
+      
+      // If we have a valid selection, highlight it
+      if (range && !range.collapsed) {
+        try {
+          const selectedText = range.toString().trim();
+          if (selectedText && selectedText.length > 0) {
+            // Create highlight span
+            const span = document.createElement("span");
+            span.style.backgroundColor = color;
+            span.style.padding = "0 2px";
+            span.style.borderRadius = "3px";
+            span.style.display = "inline";
+            
+            try {
+              // Try to surround contents (works for simple selections)
+              range.surroundContents(span);
+            } catch (e) {
               try {
-                newRange.surroundContents(span);
-                handleInput();
-                saveSelection();
-              } catch (e) {
+                // If that fails, extract and wrap
+                const contents = range.extractContents();
+                span.appendChild(contents);
+                range.insertNode(span);
+              } catch (e2) {
+                // Last resort: delete and insert HTML
+                const selectedText = range.toString();
+                range.deleteContents();
+                const html = `<span style="background-color: ${color}; padding: 0 2px; border-radius: 3px; display: inline;">${selectedText}</span>`;
+                const fragment = document.createRange().createContextualFragment(html);
+                range.insertNode(fragment);
+              }
+            }
+            
+            handleInput();
+            saveSelection();
+            editorRef.current.focus();
+            return;
+          }
+        } catch (error) {
+          console.error("Failed to apply highlight:", error);
+        }
+      }
+      
+      // No valid selection - try to select word at cursor
+      try {
+        editorRef.current.focus();
+        // Try to select word using execCommand
+        const success = document.execCommand("selectWord", false);
+        if (success) {
+          const newSel = window.getSelection();
+          if (newSel && newSel.rangeCount > 0) {
+            const newRange = newSel.getRangeAt(0);
+            if (!newRange.collapsed && editorRef.current.contains(newRange.commonAncestorContainer)) {
+              const selectedText = newRange.toString().trim();
+              if (selectedText && selectedText.length > 0) {
+                const span = document.createElement("span");
+                span.style.backgroundColor = color;
+                span.style.padding = "0 2px";
+                span.style.borderRadius = "3px";
+                span.style.display = "inline";
+                
                 try {
-                  const contents = newRange.extractContents();
-                  span.appendChild(contents);
-                  newRange.insertNode(span);
+                  newRange.surroundContents(span);
                   handleInput();
                   saveSelection();
-                } catch (e2) {
-                  // Ignore if it fails
+                  editorRef.current.focus();
+                } catch (e) {
+                  try {
+                    const contents = newRange.extractContents();
+                    span.appendChild(contents);
+                    newRange.insertNode(span);
+                    handleInput();
+                    saveSelection();
+                    editorRef.current.focus();
+                  } catch (e2) {
+                    console.error("Failed to apply highlight to word:", e2);
+                  }
                 }
               }
             }
           }
         }
       } catch (e) {
-        // Can't select word, just set the color for visual feedback
-        setHighlightColor(color);
+        console.error("Failed to select word for highlighting:", e);
       }
-    }
-    
-    editorRef.current.focus();
+    }, 100);
   }, [saveSelection, handleInput]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -382,7 +505,7 @@ export function RichTextEditor({
       `}</style>
       <div className={cn("flex flex-col h-full bg-card rounded-2xl border border-border/30 overflow-hidden", className)}>
         {/* Formatting Toolbar - Apple Notes Style */}
-        {isFocused && (
+        {(isFocused || highlightDropdownOpen) && (
           <div className="flex items-center gap-3 p-4 border-b border-border/30 bg-muted/20 shrink-0">
             {/* Bold */}
             <Button
@@ -417,7 +540,25 @@ export function RichTextEditor({
             </Button>
 
             {/* Highlight */}
-            <DropdownMenu open={highlightDropdownOpen} onOpenChange={setHighlightDropdownOpen}>
+            <DropdownMenu 
+              open={highlightDropdownOpen} 
+              onOpenChange={(open) => {
+                setHighlightDropdownOpen(open);
+                if (open) {
+                  // Save selection when opening
+                  saveSelection();
+                  // Keep editor focused
+                  if (editorRef.current) {
+                    editorRef.current.focus();
+                  }
+                } else {
+                  // Restore focus when closing
+                  if (editorRef.current) {
+                    editorRef.current.focus();
+                  }
+                }
+              }}
+            >
               <DropdownMenuTrigger asChild>
                 <Button
                   type="button"
@@ -427,11 +568,12 @@ export function RichTextEditor({
                     "h-12 w-12 p-0 rounded-xl hover:bg-muted/80 transition-colors active:scale-95",
                     highlightColor && "bg-primary/10"
                   )}
-                  onClick={(e) => { 
+                  onMouseDown={(e) => { 
                     e.preventDefault();
                     e.stopPropagation();
                     saveSelection();
-                    setHighlightDropdownOpen(true);
+                    // Toggle dropdown
+                    setHighlightDropdownOpen(prev => !prev);
                   }}
                   title="Highlight"
                 >
@@ -440,37 +582,54 @@ export function RichTextEditor({
               </DropdownMenuTrigger>
               <DropdownMenuContent 
                 align="start" 
-                className="w-56 p-3"
+                className="w-auto p-3 z-[100]"
+                sideOffset={8}
                 onCloseAutoFocus={(e) => {
                   e.preventDefault();
+                  // Restore focus to editor
+                  setTimeout(() => {
+                    if (editorRef.current) {
+                      editorRef.current.focus();
+                    }
+                  }, 0);
+                }}
+                onEscapeKeyDown={() => {
+                  setHighlightDropdownOpen(false);
                   if (editorRef.current) {
                     editorRef.current.focus();
                   }
                 }}
               >
-                <div className="grid grid-cols-5 gap-2">
-                  {HIGHLIGHT_COLORS.map((color) => (
+                <div className="grid grid-cols-5 gap-2.5">
+                  {HIGHLIGHT_COLORS.map((color, index) => (
                     <button
-                      key={color.value}
+                      key={color.value || "remove"}
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         applyHighlight(color.value);
                       }}
-                      className="flex flex-col items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
-                      title={color.label}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group active:scale-95"
+                      title={color.isRemove ? "Remove highlight" : undefined}
                     >
-                      <div
-                        className={cn(
-                          "w-10 h-10 rounded-md border-2 shadow-sm group-hover:scale-110 transition-transform",
-                          highlightColor === color.value ? "border-primary border-2" : "border-border/50"
-                        )}
-                        style={{ backgroundColor: color.value }}
-                      />
-                      <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                        {color.label}
-                      </span>
+                      {color.isRemove ? (
+                        <div className="w-10 h-10 rounded-md border-2 border-border/50 shadow-sm group-hover:scale-110 transition-transform flex items-center justify-center bg-muted/30">
+                          <X className="w-5 h-5 text-muted-foreground" strokeWidth={2.5} />
+                        </div>
+                      ) : (
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-md border-2 shadow-sm group-hover:scale-110 transition-transform",
+                            highlightColor === color.value ? "border-primary border-2 ring-2 ring-primary/20" : "border-border/50"
+                          )}
+                          style={{ backgroundColor: color.value }}
+                        />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -559,3 +718,4 @@ export function RichTextEditor({
     </>
   );
 }
+

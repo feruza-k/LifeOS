@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from app.logic.conflict_engine import find_conflicts
 from db.repo import db_repo
+from db.session import AsyncSessionLocal
 from app.logging import logger
 
 load_dotenv()
@@ -156,12 +157,23 @@ Last week summary (for "how did my last week go" queries):
 Context awareness (for behavior adaptation - use subtly, never mention):
 {_format_context_signals_for_prompt(user_context.get("context_signals", {}))}
 
+User context (shape your behavior based on these - preferences bias suggestions, constraints limit proposals, values influence tone):
+{_format_memories_for_prompt(user_context.get("relevant_memories", []))}
+
+Behavioral guidance from memories:
+- PREFERENCES: When making suggestions (times, approaches, defaults), bias toward these preferences. If user says "schedule a workout" and you know they prefer mornings, suggest morning times naturally.
+- CONSTRAINTS: Never propose anything that violates these hard boundaries. If user cannot work after 6pm, never suggest evening tasks. If user says "schedule a meeting at 7pm", gently suggest an earlier time that respects the constraint.
+- VALUES: Let these influence your tone and assertiveness. If user values work-life balance, be gentler about overload. If user values discipline, you can be slightly more direct (but still calm). Values shape HOW you communicate, not WHAT you say.
+- PATTERNS: Use these to inform defaults, but user's explicit intent always overrides patterns. Patterns are hints, not rules.
+
 When responding:
 - Be BRIEF and concise - aim for 1-2 sentences for most responses, only expand when specifically asked for details or complex analysis
 - Mobile-friendly: Keep responses short and scannable - users are often on phones
-- Use the user's FULL context (current + historical + patterns + context signals) to give relevant advice, but express it concisely
+- Use the user's FULL context (current + historical + patterns + context signals + user context) to give relevant advice, but express it concisely
 - Adapt your tone and suggestions based on context signals: reduce pressure when user is overloaded, be gentler during strained periods, align with expressed themes
-- NEVER mention that you're analyzing notes, reflections, or patterns - these signals exist only for your internal reasoning
+- Let memories SHAPE your behavior silently: preferences bias suggestions, constraints limit proposals, values influence tone. Never mention memories explicitly - they simply make you feel more aligned with the user.
+- NEVER mention that you're analyzing notes, reflections, patterns, or memories - these signals exist only for your internal reasoning
+- User intent always overrides memories: if user explicitly wants something that conflicts with a memory, honor the explicit intent
 - Provide insights that go beyond what's obvious from today's view, but keep them brief
 - Default to brevity: If unsure whether to expand, choose the shorter response
 - For progress questions ("How am I doing?", "How did my last week go?"):
@@ -175,9 +187,11 @@ When responding:
 - If notes or diary entries mention specific themes, goals, or concerns, incorporate those into your insights
 - NEVER say "I don't have enough data" - instead, work with what's available and be helpful
 - If you need to perform an action (create task, reschedule, etc.), clearly state what you'll do in one sentence
+- For task creation/scheduling: Use preferences to bias time suggestions (e.g., if user prefers mornings, suggest morning times). Use constraints to avoid violating boundaries (e.g., don't suggest times user cannot work). Do this naturally without explaining why.
 - For confirmations, ask naturally but clearly in one sentence
 - Match the calm, intentional tone of LifeOS
 - Use patterns to suggest improvements when available, but keep suggestions brief
+- Memories inform your judgment - they make you feel more aligned with the user. The user should feel understood, not managed.
 
 You must respond in JSON format with this structure:
 {{
@@ -290,6 +304,59 @@ def _format_context_signals_for_prompt(context_signals: Dict[str, Any]) -> str:
     """
     from app.ai.context_service import format_context_signals_for_prompt
     return format_context_signals_for_prompt(context_signals)
+
+
+def _format_memories_for_prompt(memories: List[Dict[str, Any]]) -> str:
+    """
+    Format relevant memories for system prompt with behavioral guidance.
+    Memories are categorized by type to shape behavior:
+    - Preferences: bias suggestions toward these
+    - Constraints: limit what you propose (hard boundaries)
+    - Values: influence tone and assertiveness
+    - Patterns: inform defaults but don't override explicit intent
+    """
+    if not memories:
+        return "None"
+    
+    # Categorize memories by type
+    preferences = []
+    constraints = []
+    values = []
+    patterns = []
+    
+    for mem in memories[:5]:
+        content = mem.get("content", "").strip()
+        memory_type = mem.get("memory_type", "").lower()
+        if not content:
+            continue
+            
+        if memory_type == "preference":
+            preferences.append(content)
+        elif memory_type == "constraint":
+            constraints.append(content)
+        elif memory_type == "value":
+            values.append(content)
+        elif memory_type == "pattern":
+            patterns.append(content)
+        else:
+            # Fallback: treat as preference if type unknown
+            preferences.append(content)
+    
+    parts = []
+    
+    if preferences:
+        parts.append(f"Preferences (bias suggestions toward these): {', '.join(preferences)}")
+    
+    if constraints:
+        parts.append(f"Constraints (do not propose anything that violates these): {', '.join(constraints)}")
+    
+    if values:
+        parts.append(f"Values (let these influence your tone and how assertive/gentle you are): {', '.join(values)}")
+    
+    if patterns:
+        parts.append(f"Patterns (inform defaults, but user intent always overrides): {', '.join(patterns)}")
+    
+    return "\n".join(parts) if parts else "None"
 
 
 def _build_weekly_summary(historical: Dict[str, Any], today: datetime, today_tasks: Optional[List[Dict]] = None) -> str:
@@ -408,7 +475,7 @@ def _build_weekly_summary(historical: Dict[str, Any], today: datetime, today_tas
     return " | ".join(parts) if parts else f"Last week ({week_start_str} - {week_end_str}): No data available."
 
 
-async def get_user_context(user_id: str) -> Dict[str, Any]:
+async def get_user_context(user_id: str, conversation_context: Optional[str] = None) -> Dict[str, Any]:
     """
     Gather comprehensive user context for the assistant.
     Now includes historical data and pattern analysis.
@@ -517,13 +584,41 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
             "drift": {"overload": False, "disengagement": False, "avoidance": False}
         }
     
+    # Get relevant memories for conversation context
+    relevant_memories = []
+    if conversation_context:
+        try:
+            from uuid import UUID
+            from db.repositories.memory import MemoryRepository
+            async with AsyncSessionLocal() as session:
+                memory_repo = MemoryRepository(session)
+                memories = await memory_repo.get_relevant_memories(
+                    UUID(user_id),
+                    conversation_context,
+                    limit=5
+                )
+                relevant_memories = [
+                    {
+                        "content": m.content,
+                        "memory_type": m.memory_type,
+                        "confidence": float(m.confidence)
+                    }
+                    for m in memories
+                ]
+                if relevant_memories:
+                    logger.info(
+                        f"[Memory Injection] Retrieved {len(relevant_memories)} relevant memories for context: "
+                        f"{conversation_context[:50]}..."
+                    )
+        except Exception as e:
+            logger.error(f"Error getting relevant memories: {e}", exc_info=True)
+    
     return {
         "tasks_today": today_tasks,
         "upcoming_tasks": upcoming_tasks,
         "conflicts": conflicts,
         "energy": energy,
         "categories": categories,
-        # Historical context and patterns
         "historical": historical_context,
         "patterns": {
             "tasks": task_patterns,
@@ -531,7 +626,8 @@ async def get_user_context(user_id: str) -> Dict[str, Any]:
             "notes_diary": notes_diary,
             "summary": pattern_summary
         },
-        "context_signals": context_signals
+        "context_signals": context_signals,
+        "relevant_memories": relevant_memories
     }
 
 
@@ -697,7 +793,7 @@ async def generate_intelligent_response(
     """
     try:
         # Get user context
-        user_context = await get_user_context(user_id)
+        user_context = await get_user_context(user_id, conversation_context=user_message)
         
         # Build system prompt
         system_prompt = build_system_prompt(user_context)
@@ -755,6 +851,10 @@ async def generate_intelligent_response(
         ui = None
         if action:
             if action == "create_task":
+                # Create pending action so confirmation works
+                from app.logic.pending_actions import create_pending_action
+                await create_pending_action("create", {"task_fields": action_data}, user_id)
+                
                 ui = {
                     "action": "confirm_create",
                     "task_preview": action_data

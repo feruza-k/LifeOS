@@ -77,10 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = useCallback(async (email: string, password: string, confirmPassword: string, username?: string) => {
     await api.signup(email, password, confirmPassword, username);
-    // Tokens are now in httpOnly cookies, get user info
-    const userData = await api.getCurrentUser();
-    setUser(userData);
-    setIsAuthenticated(true);
+    // Tokens are now in httpOnly cookies, try to get user info
+    // If this fails, user can still verify email and log in
+    try {
+      const userData = await api.getCurrentUser();
+      setUser(userData);
+      setIsAuthenticated(true);
+    } catch (error) {
+      // If getCurrentUser fails, that's okay - user can verify email and log in
+      // The signup was successful, tokens are in cookies
+      console.log("Could not fetch user after signup, but signup was successful:", error);
+      // Don't throw - signup was successful, user just needs to verify email
+    }
   }, []);
 
   const refreshUser = useCallback(async () => {

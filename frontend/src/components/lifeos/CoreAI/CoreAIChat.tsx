@@ -471,7 +471,7 @@ export function CoreAIChat({
         {/* Messages */}
         <div 
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+          className="flex-1 overflow-y-auto p-4 space-y-3 relative"
         >
           {messages.length === 0 ? (
             <div className="text-center py-8">
@@ -517,7 +517,7 @@ export function CoreAIChat({
           ) : (
             <>
               {messages.map((msg) => (
-                <div key={msg.id} className="space-y-2 group">
+                <div key={msg.id} className="space-y-1.5 group">
                   <div
                     className={cn(
                       "flex",
@@ -526,7 +526,7 @@ export function CoreAIChat({
                   >
                     <div
                       className={cn(
-                        "max-w-[80%] rounded-2xl p-4 font-sans text-base border relative",
+                        "max-w-[80%] rounded-xl px-3 py-2.5 font-sans text-sm border relative",
                         msg.role === "user"
                           ? "bg-primary/10 text-foreground border-primary/20"
                           : "bg-card text-foreground border-border/30 shadow-soft"
@@ -536,7 +536,7 @@ export function CoreAIChat({
                       {msg.role === "assistant" && (
                         <button
                           onClick={() => handleCopyMessage(msg.id, msg.content)}
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-muted transition-opacity"
+                          className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-muted transition-opacity"
                           title="Copy message"
                         >
                           {copiedMessageId === msg.id ? (
@@ -547,7 +547,7 @@ export function CoreAIChat({
                         </button>
                       )}
                       
-                      <p className="whitespace-pre-wrap leading-relaxed pr-8">{msg.content}</p>
+                      <p className="whitespace-pre-wrap leading-normal pr-7">{msg.content}</p>
                       {/* Message reactions */}
                       {msg.role === "assistant" && (
                         <div className="flex items-center gap-1 mt-2">
@@ -590,12 +590,12 @@ export function CoreAIChat({
                     </div>
                   </div>
                   
-                  {/* Render confirmation UI if present */}
+                  {/* Render confirmation UI if present - don't show message bubble if there's a confirmation UI */}
                   {msg.role === "assistant" && msg.ui && (
                     <div className="flex justify-start">
                       {(msg.ui.action === "confirm_create" || msg.ui.action === "confirm_reschedule") && onConfirmAction && (
                         <ConfirmationCard
-                          message={msg.content}
+                          message="" // Don't repeat the message - it's already in the chat bubble above
                           preview={msg.ui.task_preview || (msg.ui.task_id ? { id: msg.ui.task_id } : undefined)}
                           onConfirm={onConfirmAction}
                           onCancel={() => {

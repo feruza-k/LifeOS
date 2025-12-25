@@ -13,6 +13,11 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
     ...(options.headers || {}),
   };
 
+  // Debug logging for mobile
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    console.log(`[API] Requesting: ${url}`);
+  }
+
   try {
     const res = await fetch(url, {
       ...options,
@@ -103,6 +108,9 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
     }
     return res.json();
   } catch (error: any) {
+    // Enhanced error logging for debugging
+    console.error(`[API Error] URL: ${url}`, error);
+    
     if (error instanceof TypeError) {
       const isNetworkError = 
         error.message.includes("fetch") ||
@@ -111,7 +119,9 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
         error.message === "Network request failed";
       
       if (isNetworkError) {
-        throw new Error(`Cannot connect to backend at ${BASE_URL}. Make sure it's running.`);
+        const errorMsg = `Cannot connect to backend at ${BASE_URL}. Make sure it's running and accessible from your network.`;
+        console.error(`[API] Network error: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
     }
     
@@ -365,17 +375,25 @@ export const api = {
     }),
 
   // --- Global Notes ---
-  getGlobalNotes: () => request("/global-notes"),
+  getGlobalNotes: (params?: { include_archived?: boolean; sort_by?: string; tags?: string; pinned_only?: boolean }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.include_archived) queryParams.append("include_archived", "true");
+    if (params?.sort_by) queryParams.append("sort_by", params.sort_by);
+    if (params?.tags) queryParams.append("tags", params.tags);
+    if (params?.pinned_only) queryParams.append("pinned_only", "true");
+    const query = queryParams.toString();
+    return request(`/global-notes${query ? `?${query}` : ""}`);
+  },
 
   getGlobalNote: (noteId: string) => request(`/global-notes/${noteId}`),
 
-  createGlobalNote: (note: { title?: string; content: string }) =>
+  createGlobalNote: (note: { title?: string; content: string; pinned?: boolean; archived?: boolean }) =>
     request("/global-notes", {
       method: "POST",
       body: JSON.stringify(note),
     }),
 
-  updateGlobalNote: (noteId: string, note: { title?: string; content: string }) =>
+  updateGlobalNote: (noteId: string, note: { title?: string; content?: string; pinned?: boolean; archived?: boolean }) =>
     request(`/global-notes/${noteId}`, {
       method: "PUT",
       body: JSON.stringify(note),
@@ -385,6 +403,60 @@ export const api = {
     request(`/global-notes/${noteId}`, {
       method: "DELETE",
     }),
+
+  pinGlobalNote: (noteId: string) =>
+    request(`/global-notes/${noteId}/pin`, {
+      method: "POST",
+    }),
+
+  unpinGlobalNote: (noteId: string) =>
+    request(`/global-notes/${noteId}/unpin`, {
+      method: "POST",
+    }),
+
+  archiveGlobalNote: (noteId: string) =>
+    request(`/global-notes/${noteId}/archive`, {
+      method: "POST",
+    }),
+
+  unarchiveGlobalNote: (noteId: string) =>
+    request(`/global-notes/${noteId}/unarchive`, {
+      method: "POST",
+    }),
+
+  uploadNoteImage: async (noteId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request(`/global-notes/${noteId}/image`, {
+      method: "POST",
+      headers: {}, // Let browser set Content-Type for FormData
+      body: formData,
+    });
+  },
+
+  deleteNoteImage: (noteId: string) =>
+    request(`/global-notes/${noteId}/image`, {
+      method: "DELETE",
+    }),
+
+  getNoteImageUrl: (noteId: string) => `${BASE_URL}/global-notes/${noteId}/image`,
+
+  uploadNoteAudio: async (noteId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request(`/global-notes/${noteId}/audio`, {
+      method: "POST",
+      headers: {}, // Let browser set Content-Type for FormData
+      body: formData,
+    });
+  },
+
+  deleteNoteAudio: (noteId: string) =>
+    request(`/global-notes/${noteId}/audio`, {
+      method: "DELETE",
+    }),
+
+  getNoteAudioUrl: (noteId: string) => `${BASE_URL}/global-notes/${noteId}/audio`,
 
   // --- Core AI Chat ---
   chat: (message: string, conversationHistory?: Array<{ role: string; content: string }>) =>

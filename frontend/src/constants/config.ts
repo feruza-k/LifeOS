@@ -23,10 +23,14 @@ const getBaseURL = () => {
     const hostname = window.location.hostname;
     // If accessing from network IP, use that IP for backend
     if (hostname !== "localhost" && hostname !== "127.0.0.1") {
-      return `http://${hostname}:8000`;
+      const url = `http://${hostname}:8000`;
+      console.log(`[Config] Mobile device detected. Using backend: ${url}`);
+      return url;
     }
     // Fallback to common network IPs
-    return `http://192.168.1.11:8000`;
+    const fallbackUrl = `http://192.168.1.11:8000`;
+    console.log(`[Config] Using fallback backend: ${fallbackUrl}`);
+    return fallbackUrl;
   }
   
   return `http://localhost:8000`;

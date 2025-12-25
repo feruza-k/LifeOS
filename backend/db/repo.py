@@ -129,6 +129,10 @@ class DatabaseRepo:
             if not user:
                 return None
             
+            # Map "password" to "password_hash" for database column
+            if "password" in updates:
+                updates["password_hash"] = updates.pop("password")
+            
             # Fields that should be converted from ISO strings to datetime
             datetime_fields = {
                 "verification_token_expires",
@@ -473,14 +477,18 @@ class DatabaseRepo:
             "user_id": str(note.user_id),
             "title": note.title or "Untitled Note",
             "content": note.content,
+            "pinned": getattr(note, 'pinned', False),
+            "archived": getattr(note, 'archived', False),
+            "audio_filename": getattr(note, 'audio_filename', None),
+            "image_filename": getattr(note, 'image_filename', None),
             "created_at": note.created_at.isoformat() if note.created_at else None,
             "updated_at": note.updated_at.isoformat() if note.updated_at else None,
         }
     
-    async def get_global_notes(self, user_id: str) -> List[Dict]:
+    async def get_global_notes(self, user_id: str, include_archived: bool = False, sort_by: str = "updated_at", pinned_only: bool = False) -> List[Dict]:
         async with AsyncSessionLocal() as session:
             repo = GlobalNoteRepository(session)
-            notes = await repo.list_by_user_ordered(UUID(user_id))
+            notes = await repo.list_by_user_ordered(UUID(user_id), include_archived=include_archived, sort_by=sort_by, pinned_only=pinned_only)
             return [self._global_note_to_dict(note) for note in notes]
     
     async def get_global_note(self, note_id: str, user_id: str) -> Optional[Dict]:
@@ -497,6 +505,10 @@ class DatabaseRepo:
             note_data = {
                 "title": note_dict.get("title"),
                 "content": note_dict.get("content", ""),
+                "pinned": note_dict.get("pinned", False),
+                "archived": note_dict.get("archived", False),
+                "audio_filename": note_dict.get("audio_filename"),
+                "image_filename": note_dict.get("image_filename"),
             }
             note = await repo.create(user_id=UUID(user_id), **note_data)
             await session.commit()
@@ -510,11 +522,22 @@ class DatabaseRepo:
             if not note:
                 return None
             
-            note_data = {
-                "title": note_dict.get("title", note.title),
-                "content": note_dict.get("content", note.content),
-            }
-            updated_note = await repo.update(note.id, UUID(user_id), **note_data)
+            # Update only provided fields
+            update_data = {}
+            if "title" in note_dict:
+                update_data["title"] = note_dict["title"]
+            if "content" in note_dict:
+                update_data["content"] = note_dict["content"]
+            if "pinned" in note_dict:
+                update_data["pinned"] = note_dict["pinned"]
+            if "archived" in note_dict:
+                update_data["archived"] = note_dict["archived"]
+            if "audio_filename" in note_dict:
+                update_data["audio_filename"] = note_dict["audio_filename"]
+            if "image_filename" in note_dict:
+                update_data["image_filename"] = note_dict["image_filename"]
+            
+            updated_note = await repo.update(note.id, UUID(user_id), **update_data)
             await session.commit()
             await session.refresh(updated_note)
             return self._global_note_to_dict(updated_note)

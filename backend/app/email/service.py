@@ -92,7 +92,7 @@ else:
 
 def send_verification_email(email: str, token: str) -> bool:
     """Send email verification email."""
-    verification_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/verify-email?token={token}"
+    verification_url = f"{os.getenv('FRONTEND_URL', 'http://172.20.10.1:8080')}/verify-email?token={token}"
     
     subject = "Verify your LifeOS email"
     
@@ -134,7 +134,7 @@ This link will expire in 24 hours.
 
 def send_password_reset_email(email: str, token: str) -> bool:
     """Send password reset email."""
-    reset_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/auth?mode=reset-password&token={token}"
+    reset_url = f"{os.getenv('FRONTEND_URL', 'http://172.20.10.1:8080')}/auth?mode=reset-password&token={token}"
     
     subject = "Reset your LifeOS password"
     

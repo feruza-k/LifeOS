@@ -14,6 +14,7 @@ from app.ai.parser import test_ai_connection, parse_intent
 from app.ai.assistant import generate_assistant_response
 from db.repo import db_repo
 from app.storage.photo_storage import save_photo, delete_photo, get_photo_path, photo_exists
+from app.storage.audio_storage import save_audio, delete_audio, get_audio_path, audio_exists
 from app.logic.intent_handler import handle_intent
 from app.logic.today_engine import get_today_view
 from app.logic.suggestion_engine import get_suggestions
@@ -37,12 +38,82 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 load_dotenv()
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+# Default to hotspot IP for mobile access (172.20.10.1 is common for iPhone hotspot)
+# Can be overridden with FRONTEND_URL environment variable
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://172.20.10.1:8080")
+
+def get_frontend_url_from_request(request: Request) -> str:
+    """
+    Get the frontend URL from the request Origin header or Referer header.
+    Falls back to using the request client IP if headers don't provide a valid URL.
+    """
+    # Try Origin header first
+    origin = request.headers.get("Origin")
+    if origin:
+        # Check if it's a local network origin (localhost, private IPs, hotspots)
+        is_local = (
+            origin.startswith("http://localhost") or
+            origin.startswith("http://127.0.0.1") or
+            origin.startswith("http://192.168.") or
+            origin.startswith("http://10.") or
+            (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
+        )
+        
+        if is_local:
+            # Use the origin as the frontend URL
+            return origin.rstrip("/")
+    
+    # Try Referer header as fallback
+    referer = request.headers.get("Referer")
+    if referer:
+        # Extract the base URL from referer (remove path)
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+            # Check if it's a local network
+            is_local = (
+                base_url.startswith("http://localhost") or
+                base_url.startswith("http://127.0.0.1") or
+                base_url.startswith("http://192.168.") or
+                base_url.startswith("http://10.") or
+                (base_url.startswith("http://172.") and any(base_url.startswith(f"http://172.{i}.") for i in range(16, 32)))
+            )
+            if is_local:
+                return base_url.rstrip("/")
+        except Exception:
+            pass
+    
+    # Fall back to using request client IP (most reliable for mobile/hotspot)
+    if request.client and request.client.host:
+        client_ip = request.client.host
+        # Check if it's a local network IP
+        is_local_ip = (
+            client_ip.startswith("192.168.") or
+            client_ip.startswith("10.") or
+            client_ip.startswith("172.") or
+            client_ip == "127.0.0.1" or
+            client_ip == "localhost"
+        )
+        if is_local_ip:
+            # Use port 8080 (frontend port) with the client IP
+            return f"http://{client_ip}:8080"
+    
+    # Final fallback to configured FRONTEND_URL
+    return FRONTEND_URL.rstrip("/")
 # Allow localhost and common network IPs for development
-default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173"
+# Include common hotspot IPs (172.20.10.x for iPhone hotspot, 192.168.43.x for Android)
+default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173,http://172.20.10.1:8080,http://172.20.10.1:5173"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
-IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "production") == "production"
+
+# In development, be more permissive with CORS - allow any local network origin
+# This handles dynamic IPs from hotspots and different network configurations
+if not IS_PRODUCTION:
+    # Allow any origin that looks like a local network (localhost, private IP ranges)
+    # We'll handle this in the OPTIONS handler
+    pass
 
 try:
     from app.auth.auth import (
@@ -65,6 +136,7 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
 
+# CORS middleware - in development, we'll handle CORS via custom middleware and OPTIONS handler
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -72,6 +144,72 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+# Pre-CORS middleware to handle OPTIONS for local networks in development
+# This runs AFTER CORSMiddleware registration (so BEFORE it in execution order)
+# to intercept OPTIONS requests before CORSMiddleware rejects them
+class PreCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Handle OPTIONS requests for local networks in development
+        if request.method == "OPTIONS" and not IS_PRODUCTION:
+            origin = request.headers.get("Origin")
+            if origin:
+                # Check if it's a local network origin
+                is_local = (
+                    origin.startswith("http://localhost") or
+                    origin.startswith("http://127.0.0.1") or
+                    origin.startswith("http://192.168.") or
+                    origin.startswith("http://10.") or
+                    (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
+                )
+                if is_local:
+                    # Return 200 immediately for local network OPTIONS requests
+                    return Response(
+                        status_code=200,
+                        headers={
+                            "Access-Control-Allow-Origin": origin,
+                            "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                            "Access-Control-Allow-Credentials": "true",
+                            "Access-Control-Max-Age": "3600",
+                        }
+                    )
+        
+        return await call_next(request)
+
+# Add pre-CORS middleware AFTER CORSMiddleware (so it runs BEFORE in execution)
+app.add_middleware(PreCORSMiddleware)
+
+# Custom middleware to allow local network origins in development
+# This runs AFTER the CORS middleware to override headers for local networks
+class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # For OPTIONS requests, let our handler deal with it
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
+        response = await call_next(request)
+        
+        if not IS_PRODUCTION:
+            origin = request.headers.get("Origin")
+            if origin:
+                # Allow any local network origin in development
+                is_local = (
+                    origin.startswith("http://localhost") or
+                    origin.startswith("http://127.0.0.1") or
+                    origin.startswith("http://192.168.") or
+                    origin.startswith("http://10.") or
+                    (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
+                )
+                if is_local:
+                    response.headers["Access-Control-Allow-Origin"] = origin
+                    response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+        return response
+
+if not IS_PRODUCTION:
+    app.add_middleware(DevelopmentCORSMiddleware)
+
 app.add_middleware(SecurityHeadersMiddleware)
 
 class ChatRequest(BaseModel):
@@ -164,12 +302,28 @@ async def catch_all_options(request: Request, full_path: str):
     """Catch-all OPTIONS handler for CORS preflight - must be registered early"""
     origin = request.headers.get("Origin")
     allowed_origin = "*"
-    if origin:
+    
+    # In development, always allow local network origins
+    if not IS_PRODUCTION and origin:
+        # Check if it's a local network origin (localhost, private IPs, hotspots)
+        is_local = (
+            origin.startswith("http://localhost") or
+            origin.startswith("http://127.0.0.1") or
+            origin.startswith("http://192.168.") or
+            origin.startswith("http://10.") or
+            (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
+        )
+        if is_local:
+            allowed_origin = origin
+        elif origin in ALLOWED_ORIGINS:
+            allowed_origin = origin
+    elif origin:
         if origin in ALLOWED_ORIGINS:
             allowed_origin = origin
         elif "*" in ALLOWED_ORIGINS:
             allowed_origin = "*"
     
+    # Always return 200 for OPTIONS (CORS preflight)
     return Response(
         status_code=200,
         headers={
@@ -313,14 +467,18 @@ async def signup(request: Request, response: Response, user_data: UserCreate):
             "verification_token_expires": verification_expires
         })
     
-    verification_url = f"{FRONTEND_URL.rstrip('/')}/verify-email?token={verification_token}"
+    # Get frontend URL from request origin (detects user's current network)
+    frontend_url = get_frontend_url_from_request(request)
+    verification_url = f"{frontend_url}/verify-email?token={verification_token}"
+    
+    logger.info(f"Using frontend URL from request: {frontend_url}")
     
     try:
         username = user.get("username") if user else user_data.username
         subject, html, text = render_verification_email(
             user_data.email,
             verification_token,
-            FRONTEND_URL,
+            frontend_url,
             username=username
         )
         logger.info(f"Calling send_email for {user_data.email}...")
@@ -655,7 +813,7 @@ async def verify_email_by_token(request: Request, verify_data: VerifyEmailReques
     return {"message": "Email verified successfully", "verified": True}
 
 @app.post("/auth/resend-verification")
-async def resend_verification(req: ResendVerificationRequest):
+async def resend_verification(request: Request, req: ResendVerificationRequest):
     email_normalized = req.email.lower().strip()
     user = await db_repo.get_user_by_email(email_normalized)
     
@@ -674,12 +832,16 @@ async def resend_verification(req: ResendVerificationRequest):
         "verification_token_expires": verification_expires
     })
     
+    # Get frontend URL from request origin (detects user's current network)
+    frontend_url = get_frontend_url_from_request(request)
+    logger.info(f"Resending verification email using frontend URL from request: {frontend_url}")
+    
     try:
         username = user.get("username")
         subject, html, text = render_verification_email(
             req.email,
             verification_token,
-            FRONTEND_URL,
+            frontend_url,
             username=username
         )
         send_email(req.email, subject, html, text)
@@ -704,7 +866,7 @@ class ChangePasswordRequest(BaseModel):
     confirm_password: str
 
 @app.post("/auth/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest):
+async def forgot_password(request: Request, req: ForgotPasswordRequest):
     email_normalized = req.email.lower().strip()
     user = await db_repo.get_user_by_email(email_normalized)
     
@@ -726,12 +888,16 @@ async def forgot_password(req: ForgotPasswordRequest):
         "reset_token_expires": reset_expires
     })
     
+    # Get frontend URL from request origin (detects user's current network)
+    frontend_url = get_frontend_url_from_request(request)
+    logger.info(f"Sending password reset email using frontend URL from request: {frontend_url}")
+    
     try:
         username = user.get("username")
         subject, html, text = render_password_reset_email(
             req.email,
             reset_token,
-            FRONTEND_URL,
+            frontend_url,
             username=username
         )
         send_email(req.email, subject, html, text)
@@ -1485,10 +1651,18 @@ async def save_checkin(
 
 @app.get("/global-notes")
 async def get_global_notes(
+    include_archived: bool = Query(False, description="Include archived notes"),
+    sort_by: str = Query("updated_at", description="Sort by: updated_at, created_at, title"),
+    pinned_only: bool = Query(False, description="Only return pinned notes"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all global notes for the current user, ordered by most recently updated."""
-    notes = await db_repo.get_global_notes(current_user["id"])
+    """Get all global notes for the current user with filtering and sorting."""
+    notes = await db_repo.get_global_notes(
+        current_user["id"],
+        include_archived=include_archived,
+        sort_by=sort_by,
+        pinned_only=pinned_only
+    )
     return notes
 
 @app.get("/global-notes/{note_id}")
@@ -1533,6 +1707,160 @@ async def delete_global_note(
     if not success:
         raise HTTPException(status_code=404, detail="Note not found")
     return {"message": "Note deleted successfully"}
+
+@app.post("/global-notes/{note_id}/pin")
+async def pin_global_note(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Pin a global note to the top."""
+    result = await db_repo.update_global_note(note_id, {"pinned": True}, current_user["id"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return result
+
+@app.post("/global-notes/{note_id}/unpin")
+async def unpin_global_note(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Unpin a global note."""
+    result = await db_repo.update_global_note(note_id, {"pinned": False}, current_user["id"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return result
+
+@app.post("/global-notes/{note_id}/archive")
+async def archive_global_note(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Archive a global note."""
+    result = await db_repo.update_global_note(note_id, {"archived": True}, current_user["id"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return result
+
+@app.post("/global-notes/{note_id}/unarchive")
+async def unarchive_global_note(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Unarchive a global note."""
+    result = await db_repo.update_global_note(note_id, {"archived": False}, current_user["id"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return result
+
+@app.post("/global-notes/{note_id}/image")
+async def upload_note_image(
+    note_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload an image for a global note."""
+    note = await db_repo.get_global_note(note_id, current_user["id"])
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    if note.get("image_filename"):
+        old_filename = note["image_filename"]
+        if photo_exists(old_filename):
+            delete_photo(old_filename)
+    
+    filename = save_photo(file, note_id)
+    result = await db_repo.update_global_note(note_id, {"image_filename": filename}, current_user["id"])
+    return result
+
+@app.delete("/global-notes/{note_id}/image")
+async def delete_note_image(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete the image from a global note."""
+    note = await db_repo.get_global_note(note_id, current_user["id"])
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    if note.get("image_filename"):
+        filename = note["image_filename"]
+        if photo_exists(filename):
+            delete_photo(filename)
+        await db_repo.update_global_note(note_id, {"image_filename": None}, current_user["id"])
+    
+    return {"message": "Image deleted successfully"}
+
+@app.get("/global-notes/{note_id}/image")
+async def get_note_image(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the image for a global note."""
+    note = await db_repo.get_global_note(note_id, current_user["id"])
+    if not note or not note.get("image_filename"):
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    filename = note["image_filename"]
+    if not photo_exists(filename):
+        raise HTTPException(status_code=404, detail="Image file not found")
+    
+    photo_path = get_photo_path(filename)
+    return FileResponse(photo_path, media_type="image/jpeg")
+
+@app.post("/global-notes/{note_id}/audio")
+async def upload_note_audio(
+    note_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload an audio file (voice note) for a global note."""
+    note = await db_repo.get_global_note(note_id, current_user["id"])
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    if note.get("audio_filename"):
+        old_filename = note["audio_filename"]
+        if audio_exists(old_filename):
+            delete_audio(old_filename)
+    
+    filename = save_audio(file, note_id)
+    result = await db_repo.update_global_note(note_id, {"audio_filename": filename}, current_user["id"])
+    return result
+
+@app.delete("/global-notes/{note_id}/audio")
+async def delete_note_audio(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete the audio from a global note."""
+    note = await db_repo.get_global_note(note_id, current_user["id"])
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    if note.get("audio_filename"):
+        filename = note["audio_filename"]
+        if audio_exists(filename):
+            delete_audio(filename)
+        await db_repo.update_global_note(note_id, {"audio_filename": None}, current_user["id"])
+    
+    return {"message": "Audio deleted successfully"}
+
+@app.get("/global-notes/{note_id}/audio")
+async def get_note_audio(
+    note_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the audio file for a global note."""
+    note = await db_repo.get_global_note(note_id, current_user["id"])
+    if not note or not note.get("audio_filename"):
+        raise HTTPException(status_code=404, detail="Audio not found")
+    
+    filename = note["audio_filename"]
+    if not audio_exists(filename):
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    audio_path = get_audio_path(filename)
+    return FileResponse(audio_path, media_type="audio/mpeg")
 
 # Context Signals Endpoints (Foundation Only - No UI)
 @app.post("/context-signals/refresh")
@@ -1800,19 +2128,11 @@ async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_
             payload.conversation_history
         )
         
-        # For structured actions (create, reschedule), use rule-based logic for reliability
-        # But use intelligent assistant's natural response text
-        if intelligent_reply.get("ui") and intelligent_reply["ui"].get("action") in ["confirm_create", "apply_reschedule"]:
-            # Get the structured action from rule-based logic
-            rule_based_reply = await generate_rule_based(payload.message, current_user["id"])
-            if rule_based_reply.get("ui"):
-                # Use intelligent response text but rule-based UI action (more reliable)
-                return {
-                    "assistant_response": intelligent_reply.get("assistant_response", rule_based_reply.get("assistant_response", "Something went wrong.")),
-                    "ui": rule_based_reply.get("ui")
-                }
+        # Intelligent assistant now creates pending actions for task creation
+        # So we can use its response directly - no need to call rule-based assistant
+        # This prevents duplication and ensures consistency
         
-        # For non-action responses, use intelligent assistant
+        # Return intelligent assistant's response
         if intelligent_reply.get("assistant_response"):
             return {
                 "assistant_response": intelligent_reply.get("assistant_response", "Something went wrong."),
@@ -1843,7 +2163,21 @@ async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_
 @app.post("/assistant/confirm")
 async def assistant_confirm(current_user: dict = Depends(get_current_user)):
     """Confirm pending action (equivalent to user saying 'yes', user-scoped)."""
-    return await generate_assistant_response("yes", current_user["id"])
+    from app.ai.assistant import generate_assistant_response
+    
+    # Check if there's a pending action first
+    from app.logic.pending_actions import get_current_pending
+    pending = await get_current_pending(current_user["id"])
+    
+    if pending:
+        # Use rule-based assistant to handle pending action confirmation
+        return await generate_assistant_response("yes", current_user["id"])
+    else:
+        # No pending action - return helpful message
+        return {
+            "assistant_response": "There's nothing to confirm right now.",
+            "ui": None
+        }
 
 @app.get("/assistant/context-actions")
 async def get_context_actions(
