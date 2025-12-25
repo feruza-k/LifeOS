@@ -1726,7 +1726,7 @@ I also made SolAI more concise — responses are now 1-2 sentences by default, e
 
 ### **Day 25**: Selective Memory Injection & Memory-Informed Behavior (Dec 25, 2025)
 
-Today I closed the loop on memory: SolAI now uses stored memories to shape its behavior, but silently. No mentions, no announcements — memories just make the assistant feel more aligned.
+Today I closed the loop on memory: SolAI now uses stored memories to shape its behavior, but silently. No mentions, no announcements; memories just make the assistant feel more aligned.
 
 #### **Selective Memory Injection**
 
@@ -1738,22 +1738,21 @@ The key is selectivity — not all memories, just the ones that actually matter 
 
 Memories now shape SolAI's judgment without being mentioned. I categorized memories by type and gave each type specific behavioral guidance:
 
-- **Preferences** bias suggestions — if you prefer morning workouts, SolAI suggests morning times naturally
-- **Constraints** limit proposals — if you can't work after 6pm, SolAI never suggests evening tasks
-- **Values** influence tone — if you value work-life balance, SolAI is gentler about overload
-- **Patterns** inform defaults — but user intent always overrides
+- **Preferences** bias suggestions: If you prefer morning workouts, SolAI suggests morning times naturally
+- **Constraints** limit proposals: If you can't work after 6pm, SolAI never suggests evening tasks
+- **Values** influence tone: If you value work-life balance, SolAI is gentler about overload
+- **Patterns** inform defaults, but user intent always overrides
 
-The system prompt includes clear instructions: use preferences to bias, use constraints to limit, use values to shape tone. But never mention memories explicitly — they simply make SolAI feel more aligned with you.
+The system prompt includes clear instructions: use preferences to bias, use constraints to limit, use values to shape tone. But never mention memories explicitly, they simply make SolAI feel more aligned with the user.
 
 #### **Reflection**
 
-This is the subtle part. Memories don't control behavior — they inform it. If you explicitly want something that conflicts with a memory, your intent wins. Memories are hints, not rules.
+Memories don't control behavior — they inform it. If you explicitly want something that conflicts with a memory, your intent wins. Memories are hints, not rules.
 
-The assistant should feel understood, not managed. When you say "schedule a workout" and SolAI suggests morning times because it knows you prefer mornings, it should feel natural — like the assistant just gets you, not like it's following a script.
+The assistant should feel understood, not managed. When you say "schedule a workout" and SolAI suggests morning times because it knows you prefer mornings, it should feel natural - like the assistant just gets you, not like it's following a script.
 
 ---
 
 ## **Next Steps:**
 
-Build user-facing features that leverage the memory and context foundation: weekly reflections, morning briefings, goal alignment, and habit reinforcement. Continue refining SolAI's personality to feel more like a trusted executive assistant.
-
+Build user-facing features that leverage the memory and context foundation: weekly reflections, morning briefings, goal alignment, and habit reinforcement.
