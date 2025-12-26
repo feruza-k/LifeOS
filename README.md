@@ -1794,8 +1794,6 @@ The app is functional in production, but I want to make sure the authentication 
 
 Deployment always takes longer than expected, but it's worth doing now. Having a real environment to test against makes everything else easier. Plus, it's satisfying to see LifeOS actually running on a real domain instead of just localhost.
 
-I'm planning to finish the remaining deployment polish tomorrow, then move on to the Explore page and Weekly Reflection feature. The foundation is solid — now it's about making it reliable for real users.
-
 ---
 
 ## **Next Steps:**
