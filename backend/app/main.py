@@ -340,6 +340,11 @@ def home():
     """Basic API health check."""
     return {"message": "LifeOS API is running 🚀"}
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Railway/deployment monitoring."""
+    return {"status": "healthy", "message": "LifeOS API is running"}
+
 @app.get("/ai-test")
 def ai_test():
     return {"response": test_ai_connection()}
