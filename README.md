@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 25, 2025
+**Current Date:** December 26, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -32,6 +32,7 @@
   - [Day 23: Memory Foundation](#day-23-memory-foundation-dec-23-2025)
   - [Day 24: Context Awareness Signals & Memory Extraction](#day-24-context-awareness-signals--memory-extraction-dec-24-2025)
   - [Day 25: Selective Memory Injection & Memory-Informed Behavior](#day-25-selective-memory-injection--memory-informed-behavior-dec-25-2025)
+  - [Day 26: Deployment & Production Setup](#day-26-deployment--production-setup-dec-26-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1753,6 +1754,50 @@ The assistant should feel understood, not managed. When you say "schedule a work
 
 ---
 
+### **Day 26**: Deployment & Production Setup (Dec 26, 2025)
+
+Today I focused on getting LifeOS deployed and accessible to real users. I thought it made sense to handle deployment before building new features. This way I can test everything in a real environment, and other people can actually use the app.
+
+#### **What I Did**
+
+- **Bought and configured domain** (`mylifeos.dev`)
+  - Connected it to Resend for email delivery
+  - Updated email templates to use the new domain
+  - Multiple accounts can now sign up and use the app
+
+- **Deployed backend to Railway**
+  - Set up PostgreSQL connection (Session mode for better deployment compatibility)
+  - Configured environment variables
+  - Backend is live and accessible
+
+- **Deployed frontend to Vercel**
+  - Set up PWA configuration (manifest, service worker, icons)
+  - Configured routing and environment variables
+  - Frontend is live and accessible
+
+- **Fixed deployment issues**
+  - Resolved CORS configuration for cross-domain cookies (Vercel ↔ Railway)
+  - Updated cookie settings to use `SameSite=None` for production
+  - Fixed CSS build errors (import order)
+  - Improved error handling for API calls
+
+#### **Current Status**
+
+Both deployments are successful, but I'm still working through some edge cases:
+- Login/signup flow needs final polish
+- Mobile device detection for local development
+- Some CORS edge cases to resolve
+
+The app is functional in production, but I want to make sure the authentication flow is rock-solid before moving forward.
+
+#### **Reflection**
+
+Deployment always takes longer than expected, but it's worth doing now. Having a real environment to test against makes everything else easier. Plus, it's satisfying to see LifeOS actually running on a real domain instead of just localhost.
+
+I'm planning to finish the remaining deployment polish tomorrow, then move on to the Explore page and Weekly Reflection feature. The foundation is solid — now it's about making it reliable for real users.
+
+---
+
 ## **Next Steps:**
 
-Build user-facing features that leverage the memory and context foundation: weekly reflections, morning briefings, goal alignment, and habit reinforcement.
+Finish deployment polish, then build user-facing features that leverage the memory and context foundation: weekly reflections, morning briefings, goal alignment, and habit reinforcement.

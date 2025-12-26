@@ -137,7 +137,8 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
 
-# CORS middleware - in development, we'll handle CORS via custom middleware and OPTIONS handler
+# CORS middleware - we'll handle Vercel domains dynamically in custom middleware
+# For now, use the allowed origins list (will be extended by custom middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -151,20 +152,33 @@ app.add_middleware(
 # to intercept OPTIONS requests before CORSMiddleware rejects them
 class PreCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Handle OPTIONS requests for local networks in development
-        if request.method == "OPTIONS" and not IS_PRODUCTION:
+        # Handle OPTIONS requests (CORS preflight) for both dev and production
+        if request.method == "OPTIONS":
             origin = request.headers.get("Origin")
             if origin:
-                # Check if it's a local network origin
-                is_local = (
-                    origin.startswith("http://localhost") or
-                    origin.startswith("http://127.0.0.1") or
-                    origin.startswith("http://192.168.") or
-                    origin.startswith("http://10.") or
-                    (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
-                )
-                if is_local:
-                    # Return 200 immediately for local network OPTIONS requests
+                allowed = False
+                
+                # In development, allow local network origins
+                if not IS_PRODUCTION:
+                    is_local = (
+                        origin.startswith("http://localhost") or
+                        origin.startswith("http://127.0.0.1") or
+                        origin.startswith("http://192.168.") or
+                        origin.startswith("http://10.") or
+                        (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
+                    )
+                    if is_local:
+                        allowed = True
+                
+                # Check if origin is in allowed list
+                if origin in ALLOWED_ORIGINS:
+                    allowed = True
+                # In production, allow Vercel domains
+                elif IS_PRODUCTION and (origin.endswith(".vercel.app") or origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev")):
+                    allowed = True
+                
+                if allowed:
+                    # Return 200 immediately for allowed OPTIONS requests
                     return Response(
                         status_code=200,
                         headers={
@@ -182,16 +196,12 @@ class PreCORSMiddleware(BaseHTTPMiddleware):
 app.add_middleware(PreCORSMiddleware)
 
 # Custom middleware to allow local network origins in development and Vercel domains in production
-# This runs AFTER the CORS middleware to override headers
+# This runs AFTER the CORS middleware to override headers and add credentials
 class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # For OPTIONS requests, let our handler deal with it
-        if request.method == "OPTIONS":
-            return await call_next(request)
-        
-        response = await call_next(request)
-        
         origin = request.headers.get("Origin")
+        allowed = False
+        
         if origin:
             # In development, allow any local network origin
             if not IS_PRODUCTION:
@@ -203,13 +213,34 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
                     (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
                 )
                 if is_local:
-                    response.headers["Access-Control-Allow-Origin"] = origin
-                    response.headers["Access-Control-Allow-Credentials"] = "true"
-            # In production, allow Vercel domains
-            elif IS_PRODUCTION and (origin.endswith(".vercel.app") or origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev")):
-                if origin not in ALLOWED_ORIGINS:
-                    response.headers["Access-Control-Allow-Origin"] = origin
-                    response.headers["Access-Control-Allow-Credentials"] = "true"
+                    allowed = True
+            # In production, allow Vercel domains and mylifeos.dev
+            elif IS_PRODUCTION:
+                if (origin.endswith(".vercel.app") or 
+                    origin.endswith("mylifeos.dev") or 
+                    origin.endswith("www.mylifeos.dev") or
+                    origin in ALLOWED_ORIGINS):
+                    allowed = True
+        
+        # For OPTIONS requests, handle CORS preflight
+        if request.method == "OPTIONS" and allowed:
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Max-Age": "3600",
+                }
+            )
+        
+        response = await call_next(request)
+        
+        # Add CORS headers to response if origin is allowed
+        if allowed and origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
         
         return response
 

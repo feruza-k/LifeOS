@@ -54,7 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           clearTimeout(timeoutId);
           // No valid session - this is expected if user is not logged in
-          console.log("No valid session:", error);
+          // Only log network errors, not 401s (which are normal for logged-out users)
+          const errorMessage = error?.message || String(error);
+          if (errorMessage.includes("network") || errorMessage.includes("fetch") || errorMessage.includes("connect")) {
+            console.error("Auth check failed - backend unreachable:", errorMessage);
+          } else {
+            // 401 or other auth errors are normal - user just isn't logged in
+            console.log("No valid session (user not logged in)");
+          }
           setUser(null);
           setIsAuthenticated(false);
           setLoading(false);

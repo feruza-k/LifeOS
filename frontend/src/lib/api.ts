@@ -26,9 +26,18 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
     });
     
     if (res.status === 401) {
-      // If we should skip refresh (e.g., for session checks), just throw
+      // If we should skip refresh (e.g., for signup, session checks), read the actual error
       if (skipRefresh || refreshHasFailed) {
-        throw new Error("Unauthorized - please log in again");
+        // Read the actual error message from the backend
+        const responseText = await res.text();
+        let errorMessage = "Unauthorized - please log in again";
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
       
       // Prevent infinite loops - don't retry if we've already tried
@@ -106,13 +115,20 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
       // Read response as text first (can only read once)
       const responseText = await res.text();
       let errorMessage = `API error ${res.status}`;
-      try {
-        // Try to parse as JSON for structured error
-        const errorData = JSON.parse(responseText);
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      } catch {
-        // If not JSON, use the text as error message
-        errorMessage = responseText || errorMessage;
+      
+      // Special handling for 405 (Method Not Allowed) - usually CORS or routing issue
+      if (res.status === 405) {
+        errorMessage = `Method not allowed. This might be a CORS issue. Check if the backend is accessible at ${BASE_URL}`;
+        console.error(`[API] 405 Error for ${url}. Response:`, responseText);
+      } else {
+        try {
+          // Try to parse as JSON for structured error
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          // If not JSON, use the text as error message
+          errorMessage = responseText || errorMessage;
+        }
       }
       throw new Error(errorMessage);
     }
@@ -176,13 +192,25 @@ export const api = {
   },
 
   signup: async (email: string, password: string, confirmPassword: string, username?: string) => {
+    // Skip token refresh for signup - user doesn't have tokens yet
     return request("/auth/signup", {
       method: "POST",
       body: JSON.stringify({ email, password, confirm_password: confirmPassword, username }),
-    });
+    }, 0, true); // skipRefresh = true
   },
 
-  getCurrentUser: () => request("/auth/me", {}, 0, true), // Skip auto-refresh to avoid loops, just check session
+  getCurrentUser: () => {
+    // Skip auto-refresh to avoid loops, just check session
+    // This endpoint returns 401 if not logged in, which is normal - don't treat as error
+    return request("/auth/me", {}, 0, true).catch((error) => {
+      // If it's a network error, re-throw it
+      if (error?.message?.includes("network") || error?.message?.includes("fetch") || error?.message?.includes("connect")) {
+        throw error;
+      }
+      // Otherwise, it's probably a 401 (not logged in) - throw a specific error
+      throw new Error("Not authenticated");
+    });
+  },
 
   verifyEmail: (token: string) =>
     request("/auth/verify-email-by-token", {

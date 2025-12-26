@@ -9,8 +9,22 @@ const isMobileDevice = () => {
 
 const getBaseURL = () => {
   // Production: Use environment variable (set during build)
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  // Vite environment variables are replaced at build time, so they must be set in Vercel before building
+  const viteApiUrl = import.meta.env.VITE_API_URL;
+  
+  // Debug logging to verify environment variable is set
+  if (typeof window !== 'undefined') {
+    console.log('[Config] Environment check:', {
+      isDev: isDev,
+      hasViteApiUrl: !!viteApiUrl,
+      viteApiUrl: viteApiUrl ? `${viteApiUrl.substring(0, 30)}...` : 'NOT SET',
+      hostname: window.location.hostname,
+    });
+  }
+  
+  if (viteApiUrl) {
+    console.log('[Config] ✅ Using VITE_API_URL from environment');
+    return viteApiUrl;
   }
   
   // In development, use Vite proxy (same-origin) for cookies to work
@@ -28,7 +42,11 @@ const getBaseURL = () => {
       console.log(`[Config] Mobile device detected. Using backend: ${url}`);
       return url;
     }
-    // Fallback to common network IPs
+    // If on localhost but mobile device, try to use the computer's network IP
+    // This happens when phone is on same WiFi but accessing via localhost
+    // User should access via computer's IP address (e.g., http://192.168.1.11:8080)
+    console.warn(`[Config] Mobile device on localhost. Access frontend via your computer's IP (e.g., http://192.168.1.11:8080)`);
+    // Try common network IPs as fallback
     const fallbackUrl = `http://192.168.1.11:8000`;
     console.log(`[Config] Using fallback backend: ${fallbackUrl}`);
     return fallbackUrl;
@@ -37,7 +55,8 @@ const getBaseURL = () => {
   // Production fallback: Use Railway backend URL
   // This should be set via VITE_API_URL environment variable in Vercel
   const railwayUrl = "https://lifeos-production-f5df.up.railway.app";
-  console.warn(`[Config] No VITE_API_URL set in production. Using Railway URL: ${railwayUrl}`);
+  console.warn(`[Config] ⚠️ No VITE_API_URL set in production. Using fallback: ${railwayUrl}`);
+  console.warn(`[Config] 💡 Set VITE_API_URL in Vercel environment variables for production!`);
   return railwayUrl;
 };
 
