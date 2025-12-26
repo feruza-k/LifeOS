@@ -24,12 +24,26 @@ const getBaseURL = () => {
   
   if (viteApiUrl) {
     // Ensure production URLs use HTTPS (Railway redirects HTTP to HTTPS, causing 405 errors)
-    const url = viteApiUrl.trim();
+    let url = viteApiUrl.trim();
+    
+    // If URL doesn't have a protocol, add https:// in production or http:// in dev
+    if (!url.match(/^https?:\/\//)) {
+      if (isDev) {
+        url = `http://${url}`;
+        console.warn('[Config] ⚠️ VITE_API_URL missing protocol. Added http:// for development.');
+      } else {
+        url = `https://${url}`;
+        console.warn('[Config] ⚠️ VITE_API_URL missing protocol. Added https:// for production.');
+      }
+    }
+    
+    // Ensure production URLs use HTTPS (convert HTTP to HTTPS)
     if (!isDev && url.startsWith('http://')) {
       console.warn('[Config] ⚠️ VITE_API_URL uses HTTP in production. Converting to HTTPS.');
-      return url.replace('http://', 'https://');
+      url = url.replace('http://', 'https://');
     }
-    console.log('[Config] ✅ Using VITE_API_URL from environment');
+    
+    console.log('[Config] ✅ Using VITE_API_URL from environment:', url);
     return url;
   }
   
