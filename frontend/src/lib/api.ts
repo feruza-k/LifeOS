@@ -167,10 +167,15 @@ export const api = {
     formData.append("username", email);
     formData.append("password", password);
     
-    const res = await fetch(`${BASE_URL}/auth/login`, {
+    // Ensure BASE_URL uses HTTPS in production (Railway redirects HTTP to HTTPS, causing 405)
+    const loginUrl = `${BASE_URL}/auth/login`;
+    console.log(`[API] Login request to: ${loginUrl}`);
+    
+    const res = await fetch(loginUrl, {
       method: "POST",
       body: formData,
       credentials: "include",  // Include cookies
+      // Don't set Content-Type header - browser sets it automatically for FormData with boundary
     });
     
     if (!res.ok) {

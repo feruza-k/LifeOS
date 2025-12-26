@@ -246,16 +246,37 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
         
         response = await call_next(request)
         
-        # Add CORS headers to response if origin is allowed
+        # Add CORS headers to response if origin is allowed (for all requests, not just OPTIONS)
+        # This overrides CORSMiddleware's headers for dynamic origins (Vercel domains)
         if allowed and origin:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
+        elif IS_PRODUCTION and origin:
+            # Log if origin wasn't allowed in production (for debugging 405 errors)
+            logger.warning(f"CORS: Origin not allowed: {origin}, method: {request.method}, path: {request.url.path}")
         
         return response
 
 # Add DevelopmentCORSMiddleware in both dev and production to handle dynamic origins
 app.add_middleware(DevelopmentCORSMiddleware)
 
+# Request logging middleware for debugging 405 errors
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Log all requests in production for debugging
+        if IS_PRODUCTION and request.url.path.startswith("/auth"):
+            origin = request.headers.get("Origin")
+            logger.info(f"[REQUEST] {request.method} {request.url.path} - Origin: {origin}, Scheme: {request.url.scheme}, Headers: {dict(request.headers)}")
+        
+        response = await call_next(request)
+        
+        # Log response status for auth endpoints
+        if IS_PRODUCTION and request.url.path.startswith("/auth"):
+            logger.info(f"[RESPONSE] {request.method} {request.url.path} - Status: {response.status_code}")
+        
+        return response
+
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 class ChatRequest(BaseModel):
@@ -610,6 +631,9 @@ async def signup(request: Request, response: Response, user_data: UserCreate):
 @app.post("/auth/login")
 @limiter.limit("6/15minutes", key_func=get_ip_rate_limit_key)  # 6 attempts allows account lockout at 5 to trigger first
 async def login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
+    # Debug logging for 405 errors
+    origin = request.headers.get("Origin")
+    logger.info(f"[LOGIN] Request received - origin: {origin}, method: {request.method}, path: {request.url.path}, scheme: {request.url.scheme}")
     from app.auth.security import is_account_locked, handle_failed_login, clear_failed_attempts
     from slowapi.util import get_remote_address
     
