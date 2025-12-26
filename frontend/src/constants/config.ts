@@ -34,9 +34,11 @@ const getBaseURL = () => {
     return fallbackUrl;
   }
   
-  // Production fallback: This shouldn't happen if VITE_API_URL is set
-  console.warn("[Config] No VITE_API_URL set in production. Using fallback.");
-  return `http://localhost:8000`;
+  // Production fallback: Use Railway backend URL
+  // This should be set via VITE_API_URL environment variable in Vercel
+  const railwayUrl = "https://lifeos-production-f5df.up.railway.app";
+  console.warn(`[Config] No VITE_API_URL set in production. Using Railway URL: ${railwayUrl}`);
+  return railwayUrl;
 };
 
 export const BASE_URL = getBaseURL();

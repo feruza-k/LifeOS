@@ -155,10 +155,9 @@ export default function Auth() {
     try {
       await login(email, password);
       toast.success("Welcome back!");
-      // Wait longer for auth state to fully update before navigating
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Use window.location for a full page reload to ensure clean state
-      window.location.href = "/";
+      // Wait for auth state to update before navigating
+      await new Promise(resolve => setTimeout(resolve, 300));
+      navigate("/", { replace: true });
     } catch (error: any) {
       const errorMessage = error?.message || "Something went wrong. Please try again.";
       try {
