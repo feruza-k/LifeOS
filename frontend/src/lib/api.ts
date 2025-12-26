@@ -103,9 +103,20 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
     }
     
     if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`API error ${res.status}: ${errorText}`);
+      // Read response as text first (can only read once)
+      const responseText = await res.text();
+      let errorMessage = `API error ${res.status}`;
+      try {
+        // Try to parse as JSON for structured error
+        const errorData = JSON.parse(responseText);
+        errorMessage = errorData.detail || errorData.message || errorMessage;
+      } catch {
+        // If not JSON, use the text as error message
+        errorMessage = responseText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
+    // For successful response, read as JSON
     return res.json();
   } catch (error: any) {
     // Enhanced error logging for debugging
@@ -239,8 +250,15 @@ export const api = {
       });
       
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`API error ${res.status}: ${errorText}`);
+        const responseText = await res.text();
+        let errorMessage = `API error ${res.status}`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
       return res.json();
     } catch (error) {
@@ -319,8 +337,15 @@ export const api = {
       }
       
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`API error ${res.status}: ${errorText}`);
+        const responseText = await res.text();
+        let errorMessage = `API error ${res.status}`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
       return res.json();
     } catch (error) {
