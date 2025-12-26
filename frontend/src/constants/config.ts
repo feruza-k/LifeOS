@@ -23,8 +23,14 @@ const getBaseURL = () => {
   }
   
   if (viteApiUrl) {
+    // Ensure production URLs use HTTPS (Railway redirects HTTP to HTTPS, causing 405 errors)
+    const url = viteApiUrl.trim();
+    if (!isDev && url.startsWith('http://')) {
+      console.warn('[Config] ⚠️ VITE_API_URL uses HTTP in production. Converting to HTTPS.');
+      return url.replace('http://', 'https://');
+    }
     console.log('[Config] ✅ Using VITE_API_URL from environment');
-    return viteApiUrl;
+    return url;
   }
   
   // In development, use Vite proxy (same-origin) for cookies to work

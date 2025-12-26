@@ -104,9 +104,11 @@ def get_frontend_url_from_request(request: Request) -> str:
 # Allow localhost and common network IPs for development
 # Include common hotspot IPs (172.20.10.x for iPhone hotspot, 192.168.43.x for Android)
 # Production domains (Vercel)
-default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173,http://172.20.10.1:8080,http://172.20.10.1:5173,https://mylifeos.dev,https://www.mylifeos.dev,https://*.vercel.app"
+default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173,http://172.20.10.1:8080,http://172.20.10.1:5173,https://mylifeos.dev,https://www.mylifeos.dev,https://lifeos-indol.vercel.app"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
+# Remove wildcard entries (CORSMiddleware doesn't support them)
+ALLOWED_ORIGINS = [origin for origin in ALLOWED_ORIGINS if "*" not in origin]
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "production") == "production"
 
 # In development, be more permissive with CORS - allow any local network origin
@@ -137,14 +139,16 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
 
-# CORS middleware - we'll handle Vercel domains dynamically in custom middleware
-# For now, use the allowed origins list (will be extended by custom middleware)
+# CORS middleware - MUST be registered FIRST (runs LAST) to handle all CORS properly
+# This ensures OPTIONS preflight requests are handled correctly
+# We use allow_methods=["*"] and allow_headers=["*"] to be permissive,
+# then filter in custom middleware if needed
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS,  # Explicit origins only (no wildcards)
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["*"],  # Allow all methods including OPTIONS
+    allow_headers=["*"],  # Allow all headers for CORS preflight
 )
 
 # Pre-CORS middleware to handle OPTIONS for local networks in development
@@ -173,9 +177,14 @@ class PreCORSMiddleware(BaseHTTPMiddleware):
                 # Check if origin is in allowed list
                 if origin in ALLOWED_ORIGINS:
                     allowed = True
-                # In production, allow Vercel domains
-                elif IS_PRODUCTION and (origin.endswith(".vercel.app") or origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev")):
-                    allowed = True
+                # In production, allow Vercel domains (check more broadly)
+                elif IS_PRODUCTION:
+                    # Allow any Vercel subdomain
+                    if ".vercel.app" in origin:
+                        allowed = True
+                    # Allow mylifeos.dev domains
+                    elif origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev"):
+                        allowed = True
                 
                 if allowed:
                     # Return 200 immediately for allowed OPTIONS requests
@@ -244,8 +253,8 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
         
         return response
 
-if not IS_PRODUCTION:
-    app.add_middleware(DevelopmentCORSMiddleware)
+# Add DevelopmentCORSMiddleware in both dev and production to handle dynamic origins
+app.add_middleware(DevelopmentCORSMiddleware)
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -340,6 +349,10 @@ async def catch_all_options(request: Request, full_path: str):
     origin = request.headers.get("Origin")
     allowed_origin = None
     
+    # Log for debugging
+    if IS_PRODUCTION:
+        logger.debug(f"OPTIONS request for {full_path} from origin: {origin}")
+    
     if origin:
         # In development, always allow local network origins
         if not IS_PRODUCTION:
@@ -357,15 +370,20 @@ async def catch_all_options(request: Request, full_path: str):
         # Check if origin is in allowed list
         if origin in ALLOWED_ORIGINS:
             allowed_origin = origin
-        # Allow any Vercel domain in production
-        elif IS_PRODUCTION and (origin.endswith(".vercel.app") or origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev")):
-            allowed_origin = origin
+        # Allow any Vercel domain in production (including subdomains)
+        elif IS_PRODUCTION:
+            if (origin.endswith(".vercel.app") or 
+                origin.endswith("mylifeos.dev") or 
+                origin.endswith("www.mylifeos.dev") or
+                "vercel.app" in origin):
+                allowed_origin = origin
     
-    # If no origin matched, don't allow (return 403 or use a default)
+    # If no origin matched, return 200 with no CORS headers (browser will block, but don't return 403)
+    # Returning 403 causes issues - better to return 200 and let browser handle CORS
     if not allowed_origin:
-        return Response(status_code=403, content="CORS not allowed")
+        return Response(status_code=200, headers={})
     
-    # Always return 200 for OPTIONS (CORS preflight)
+    # Return 200 for OPTIONS (CORS preflight) with proper headers
     return Response(
         status_code=200,
         headers={
