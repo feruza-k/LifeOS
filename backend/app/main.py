@@ -103,7 +103,8 @@ def get_frontend_url_from_request(request: Request) -> str:
     return FRONTEND_URL.rstrip("/")
 # Allow localhost and common network IPs for development
 # Include common hotspot IPs (172.20.10.x for iPhone hotspot, 192.168.43.x for Android)
-default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173,http://172.20.10.1:8080,http://172.20.10.1:5173"
+# Production domains (Vercel)
+default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173,http://172.20.10.1:8080,http://172.20.10.1:5173,https://mylifeos.dev,https://www.mylifeos.dev,https://*.vercel.app"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "production") == "production"
@@ -180,8 +181,8 @@ class PreCORSMiddleware(BaseHTTPMiddleware):
 # Add pre-CORS middleware AFTER CORSMiddleware (so it runs BEFORE in execution)
 app.add_middleware(PreCORSMiddleware)
 
-# Custom middleware to allow local network origins in development
-# This runs AFTER the CORS middleware to override headers for local networks
+# Custom middleware to allow local network origins in development and Vercel domains in production
+# This runs AFTER the CORS middleware to override headers
 class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # For OPTIONS requests, let our handler deal with it
@@ -190,10 +191,10 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
         
         response = await call_next(request)
         
-        if not IS_PRODUCTION:
-            origin = request.headers.get("Origin")
-            if origin:
-                # Allow any local network origin in development
+        origin = request.headers.get("Origin")
+        if origin:
+            # In development, allow any local network origin
+            if not IS_PRODUCTION:
                 is_local = (
                     origin.startswith("http://localhost") or
                     origin.startswith("http://127.0.0.1") or
@@ -202,6 +203,11 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
                     (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
                 )
                 if is_local:
+                    response.headers["Access-Control-Allow-Origin"] = origin
+                    response.headers["Access-Control-Allow-Credentials"] = "true"
+            # In production, allow Vercel domains
+            elif IS_PRODUCTION and (origin.endswith(".vercel.app") or origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev")):
+                if origin not in ALLOWED_ORIGINS:
                     response.headers["Access-Control-Allow-Origin"] = origin
                     response.headers["Access-Control-Allow-Credentials"] = "true"
         
@@ -301,27 +307,32 @@ class MonthlyFocusRequest(BaseModel):
 async def catch_all_options(request: Request, full_path: str):
     """Catch-all OPTIONS handler for CORS preflight - must be registered early"""
     origin = request.headers.get("Origin")
-    allowed_origin = "*"
+    allowed_origin = None
     
-    # In development, always allow local network origins
-    if not IS_PRODUCTION and origin:
-        # Check if it's a local network origin (localhost, private IPs, hotspots)
-        is_local = (
-            origin.startswith("http://localhost") or
-            origin.startswith("http://127.0.0.1") or
-            origin.startswith("http://192.168.") or
-            origin.startswith("http://10.") or
-            (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
-        )
-        if is_local:
-            allowed_origin = origin
-        elif origin in ALLOWED_ORIGINS:
-            allowed_origin = origin
-    elif origin:
+    if origin:
+        # In development, always allow local network origins
+        if not IS_PRODUCTION:
+            # Check if it's a local network origin (localhost, private IPs, hotspots)
+            is_local = (
+                origin.startswith("http://localhost") or
+                origin.startswith("http://127.0.0.1") or
+                origin.startswith("http://192.168.") or
+                origin.startswith("http://10.") or
+                (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
+            )
+            if is_local:
+                allowed_origin = origin
+        
+        # Check if origin is in allowed list
         if origin in ALLOWED_ORIGINS:
             allowed_origin = origin
-        elif "*" in ALLOWED_ORIGINS:
-            allowed_origin = "*"
+        # Allow any Vercel domain in production
+        elif IS_PRODUCTION and (origin.endswith(".vercel.app") or origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev")):
+            allowed_origin = origin
+    
+    # If no origin matched, don't allow (return 403 or use a default)
+    if not allowed_origin:
+        return Response(status_code=403, content="CORS not allowed")
     
     # Always return 200 for OPTIONS (CORS preflight)
     return Response(
@@ -2324,4 +2335,5 @@ async def assistant_reschedule_options(task_id: str, current_user: dict = Depend
 async def meta_categories(current_user: dict = Depends(get_current_user)):
     """Get category color mapping."""
     return await get_category_colors(current_user["id"])
+
 

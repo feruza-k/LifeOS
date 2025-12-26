@@ -25,11 +25,11 @@ def set_auth_cookies(
     """
     # Cookie settings for security
     # SameSite=Lax works in development with Vite proxy (makes frontend/backend same-origin)
-    # In production, Secure=True requires HTTPS
+    # In production with cross-domain (Vercel + Railway), use SameSite=None with Secure=True
     cookie_kwargs = {
         "httponly": True,
-        "samesite": "lax",
-        "secure": IS_PRODUCTION,
+        "samesite": "none" if IS_PRODUCTION else "lax",  # None for cross-domain, Lax for same-origin
+        "secure": True,  # Always True (required for SameSite=None, and HTTPS in production)
         "path": "/",
     }
     
@@ -56,8 +56,8 @@ def clear_auth_cookies(response: Response, domain: Optional[str] = None):
     """Clear authentication cookies."""
     cookie_kwargs = {
         "httponly": True,
-        "samesite": "lax",
-        "secure": IS_PRODUCTION,
+        "samesite": "none" if IS_PRODUCTION else "lax",  # Match the setting used when setting cookies
+        "secure": True,  # Always True (required for SameSite=None, and HTTPS in production)
         "path": "/",  # Match the path used when setting cookies
     }
     
