@@ -155,10 +155,9 @@ export default function Auth() {
     try {
       await login(email, password);
       toast.success("Welcome back!");
-      // Use replace to avoid back button issues, and add small delay for state to update
-      setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 100);
+      // Wait for auth state to update before navigating
+      await new Promise(resolve => setTimeout(resolve, 200));
+      navigate("/", { replace: true });
     } catch (error: any) {
       const errorMessage = error?.message || "Something went wrong. Please try again.";
       try {

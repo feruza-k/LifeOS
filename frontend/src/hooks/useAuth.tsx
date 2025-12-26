@@ -68,16 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    try {
-      await api.login(email, password);
-      // Tokens are now in httpOnly cookies, get user info
-      const userData = await api.getCurrentUser();
-      setUser(userData);
-      setIsAuthenticated(true);
-    } catch (error) {
-      // Re-throw to let the caller handle it
-      throw error;
-    }
+    await api.login(email, password);
+    // Tokens are now in httpOnly cookies, get user info
+    // Wait a bit for cookies to be set
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const userData = await api.getCurrentUser();
+    setUser(userData);
+    setIsAuthenticated(true);
   }, []);
 
   const signup = useCallback(async (email: string, password: string, confirmPassword: string, username?: string) => {
