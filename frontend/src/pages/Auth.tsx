@@ -155,7 +155,10 @@ export default function Auth() {
     try {
       await login(email, password);
       toast.success("Welcome back!");
-      navigate("/");
+      // Use replace to avoid back button issues, and add small delay for state to update
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 100);
     } catch (error: any) {
       const errorMessage = error?.message || "Something went wrong. Please try again.";
       try {
