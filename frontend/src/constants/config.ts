@@ -8,6 +8,7 @@ const isMobileDevice = () => {
 };
 
 const getBaseURL = () => {
+  // Production: Use environment variable (set during build)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
@@ -18,8 +19,8 @@ const getBaseURL = () => {
     return "/api"; // Use proxy - same origin as frontend
   }
   
-  // For mobile, detect the hostname and use port 8000 for backend
-  if (isMobileDevice() || !isDev) {
+  // For mobile development, detect the hostname and use port 8000 for backend
+  if (isDev && isMobileDevice()) {
     const hostname = window.location.hostname;
     // If accessing from network IP, use that IP for backend
     if (hostname !== "localhost" && hostname !== "127.0.0.1") {
@@ -33,6 +34,8 @@ const getBaseURL = () => {
     return fallbackUrl;
   }
   
+  // Production fallback: This shouldn't happen if VITE_API_URL is set
+  console.warn("[Config] No VITE_API_URL set in production. Using fallback.");
   return `http://localhost:8000`;
 };
 
