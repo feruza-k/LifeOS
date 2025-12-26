@@ -148,16 +148,19 @@ export const api = {
     
     if (!res.ok) {
       let errorMessage = "Login failed";
+      // Read response as text first (can only read once)
+      const responseText = await res.text();
       try {
-        const errorData = await res.json();
+        // Try to parse as JSON
+        const errorData = JSON.parse(responseText);
         errorMessage = errorData.detail || errorMessage;
       } catch {
-        // If response is not JSON, try text
-        const errorText = await res.text();
-        errorMessage = errorText || errorMessage;
+        // If not JSON, use the text as error message
+        errorMessage = responseText || errorMessage;
       }
       throw new Error(errorMessage);
     }
+    // For successful response, read as JSON
     return res.json();
   },
 
