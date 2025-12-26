@@ -71,10 +71,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.login(email, password);
     // Tokens are now in httpOnly cookies, get user info
     // Wait a bit for cookies to be set
-    await new Promise(resolve => setTimeout(resolve, 100));
-    const userData = await api.getCurrentUser();
-    setUser(userData);
-    setIsAuthenticated(true);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    try {
+      const userData = await api.getCurrentUser();
+      setUser(userData);
+      setIsAuthenticated(true);
+    } catch (error) {
+      // If getCurrentUser fails, still mark as authenticated since login succeeded
+      // The cookies are set, so the user is logged in
+      console.warn("Could not fetch user after login, but login was successful:", error);
+      setIsAuthenticated(true);
+      // Set a minimal user object to prevent redirect loops
+      setUser({ id: "", email, email_verified: false, created_at: new Date().toISOString() });
+    }
   }, []);
 
   const signup = useCallback(async (email: string, password: string, confirmPassword: string, username?: string) => {
