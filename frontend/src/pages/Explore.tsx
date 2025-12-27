@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Target, MessageSquare, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity } from "lucide-react";
+import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
-import { useLifeOSStore } from "@/hooks/useLifeOSStore";
+import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -106,18 +106,99 @@ interface AnalyticsData {
   };
 }
 
-const Align = () => {
+const Explore = () => {
   const [alignData, setAlignData] = useState<AlignData | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSetFocus, setShowSetFocus] = useState(false);
+  const [currentGoalIndex, setCurrentGoalIndex] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const autoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
 
+  // Convert single goal to array for carousel (ready for multiple goals)
+  const goals = alignData?.goals.month_focus.title 
+    ? [alignData.goals.month_focus] 
+    : [];
+
   useEffect(() => {
     loadAlignData();
   }, []);
+
+  // Auto-rotate carousel every 5 seconds
+  useEffect(() => {
+    if (goals.length > 1) {
+      autoRotateTimerRef.current = setInterval(() => {
+        setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
+      }, 5000);
+      
+      return () => {
+        if (autoRotateTimerRef.current) {
+          clearInterval(autoRotateTimerRef.current);
+        }
+      };
+    }
+  }, [goals.length]);
+
+  // Handle swipe gestures
+  useEffect(() => {
+    if (!carouselRef.current || goals.length <= 1) return;
+
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+      isDragging = true;
+      if (autoRotateTimerRef.current) {
+        clearInterval(autoRotateTimerRef.current);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging) return;
+      currentX = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      
+      const diff = startX - currentX;
+      const threshold = 50; // Minimum swipe distance
+      
+      if (Math.abs(diff) > threshold) {
+        if (diff > 0) {
+          // Swipe left - next goal
+          setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
+        } else {
+          // Swipe right - previous goal
+          setCurrentGoalIndex((prev) => (prev - 1 + goals.length) % goals.length);
+        }
+      }
+      
+      // Restart auto-rotate
+      if (goals.length > 1) {
+        autoRotateTimerRef.current = setInterval(() => {
+          setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
+        }, 5000);
+      }
+    };
+
+    const element = carouselRef.current;
+    element.addEventListener('touchstart', handleTouchStart);
+    element.addEventListener('touchmove', handleTouchMove);
+    element.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      element.removeEventListener('touchstart', handleTouchStart);
+      element.removeEventListener('touchmove', handleTouchMove);
+      element.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [goals.length]);
 
   const loadAlignData = async () => {
     try {
@@ -151,11 +232,6 @@ const Align = () => {
     }
   };
 
-  // Quick helper to open AI chat with a message
-  const handleDiscussWithAI = (message: string) => {
-    coreAI.sendMessage(message);
-    navigate("/");
-  };
 
   if (loading) {
     return (
@@ -189,9 +265,9 @@ const Align = () => {
         <header className="px-6 pb-6 animate-fade-in">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-serif font-medium text-foreground">Align</h1>
+              <h1 className="text-lg font-sans font-bold text-foreground">Explore</h1>
             </div>
-            <Target className="w-7 h-7 text-primary" />
+            <Compass className="w-7 h-7 text-primary" />
           </div>
           <p className="text-muted-foreground font-sans text-sm mt-2">
             Strategic reflection and alignment
@@ -202,7 +278,7 @@ const Align = () => {
           <div className="p-6 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="text-center">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Target className="w-8 h-8 text-primary" />
+                <Compass className="w-8 h-8 text-primary" />
               </div>
               <h2 className="text-lg font-serif font-medium text-foreground mb-2">
                 I see the space, but I don't know the direction yet.
@@ -217,13 +293,6 @@ const Align = () => {
                 >
                   Set Monthly Focus
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleDiscussWithAI("Help me set up my values and monthly focus")}
-                  className="w-full h-12 text-base font-sans font-medium"
-                >
-                  Talk to SolAI
-                </Button>
               </div>
             </div>
           </div>
@@ -237,7 +306,7 @@ const Align = () => {
           isLoading={coreAI.isLoading}
           aiName={store.settings.coreAIName}
           onClearHistory={coreAI.clearHistory}
-          currentView="align"
+          currentView="explore"
         />
         <SetFocusModal
           isOpen={showSetFocus}
@@ -257,9 +326,9 @@ const Align = () => {
       <header className="px-6 pb-4 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-serif font-medium text-foreground">Align</h1>
+            <h1 className="text-lg font-sans font-bold text-foreground">Explore</h1>
           </div>
-          <Target className="w-7 h-7 text-primary" />
+          <Compass className="w-7 h-7 text-primary" />
         </div>
         <p className="text-muted-foreground font-sans text-sm mt-2">
           Strategic reflection and alignment
@@ -280,77 +349,264 @@ const Align = () => {
               </p>
             </div>
           </div>
-          <div className="flex gap-2 mt-4">
+          <div className="mt-4">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate("/week")}
-              className="flex-1 text-sm font-sans"
+              className="w-full text-sm font-sans"
             >
               Review this week
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDiscussWithAI("Help me understand my progress this week")}
-              className="flex-1 text-sm font-sans"
-            >
-              <MessageSquare className="w-4 h-4 mr-1" />
-              Discuss with SolAI
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Monthly focus - show if set */}
-      {alignData.goals.month_focus.title && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+      {/* Analytics: Completion Rate Trends - MOVED TO TOP */}
+      {analyticsData && analyticsData.weekly_trends.length > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.05s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Layers className="w-4 h-4 text-primary" />
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Focus
+                Completion Trends
               </h3>
             </div>
-            <div className="space-y-3">
-              <div>
-                <h4 className="font-serif font-medium text-foreground text-base mb-1">
-                  {alignData.goals.month_focus.title}
-                </h4>
-                {alignData.goals.month_focus.description && (
-                  <p className="text-sm text-muted-foreground font-sans">
-                    {alignData.goals.month_focus.description}
-                  </p>
-                )}
-                {alignData.goals.month_focus.progress !== null && (
-                  <div className="mt-2">
-                    <div className="flex justify-between text-xs text-muted-foreground font-sans mb-1">
-                      <span>Progress</span>
-                      <span>{alignData.goals.month_focus.progress}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
-                        style={{ width: `${alignData.goals.month_focus.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+            {/* Line Chart Visualization */}
+            <div className="relative h-32 mb-4">
+              <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
+                {/* Grid lines */}
+                <defs>
+                  <linearGradient id="completionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgb(var(--primary))" stopOpacity="0.3" />
+                    <stop offset="100%" stopColor="rgb(var(--primary))" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {[0, 25, 50, 75, 100].map((y) => (
+                  <line
+                    key={y}
+                    x1="0"
+                    y1={100 - y}
+                    x2="300"
+                    y2={100 - y}
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeWidth="0.5"
+                    strokeOpacity="0.2"
+                  />
+                ))}
+                {/* Area under curve */}
+                <path
+                  d={(() => {
+                    const points = analyticsData.weekly_trends.slice(-4);
+                    const maxValue = Math.max(...points.map(w => w.completion_rate), 1);
+                    const width = 300;
+                    const height = 100;
+                    const step = width / (points.length - 1 || 1);
+                    
+                    let path = `M 0 ${height}`;
+                    points.forEach((week, index) => {
+                      const x = index * step;
+                      const y = height - (week.completion_rate / maxValue) * height;
+                      path += index === 0 ? ` L ${x} ${y}` : ` L ${x} ${y}`;
+                    });
+                    path += ` L ${width} ${height} Z`;
+                    return path;
+                  })()}
+                  fill="url(#completionGradient)"
+                />
+                {/* Line */}
+                <polyline
+                  points={analyticsData.weekly_trends.slice(-4).map((week, index) => {
+                    const maxValue = Math.max(...analyticsData.weekly_trends.slice(-4).map(w => w.completion_rate), 1);
+                    const width = 300;
+                    const height = 100;
+                    const step = width / (analyticsData.weekly_trends.slice(-4).length - 1 || 1);
+                    const x = index * step;
+                    const y = height - (week.completion_rate / maxValue) * height;
+                    return `${x},${y}`;
+                  }).join(' ')}
+                  fill="none"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* Data points */}
+                {analyticsData.weekly_trends.slice(-4).map((week, index) => {
+                  const maxValue = Math.max(...analyticsData.weekly_trends.slice(-4).map(w => w.completion_rate), 1);
+                  const width = 300;
+                  const height = 100;
+                  const step = width / (analyticsData.weekly_trends.slice(-4).length - 1 || 1);
+                  const x = index * step;
+                  const y = height - (week.completion_rate / maxValue) * height;
+                  return (
+                    <circle
+                      key={index}
+                      cx={x}
+                      cy={y}
+                      r="3.5"
+                      fill="hsl(var(--primary))"
+                      stroke="hsl(var(--background))"
+                      strokeWidth="2"
+                    />
+                  );
+                })}
+              </svg>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSetFocus(true)}
-              className="mt-3 text-xs font-sans text-muted-foreground"
-            >
-              Update focus
-            </Button>
+            {/* Week labels and values */}
+            <div className="flex justify-between items-end text-xs">
+              {analyticsData.weekly_trends.slice(-4).map((week, index) => {
+                const weekStart = parseISO(week.week_start);
+                const completionRate = Math.round(week.completion_rate * 100);
+                return (
+                  <div key={index} className="flex flex-col items-center gap-1">
+                    <span className="text-muted-foreground font-sans">
+                      {format(weekStart, "MMM d")}
+                    </span>
+                    <span className="font-sans font-medium text-foreground">
+                      {completionRate}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      {!alignData.goals.month_focus.title && (
+      {/* Goals Carousel */}
+      {goals.length > 0 ? (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+          <div className="relative p-5 bg-card rounded-2xl shadow-soft border border-border/50 overflow-hidden">
+            <div className="flex items-center gap-2 mb-3">
+              <Layers className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                Focus {goals.length > 1 && `(${currentGoalIndex + 1}/${goals.length})`}
+              </h3>
+            </div>
+            
+            {/* Carousel Container */}
+            <div 
+              ref={carouselRef}
+              className="relative overflow-hidden"
+            >
+              <div 
+                className="flex transition-transform duration-500 ease-in-out"
+                style={{ 
+                  transform: `translateX(-${currentGoalIndex * 100}%)`,
+                }}
+              >
+                {goals.map((goal, index) => (
+                  <div
+                    key={index}
+                    className="w-full flex-shrink-0 px-1"
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="font-serif font-medium text-foreground text-base mb-1">
+                          {goal.title}
+                        </h4>
+                        {goal.description && (
+                          <p className="text-sm text-muted-foreground font-sans">
+                            {goal.description}
+                          </p>
+                        )}
+                        {goal.progress !== null && (
+                          <div className="mt-2">
+                            <div className="flex justify-between text-xs text-muted-foreground font-sans mb-1">
+                              <span>Progress</span>
+                              <span>{goal.progress}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full transition-all duration-500"
+                                style={{ width: `${goal.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Navigation Controls */}
+            {goals.length > 1 && (
+              <>
+                {/* Previous/Next Buttons */}
+                <div className="flex items-center justify-between mt-4">
+                  <button
+                    onClick={() => {
+                      setCurrentGoalIndex((prev) => (prev - 1 + goals.length) % goals.length);
+                      if (autoRotateTimerRef.current) {
+                        clearInterval(autoRotateTimerRef.current);
+                      }
+                      autoRotateTimerRef.current = setInterval(() => {
+                        setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
+                      }, 5000);
+                    }}
+                    className="p-2 rounded-full hover:bg-muted transition-colors"
+                    aria-label="Previous goal"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+                  </button>
+
+                  {/* Dots Indicator */}
+                  <div className="flex gap-1.5">
+                    {goals.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setCurrentGoalIndex(index);
+                          if (autoRotateTimerRef.current) {
+                            clearInterval(autoRotateTimerRef.current);
+                          }
+                          autoRotateTimerRef.current = setInterval(() => {
+                            setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
+                          }, 5000);
+                        }}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          index === currentGoalIndex
+                            ? "w-6 bg-primary"
+                            : "w-1.5 bg-muted-foreground/30"
+                        }`}
+                        aria-label={`Go to goal ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
+                      if (autoRotateTimerRef.current) {
+                        clearInterval(autoRotateTimerRef.current);
+                      }
+                      autoRotateTimerRef.current = setInterval(() => {
+                        setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
+                      }, 5000);
+                    }}
+                    className="p-2 rounded-full hover:bg-muted transition-colors"
+                    aria-label="Next goal"
+                  >
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+              </>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSetFocus(true)}
+              className="mt-3 text-xs font-sans text-muted-foreground w-full"
+            >
+              {goals.length > 0 ? "Update focus" : "Set focus"}
+            </Button>
+          </div>
+        </div>
+      ) : (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50 border-dashed">
             <div className="text-center">
@@ -489,43 +745,6 @@ const Align = () => {
         </div>
       )}
 
-      {/* Analytics: Completion Rate Trends */}
-      {analyticsData && analyticsData.weekly_trends.length > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.35s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Completion Trends
-              </h3>
-            </div>
-            <div className="space-y-2">
-              {analyticsData.weekly_trends.slice(-4).map((week, index) => {
-                const weekStart = parseISO(week.week_start);
-                const completionRate = Math.round(week.completion_rate * 100);
-                return (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground font-sans">
-                      {format(weekStart, "MMM d")}
-                    </span>
-                    <div className="flex items-center gap-3 flex-1 mx-3">
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
-                          style={{ width: `${completionRate}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-sans font-medium text-foreground w-12 text-right">
-                        {completionRate}%
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Analytics: Consistency Metrics */}
       {analyticsData && analyticsData.consistency.days_with_checkins > 0 && (
@@ -650,17 +869,17 @@ const Align = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDiscussWithAI(`Help me implement: ${alignData.nudge!.message}`)}
+                    onClick={() => navigate("/week")}
                     className="flex-1 text-sm font-sans"
                   >
-                    Apply
+                    Review Week
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="flex-1 text-sm font-sans"
                   >
-                    Ignore
+                    Dismiss
                   </Button>
                 </div>
               </div>
@@ -677,7 +896,7 @@ const Align = () => {
         isLoading={coreAI.isLoading}
         aiName={store.settings.coreAIName}
         onClearHistory={coreAI.clearHistory}
-        currentView="align"
+        currentView="explore"
       />
       <SetFocusModal
         isOpen={showSetFocus}
@@ -688,5 +907,5 @@ const Align = () => {
   );
 };
 
-export default Align;
+export default Explore;
 

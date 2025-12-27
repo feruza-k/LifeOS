@@ -3,7 +3,7 @@ import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { cn } from "@/lib/utils";
-import { useLifeOSStore } from "@/hooks/useLifeOSStore";
+import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { ValueTag, ValueType } from "@/components/lifeos/ValueTag";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
 import { useCoreAI } from "@/hooks/useCoreAI";

@@ -2577,21 +2577,68 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
     else:
         progress_snapshot = f"You completed {completed_tasks} of {total_week_tasks} planned tasks this week." if total_week_tasks > 0 else "No tasks planned this week yet."
     
-    # Gentle nudge (single recommendation)
+    # Smart nudge generation - more contextual and actionable
     nudge = None
-    if task_patterns.get("preferred_times"):
+    
+    # Calculate completion rate for this week
+    week_completion_rate = completed_tasks / total_week_tasks if total_week_tasks > 0 else 0
+    
+    # Check for category drift (tasks being postponed)
+    drifted_categories = []
+    for cat, count in category_distribution.items():
+        cat_tasks = [t for t in week_tasks if t.get("category") == cat]
+        cat_completed = sum(1 for t in cat_tasks if t.get("completed", False))
+        if len(cat_tasks) > 0:
+            cat_completion_rate = cat_completed / len(cat_tasks)
+            if cat_completion_rate < 0.5 and len(cat_tasks) >= 2:
+                drifted_categories.append((cat, cat_completion_rate))
+    
+    # Priority 1: Low completion rate + specific category drift
+    if week_completion_rate < 0.6 and drifted_categories:
+        top_drifted = max(drifted_categories, key=lambda x: x[1])
+        cat_name = top_drifted[0].capitalize()
+        nudge = {
+            "message": f"Your {cat_name} tasks had a lower completion rate this week. Consider scheduling them during your peak focus times or breaking them into smaller steps.",
+            "action": "apply"
+        }
+    # Priority 2: Low overall completion rate
+    elif week_completion_rate < 0.6 and total_week_tasks > 5:
+        nudge = {
+            "message": f"You completed {completed_tasks} of {total_week_tasks} tasks this week ({int(week_completion_rate * 100)}%). Consider planning fewer tasks or scheduling more buffer time between commitments.",
+            "action": "apply"
+        }
+    # Priority 3: High reschedule rate
+    elif rescheduled_count > 3:
+        nudge = {
+            "message": f"{rescheduled_count} tasks were moved this week. Consider reviewing your weekly planning to better match your actual capacity.",
+            "action": "apply"
+        }
+    # Priority 4: Time-based optimization (only if completion is good)
+    elif week_completion_rate >= 0.7 and task_patterns.get("preferred_times"):
         preferred_time = task_patterns["preferred_times"][0] if task_patterns["preferred_times"] else None
         if preferred_time:
+            # Extract hour for better messaging
+            hour = preferred_time.split(":")[0]
+            hour_int = int(hour)
+            time_label = f"{hour_int}:00" if hour_int < 12 else f"{hour_int}:00"
+            if hour_int < 12:
+                time_label = f"{hour_int} AM" if hour_int > 0 else "midnight"
+            elif hour_int == 12:
+                time_label = "noon"
+            else:
+                time_label = f"{hour_int - 12} PM"
+            
             nudge = {
-                "message": f"You may want to protect one uninterrupted {preferred_time} block next week.",
+                "message": f"You're most productive around {time_label}. Consider scheduling your most important tasks during this window next week.",
                 "action": "apply"
             }
-    else:
-        # Check for high reschedule rate
-        rescheduled_count = sum(1 for t in week_tasks if t.get("moved_from") or t.get("rescheduled"))
-        if rescheduled_count > 3:
+    # Priority 5: Category balance
+    elif len(category_distribution) > 0:
+        top_category = max(category_distribution.items(), key=lambda x: x[1])
+        if top_category[1] / total_week_tasks > 0.6:  # More than 60% in one category
+            cat_name = top_category[0].capitalize()
             nudge = {
-                "message": "Consider batching admin tasks into one session to reduce rescheduling.",
+                "message": f"This week was heavily focused on {cat_name} ({top_category[1]} tasks). Consider balancing your time across different areas next week.",
                 "action": "apply"
             }
     
