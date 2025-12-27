@@ -24,17 +24,18 @@ def set_auth_cookies(
         domain: Cookie domain (optional)
     """
     # Cookie settings for security
-    # SameSite=Lax works in development with Vite proxy (makes frontend/backend same-origin)
-    # In production with cross-domain (Vercel + Railway), use SameSite=None with Secure=True
+    # For cross-domain (mylifeos.dev -> railway.app), use SameSite=None
+    # Once subdomain (api.mylifeos.dev) is set up, we can switch to SameSite=Lax with domain=.mylifeos.dev
+    # For now, use SameSite=None to work with current cross-domain setup
     cookie_kwargs = {
         "httponly": True,
         "samesite": "none" if IS_PRODUCTION else "lax",  # None for cross-domain, Lax for same-origin
-        "secure": True,  # Always True (required for SameSite=None, and HTTPS in production)
+        "secure": True,  # Always True (required for SameSite=None and HTTPS)
         "path": "/",
+        # Do NOT set domain attribute for cross-domain cookies
+        # Setting domain prevents cookies from being sent cross-domain
+        # Once subdomain is set up, we can add domain=".mylifeos.dev"
     }
-    
-    if domain and IS_PRODUCTION:
-        cookie_kwargs["domain"] = domain
     
     # Access token: 30 minutes
     response.set_cookie(
@@ -57,12 +58,10 @@ def clear_auth_cookies(response: Response, domain: Optional[str] = None):
     cookie_kwargs = {
         "httponly": True,
         "samesite": "none" if IS_PRODUCTION else "lax",  # Match the setting used when setting cookies
-        "secure": True,  # Always True (required for SameSite=None, and HTTPS in production)
+        "secure": True,  # Always True (required for HTTPS)
         "path": "/",  # Match the path used when setting cookies
+        # Do NOT set domain - match the setting used when setting cookies
     }
-    
-    if domain and IS_PRODUCTION:
-        cookie_kwargs["domain"] = domain
     
     response.set_cookie(key="access_token", value="", max_age=0, **cookie_kwargs)
     response.set_cookie(key="refresh_token", value="", max_age=0, **cookie_kwargs)

@@ -232,7 +232,11 @@ export const api = {
   getCurrentUser: () => {
     // Skip auto-refresh to avoid loops, just check session
     // This endpoint returns 401 if not logged in, which is normal - don't treat as error
-    return request("/auth/me", {}, 0, true).catch((error) => {
+    // Explicitly ensure credentials are included
+    console.log("[API] getCurrentUser - checking credentials, BASE_URL:", BASE_URL);
+    return request("/auth/me", {
+      credentials: "include",  // Explicitly include cookies
+    }, 0, true).catch((error) => {
       // If it's a network error, re-throw it
       if (error?.message?.includes("network") || error?.message?.includes("fetch") || error?.message?.includes("connect")) {
         throw error;

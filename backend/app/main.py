@@ -104,7 +104,7 @@ def get_frontend_url_from_request(request: Request) -> str:
 # Allow localhost and common network IPs for development
 # Include common hotspot IPs (172.20.10.x for iPhone hotspot, 192.168.43.x for Android)
 # Production domains (Vercel)
-default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173,http://172.20.10.1:8080,http://172.20.10.1:5173,https://mylifeos.dev,https://www.mylifeos.dev,https://lifeos-indol.vercel.app"
+default_origins = "http://localhost:5173,http://localhost:8080,http://192.168.1.5:8080,http://192.168.1.5:5173,http://192.168.1.11:8080,http://192.168.1.11:5173,http://10.0.45.240:8080,http://10.0.45.240:5173,http://172.20.10.1:8080,http://172.20.10.1:5173,https://mylifeos.dev,https://www.mylifeos.dev,https://api.mylifeos.dev,https://lifeos-indol.vercel.app"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", default_origins).split(",")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
 # Remove wildcard entries (CORSMiddleware doesn't support them)

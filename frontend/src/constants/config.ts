@@ -72,12 +72,12 @@ const getBaseURL = () => {
     return fallbackUrl;
   }
   
-  // Production fallback: Use Railway backend URL
+  // Production fallback: Use subdomain API URL (api.mylifeos.dev)
   // This should be set via VITE_API_URL environment variable in Vercel
-  const railwayUrl = "https://lifeos-production-f5df.up.railway.app";
-  console.warn(`[Config] ⚠️ No VITE_API_URL set in production. Using fallback: ${railwayUrl}`);
+  const apiUrl = "https://api.mylifeos.dev";
+  console.warn(`[Config] ⚠️ No VITE_API_URL set in production. Using fallback: ${apiUrl}`);
   console.warn(`[Config] 💡 Set VITE_API_URL in Vercel environment variables for production!`);
-  return railwayUrl;
+  return apiUrl;
 };
 
 export const BASE_URL = getBaseURL();
