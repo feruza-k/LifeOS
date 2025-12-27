@@ -182,8 +182,8 @@ class PreCORSMiddleware(BaseHTTPMiddleware):
                     # Allow any Vercel subdomain
                     if ".vercel.app" in origin:
                         allowed = True
-                    # Allow mylifeos.dev domains
-                    elif origin.endswith("mylifeos.dev") or origin.endswith("www.mylifeos.dev"):
+                    # Allow mylifeos.dev domains (including subdomains like api.mylifeos.dev)
+                    elif "mylifeos.dev" in origin:
                         allowed = True
                 
                 if allowed:
@@ -223,11 +223,12 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
                 )
                 if is_local:
                     allowed = True
-            # In production, allow Vercel domains and mylifeos.dev
+            # In production, allow Vercel domains and mylifeos.dev (including subdomains)
             elif IS_PRODUCTION:
                 if (origin.endswith(".vercel.app") or 
-                    origin.endswith("mylifeos.dev") or 
+                    origin.endswith("mylifeos.dev") or  # Matches mylifeos.dev and api.mylifeos.dev
                     origin.endswith("www.mylifeos.dev") or
+                    "mylifeos.dev" in origin or  # Also match any subdomain
                     origin in ALLOWED_ORIGINS):
                     allowed = True
         
@@ -394,8 +395,7 @@ async def catch_all_options(request: Request, full_path: str):
         # Allow any Vercel domain in production (including subdomains)
         elif IS_PRODUCTION:
             if (origin.endswith(".vercel.app") or 
-                origin.endswith("mylifeos.dev") or 
-                origin.endswith("www.mylifeos.dev") or
+                "mylifeos.dev" in origin or  # Matches mylifeos.dev and any subdomain
                 "vercel.app" in origin):
                 allowed_origin = origin
     
@@ -723,6 +723,7 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
     # Log cookie setting for debugging
     if IS_PRODUCTION:
         logger.info(f"[LOGIN] Success - cookies set for user {user['id']}, origin: {origin}")
+        logger.info(f"[LOGIN] Cookie domain will be: .mylifeos.dev, SameSite: lax")
     
     return json_response
 

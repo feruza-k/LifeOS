@@ -154,6 +154,8 @@ export default function Auth() {
     setIsLoading(true);
     try {
       await login(email, password);
+      // Note: For Safari/mobile, login() will trigger window.location.href = "/" 
+      // and return early, so this code won't execute for those browsers
       toast.success("Welcome back!");
       // Wait for auth state to update before navigating
       await new Promise(resolve => setTimeout(resolve, 300));

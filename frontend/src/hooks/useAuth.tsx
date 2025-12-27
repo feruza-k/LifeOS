@@ -76,12 +76,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     await api.login(email, password);
-    // Tokens are now in httpOnly cookies, get user info
-    // Wait a bit for cookies to be set (longer for Safari/mobile)
+    // For Safari/mobile browsers, cookies must be set during navigation
+    // After login, immediately trigger a navigation to ensure Safari accepts the cookie
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const delay = (isSafari || isMobile) ? 500 : 200; // Longer delay for Safari/mobile
-    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    if (isSafari || isMobile) {
+      // Force navigation immediately to accept cookies
+      // The navigation will trigger a full page reload, which Safari requires
+      window.location.href = "/";
+      return; // Don't continue - navigation will reload the page
+    }
+    
+    // Chrome/desktop: Can use normal flow (cookies work with fetch)
+    await new Promise(resolve => setTimeout(resolve, 200));
     const userData = await api.getCurrentUser();
     setUser(userData);
     setIsAuthenticated(true);
