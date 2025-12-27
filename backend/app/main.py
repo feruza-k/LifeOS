@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Depends, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr
@@ -653,10 +653,11 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
             success=False,
             details={"reason": "account_locked"}
         )
-        raise HTTPException(
-            status_code=status.HTTP_423_LOCKED,
-            detail="Account temporarily locked due to too many failed login attempts. Please try again later or use the unlock link sent to your email.",
-        )
+        # For form submission, redirect to login page with error
+        frontend_url = get_frontend_url_from_request(request)
+        error_url = f"{frontend_url}/auth?error=locked"
+        redirect_response = RedirectResponse(url=error_url, status_code=302)
+        return redirect_response
     
     if not user or not verify_password(form_data.password, user.get("password", "")):
         if user:
@@ -670,10 +671,11 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
                     user_agent=user_agent,
                     success=False
                 )
-                raise HTTPException(
-                    status_code=status.HTTP_423_LOCKED,
-                    detail="Account temporarily locked due to too many failed login attempts. Please try again later.",
-                )
+                # For form submission, redirect to login page with error
+                frontend_url = get_frontend_url_from_request(request)
+                error_url = f"{frontend_url}/auth?error=locked"
+                redirect_response = RedirectResponse(url=error_url, status_code=302)
+                return redirect_response
         
         log_auth_event(
             "login_failure",
@@ -682,11 +684,11 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
             user_agent=user_agent,
             success=False
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # For form submission, redirect to login page with error
+        frontend_url = get_frontend_url_from_request(request)
+        error_url = f"{frontend_url}/auth?error=invalid"
+        redirect_response = RedirectResponse(url=error_url, status_code=302)
+        return redirect_response
     
     # Clear failed attempts on successful login
     await clear_failed_attempts(user["id"])
@@ -716,16 +718,23 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
         success=True
     )
     
-    # Create response and set cookies
-    json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
-    set_auth_cookies(json_response, access_token, refresh_token)
+    # CRITICAL: For Safari/mobile browsers, cookies must be set during a top-level navigation
+    # Return a redirect response so cookies are set during navigation (Safari requirement)
+    # Get frontend URL from request origin or use default
+    frontend_url = get_frontend_url_from_request(request)
+    redirect_url = f"{frontend_url}/?login=success"
+    
+    # Create redirect response and set cookies
+    redirect_response = RedirectResponse(url=redirect_url, status_code=302)
+    set_auth_cookies(redirect_response, access_token, refresh_token)
     
     # Log cookie setting for debugging
     if IS_PRODUCTION:
         logger.info(f"[LOGIN] Success - cookies set for user {user['id']}, origin: {origin}")
         logger.info(f"[LOGIN] Cookie domain will be: .mylifeos.dev, SameSite: lax")
+        logger.info(f"[LOGIN] Redirecting to: {redirect_url}")
     
-    return json_response
+    return redirect_response
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str | None = None

@@ -2,9 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Calendar from "./pages/Calendar";
@@ -28,7 +29,23 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, user, loading, refreshUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Handle login success redirect (from form submission)
+  useEffect(() => {
+    const loginSuccess = searchParams.get("login");
+    if (loginSuccess === "success") {
+      // Remove the query param from URL
+      navigate("/", { replace: true });
+      // Refresh user data to get the authenticated user
+      refreshUser().catch(() => {
+        // If refresh fails, user might need to log in again
+        console.error("Could not refresh user after login");
+      });
+    }
+  }, [searchParams, navigate, refreshUser]);
 
   if (loading) {
     return (

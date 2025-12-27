@@ -37,6 +37,33 @@ export default function Auth() {
   useEffect(() => {
     const urlMode = searchParams.get("mode");
     const urlToken = searchParams.get("token");
+    const loginSuccess = searchParams.get("login");
+    const error = searchParams.get("error");
+
+    // Handle login errors from form submission
+    if (error === "locked") {
+      toast.error("Account temporarily locked due to too many failed login attempts. Please try again later.");
+      navigate("/auth", { replace: true });
+      setIsLoading(false);
+    } else if (error === "invalid") {
+      toast.error("Incorrect email or password");
+      navigate("/auth", { replace: true });
+      setIsLoading(false);
+    }
+
+    // Handle login success redirect (from form submission)
+    if (loginSuccess === "success") {
+      // Remove the query param from URL
+      navigate("/", { replace: true });
+      // Refresh user data to get the authenticated user
+      refreshUser().then(() => {
+        toast.success("Welcome back!");
+      }).catch(() => {
+        // If refresh fails, user might need to log in again
+        toast.error("Login successful, but could not load user data. Please refresh the page.");
+      });
+      return;
+    }
 
     if (urlMode === "reset-password" && urlToken) {
       setMode("reset-password");
@@ -45,7 +72,7 @@ export default function Auth() {
       // If mode changes away from reset-password, reset token
       setResetToken("");
     }
-  }, [searchParams]);
+  }, [searchParams, navigate, refreshUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,22 +172,42 @@ export default function Auth() {
       return;
     }
 
-    // Login mode
+    // Login mode - use form submission for Safari compatibility
     if (!email.trim() || !password.trim()) {
       toast.error("Please fill in all fields");
       return;
     }
 
+    // For login, we'll use a form submission to the backend
+    // This ensures cookies are set during navigation (required for Safari)
+    // The form will be submitted programmatically
     setIsLoading(true);
-    try {
-      await login(email, password);
-      // Note: For Safari/mobile, login() will trigger window.location.href = "/" 
-      // and return early, so this code won't execute for those browsers
-      toast.success("Welcome back!");
-      // Wait for auth state to update before navigating
-      await new Promise(resolve => setTimeout(resolve, 300));
-      navigate("/", { replace: true });
-    } catch (error: any) {
+    
+    // Create a temporary form and submit it
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = `${BASE_URL}/auth/login`;
+    form.style.display = "none";
+    
+    const usernameInput = document.createElement("input");
+    usernameInput.type = "hidden";
+    usernameInput.name = "username";
+    usernameInput.value = email;
+    
+    const passwordInput = document.createElement("input");
+    passwordInput.type = "hidden";
+    passwordInput.name = "password";
+    passwordInput.value = password;
+    
+    form.appendChild(usernameInput);
+    form.appendChild(passwordInput);
+    document.body.appendChild(form);
+    
+    // Submit the form - this will trigger a navigation and Safari will accept cookies
+    form.submit();
+    
+    // Note: form.submit() triggers navigation, so code after this won't execute
+    // The backend will redirect to /?login=success, and we'll handle that in useEffect
       const errorMessage = error?.message || "Something went wrong. Please try again.";
       
       // Check if it's a cookie/auth issue (common on Safari/mobile)
