@@ -5,6 +5,9 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // CRITICAL: base must be "/" to prevent path rewriting that breaks form actions
+  // Any non-empty base path will cause Safari to prepend it to form action URLs
+  base: "/",
   server: mode === "development" ? {
     host: "0.0.0.0", // Allow connections from network
     port: 8080,

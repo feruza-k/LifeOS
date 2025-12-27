@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ type AuthMode = "login" | "signup" | "forgot-password" | "reset-password";
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const formRef = useRef<HTMLFormElement>(null);
   
   // Initialize state from URL params immediately to avoid showing error on first render
   const urlMode = searchParams.get("mode");
@@ -36,6 +37,29 @@ export default function Auth() {
   const passwordValidation = mode === "signup" || mode === "reset-password" 
     ? validatePassword(password) 
     : { isValid: true, errors: [] };
+
+  // CRITICAL: Set form action directly on DOM to prevent any base path rewriting
+  // This ensures Safari submits to the absolute URL without any path prefix
+  useEffect(() => {
+    // Check for base tag that could cause path rewriting
+    const baseTag = document.querySelector("base");
+    if (baseTag) {
+      console.error("[Auth] ⚠️ BASE TAG DETECTED - This will break form actions!", baseTag.href);
+      // Remove base tag if found (it shouldn't exist)
+      baseTag.remove();
+    }
+
+    if (formRef.current && mode === "login") {
+      // Set action directly on DOM element to bypass React/Vite rewriting
+      const absoluteUrl = "https://api.mylifeos.dev/auth/login";
+      formRef.current.action = absoluteUrl;
+      formRef.current.method = "POST";
+      // Log for debugging
+      console.log("[Auth] Form action set directly on DOM:", formRef.current.action);
+      console.log("[Auth] Current page URL:", window.location.href);
+      console.log("[Auth] Form action should be absolute:", absoluteUrl);
+    }
+  }, [mode]);
 
   // Update state when URL params change
   useEffect(() => {
@@ -215,9 +239,10 @@ export default function Auth() {
 
         {/* Form */}
         <form 
+          ref={formRef}
           onSubmit={mode === "login" ? undefined : handleSubmit}
           method={mode === "login" ? "POST" : undefined}
-          action={mode === "login" ? `${API_BASE}/auth/login` : undefined}
+          action={mode === "login" ? "https://api.mylifeos.dev/auth/login" : undefined}
           className="space-y-5"
         >
           {mode === "forgot-password" && (
