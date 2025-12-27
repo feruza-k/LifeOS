@@ -18,6 +18,13 @@ interface AlignData {
   };
   goals: {
     year_theme: string | null;
+    month_goals?: Array<{
+      title: string;
+      description: string | null;
+      progress: number | null;
+      id: string;
+      order_index: number;
+    }>;
     month_focus: {
       title: string | null;
       description: string | null;
@@ -118,10 +125,18 @@ const Explore = () => {
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
 
-  // Convert single goal to array for carousel (ready for multiple goals)
-  const goals = alignData?.goals.month_focus.title 
-    ? [alignData.goals.month_focus] 
-    : [];
+  // Get all goals from month_goals array, fallback to month_focus for backward compatibility
+  const goals = alignData?.goals.month_goals && alignData.goals.month_goals.length > 0
+    ? alignData.goals.month_goals
+    : (alignData?.goals.month_focus.title 
+        ? [{
+            title: alignData.goals.month_focus.title,
+            description: alignData.goals.month_focus.description,
+            progress: alignData.goals.month_focus.progress,
+            id: "",
+            order_index: 0
+          }]
+        : []);
 
   useEffect(() => {
     loadAlignData();
@@ -217,18 +232,14 @@ const Explore = () => {
     }
   };
 
-  const handleSetFocus = async (title: string, description?: string) => {
+  const handleSetFocus = async (goals: Array<{ title: string; description?: string }>) => {
     try {
       const currentMonth = format(new Date(), "yyyy-MM");
-      await api.saveMonthlyFocus({
-        month: currentMonth,
-        title,
-        description: description || null,
-      });
-      await loadAlignData(); // refresh to show new focus
-      toast.success("Monthly focus set");
+      await api.saveMonthlyGoals(currentMonth, goals);
+      await loadAlignData(); // refresh to show new goals
+      toast.success(`Saved ${goals.length} goal${goals.length !== 1 ? "s" : ""}`);
     } catch (error) {
-      toast.error("Failed to save monthly focus");
+      toast.error("Failed to save monthly goals");
     }
   };
 
@@ -312,6 +323,7 @@ const Explore = () => {
           isOpen={showSetFocus}
           onClose={() => setShowSetFocus(false)}
           onSave={handleSetFocus}
+          existingGoals={goals}
         />
       </div>
     );
@@ -503,7 +515,7 @@ const Explore = () => {
                   >
                     <div className="space-y-3">
                       <div>
-                        <h4 className="font-serif font-medium text-foreground text-base mb-1">
+                        <h4 className="font-sans font-medium text-foreground text-base mb-1">
                           {goal.title}
                         </h4>
                         {goal.description && (
@@ -898,11 +910,12 @@ const Explore = () => {
         onClearHistory={coreAI.clearHistory}
         currentView="explore"
       />
-      <SetFocusModal
-        isOpen={showSetFocus}
-        onClose={() => setShowSetFocus(false)}
-        onSave={handleSetFocus}
-      />
+        <SetFocusModal
+          isOpen={showSetFocus}
+          onClose={() => setShowSetFocus(false)}
+          onSave={handleSetFocus}
+          existingGoals={goals}
+        />
     </div>
   );
 };

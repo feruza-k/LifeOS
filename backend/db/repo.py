@@ -2,7 +2,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, update
+from sqlalchemy import select, and_, or_, update, delete, func
 from db.session import AsyncSessionLocal
 from db.repositories.task import TaskRepository
 from db.repositories.note import NoteRepository
@@ -674,11 +674,12 @@ class DatabaseRepo:
             return True
     
     async def get_monthly_focus(self, month: str, user_id: str) -> Optional[Dict]:
+        """Get single monthly focus (backward compatibility - returns first one)"""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(MonthlyFocus).where(
                     and_(MonthlyFocus.user_id == UUID(user_id), MonthlyFocus.month == month)
-                )
+                ).order_by(MonthlyFocus.order_index).limit(1)
             )
             focus = result.scalar_one_or_none()
             if focus:
@@ -689,32 +690,86 @@ class DatabaseRepo:
                     "title": focus.title,
                     "description": focus.description,
                     "progress": focus.progress,
+                    "order_index": focus.order_index,
                     "createdAt": focus.created_at.isoformat() if focus.created_at else None,
                 }
             return None
     
-    async def save_monthly_focus(self, focus_dict: dict, user_id: str) -> Dict:
+    async def get_monthly_goals(self, month: str, user_id: str) -> List[Dict]:
+        """Get all monthly goals for a user and month (up to 5)"""
         async with AsyncSessionLocal() as session:
-            existing = await session.execute(
+            result = await session.execute(
                 select(MonthlyFocus).where(
-                    and_(MonthlyFocus.user_id == UUID(user_id), MonthlyFocus.month == focus_dict.get("month"))
-                )
+                    and_(MonthlyFocus.user_id == UUID(user_id), MonthlyFocus.month == month)
+                ).order_by(MonthlyFocus.order_index)
             )
-            focus = existing.scalar_one_or_none()
+            focuses = result.scalars().all()
+            return [
+                {
+                    "id": str(focus.id),
+                    "user_id": str(focus.user_id),
+                    "month": focus.month,
+                    "title": focus.title,
+                    "description": focus.description,
+                    "progress": focus.progress,
+                    "order_index": focus.order_index,
+                    "createdAt": focus.created_at.isoformat() if focus.created_at else None,
+                }
+                for focus in focuses
+            ]
+    
+    async def save_monthly_focus(self, focus_dict: dict, user_id: str) -> Dict:
+        """Save a single monthly focus (creates new or updates existing by id)"""
+        async with AsyncSessionLocal() as session:
+            focus_id = focus_dict.get("id")
             
-            focus_data = {
-                "user_id": UUID(user_id),
-                "month": focus_dict.get("month", ""),
-                "title": focus_dict.get("title", ""),
-                "description": focus_dict.get("description"),
-                "progress": focus_dict.get("progress"),
-            }
-            
-            if focus:
-                for key, value in focus_data.items():
-                    setattr(focus, key, value)
+            if focus_id:
+                # Update existing
+                result = await session.execute(
+                    select(MonthlyFocus).where(
+                        and_(
+                            MonthlyFocus.id == UUID(focus_id),
+                            MonthlyFocus.user_id == UUID(user_id)
+                        )
+                    )
+                )
+                focus = result.scalar_one_or_none()
+                if focus:
+                    focus.title = focus_dict.get("title", focus.title)
+                    focus.description = focus_dict.get("description", focus.description)
+                    focus.progress = focus_dict.get("progress", focus.progress)
+                    if "order_index" in focus_dict:
+                        focus.order_index = focus_dict.get("order_index", focus.order_index)
+                else:
+                    return None
             else:
-                focus = MonthlyFocus(**focus_data)
+                # Create new - check limit of 5 goals per month
+                month = focus_dict.get("month", "")
+                existing_count = await session.execute(
+                    select(func.count(MonthlyFocus.id)).where(
+                        and_(MonthlyFocus.user_id == UUID(user_id), MonthlyFocus.month == month)
+                    )
+                )
+                count = existing_count.scalar() or 0
+                if count >= 5:
+                    raise ValueError("Maximum of 5 monthly goals allowed")
+                
+                # Get next order_index
+                max_order = await session.execute(
+                    select(func.max(MonthlyFocus.order_index)).where(
+                        and_(MonthlyFocus.user_id == UUID(user_id), MonthlyFocus.month == month)
+                    )
+                )
+                next_order = (max_order.scalar() or -1) + 1
+                
+                focus = MonthlyFocus(
+                    user_id=UUID(user_id),
+                    month=month,
+                    title=focus_dict.get("title", ""),
+                    description=focus_dict.get("description"),
+                    progress=focus_dict.get("progress", 0),
+                    order_index=next_order
+                )
                 session.add(focus)
             
             await session.commit()
@@ -726,8 +781,74 @@ class DatabaseRepo:
                 "title": focus.title,
                 "description": focus.description,
                 "progress": focus.progress,
+                "order_index": focus.order_index,
                 "createdAt": focus.created_at.isoformat() if focus.created_at else None,
             }
+    
+    async def save_monthly_goals(self, goals_list: List[dict], month: str, user_id: str) -> List[Dict]:
+        """Save multiple monthly goals (replaces all goals for the month)"""
+        async with AsyncSessionLocal() as session:
+            if len(goals_list) > 5:
+                raise ValueError("Maximum of 5 monthly goals allowed")
+            
+            # Delete existing goals for this month
+            await session.execute(
+                delete(MonthlyFocus).where(
+                    and_(MonthlyFocus.user_id == UUID(user_id), MonthlyFocus.month == month)
+                )
+            )
+            
+            # Create new goals
+            new_goals = []
+            for idx, goal_dict in enumerate(goals_list):
+                goal = MonthlyFocus(
+                    user_id=UUID(user_id),
+                    month=month,
+                    title=goal_dict.get("title", ""),
+                    description=goal_dict.get("description"),
+                    progress=goal_dict.get("progress", 0),
+                    order_index=idx
+                )
+                session.add(goal)
+                new_goals.append(goal)
+            
+            await session.commit()
+            
+            # Refresh all goals
+            for goal in new_goals:
+                await session.refresh(goal)
+            
+            return [
+                {
+                    "id": str(goal.id),
+                    "user_id": str(goal.user_id),
+                    "month": goal.month,
+                    "title": goal.title,
+                    "description": goal.description,
+                    "progress": goal.progress,
+                    "order_index": goal.order_index,
+                    "createdAt": goal.created_at.isoformat() if goal.created_at else None,
+                }
+                for goal in new_goals
+            ]
+    
+    async def delete_monthly_focus(self, focus_id: str, user_id: str) -> bool:
+        """Delete a monthly focus by id"""
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(MonthlyFocus).where(
+                    and_(
+                        MonthlyFocus.id == UUID(focus_id),
+                        MonthlyFocus.user_id == UUID(user_id)
+                    )
+                )
+            )
+            focus = result.scalar_one_or_none()
+            if focus:
+                await session.delete(focus)
+                await session.commit()
+                return True
+            return False
     
     async def get_categories(self, user_id: Optional[str] = None) -> List[Dict]:
         async with AsyncSessionLocal() as session:

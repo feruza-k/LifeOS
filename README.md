@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 26, 2025
+**Current Date:** December 27, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -33,6 +33,7 @@
   - [Day 24: Context Awareness Signals & Memory Extraction](#day-24-context-awareness-signals--memory-extraction-dec-24-2025)
   - [Day 25: Selective Memory Injection & Memory-Informed Behavior](#day-25-selective-memory-injection--memory-informed-behavior-dec-25-2025)
   - [Day 26: Deployment & Production Setup](#day-26-deployment--production-setup-dec-26-2025)
+  - [Day 27: Cross-Browser Stability & Explore Page](#day-27-cross-browser-stability--explore-page-dec-27-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1796,6 +1797,32 @@ Deployment always takes longer than expected, but it's worth doing now. Having a
 
 ---
 
+### **Day 27**: Cross-Browser Stability & Explore Page (Dec 27, 2025)
+
+Today was about moving from "it works on my machine" to "it works everywhere." Deployment is only half the battle; cross-browser stability, especially with cookies and mobile Safari, was the real challenge today.
+
+#### **Solving the Safari Cookie Trap**
+
+Tracked down a critical auth failure where Safari/mobile browsers were blocking session cookies. Unlike Chrome, Safari requires cookies to be set during a **top-level navigation response**. I refactored the login flow from a JSON-based `fetch` to a **native HTML `<form>` submission** using a FastAPI `RedirectResponse`. This forces a first-party event that Safari accepts. Also fixed a Vite `base` path leak that was breaking URL routing on the custom domain.
+
+#### **Explore: Strategic Reflection Layer**
+
+With production stable, I built the **Explore** page. This is the strategic brain of LifeOS, designed for reflection over productivity.
+
+- **SVG Completion Trends**: Replaced static bars with a dynamic **SVG Line Chart**. The backend calculates a 4-week moving completion rate by aggregating daily check-in data and task states, providing a visual narrative of consistency.
+- **Goals Carousel**: Implemented support for up to **5 monthly goals** (backed by a SQLAlchemy migration adding `order_index`). The UI uses React `useRef` and an auto-rotate timer (5s) with custom touch/swipe event handlers for a smooth mobile experience.
+- **Contextual Suggestions**: SolAI now uses a priority-based logic engine in the backend. It performs **category drift analysis** (identifying avoided areas like Health or Growth) and maps completion patterns to peak productivity windows to suggest one high-impact adjustment.
+
+
+#### **Reflection**
+
+Building for production is humbling. You think you've finished until you test on a real iPhone. Solving the Safari cookie issue felt like a proper senior engineering win. The Explore page finally feels like the "strategic brain" of the system, though there's still a massive amount of edge-case testing and feature depth to add before it's truly finished.
+
+---
+
 ## **Next Steps:**
 
-Finish deployment polish, then build user-facing features that leverage the memory and context foundation: weekly reflections, morning briefings, goal alignment, and habit reinforcement.
+- **Finish deployment polish**: Final production hardening and cross-device bug hunting.
+- **Leverage Memory & Context**: Build user-facing features like **morning briefings**, **weekly reflections**, and **habit reinforcement**.
+- **Goal Alignment**: Connect Explore goals directly to daily task suggestions and SolAI insights.
+- **Deep Reflection**: Build out the full "Review this week" flow with detailed AI narrative summaries.

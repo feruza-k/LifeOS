@@ -1,12 +1,19 @@
 import { useState } from "react";
-import { X, Target, Sparkles } from "lucide-react";
+import { X, Target, Sparkles, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+
+interface Goal {
+  title: string;
+  description: string;
+}
 
 interface SetFocusModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (title: string, description?: string) => void;
+  onSave: (goals: Array<{ title: string; description?: string }>) => void;
+  existingGoals?: Array<{ title: string; description?: string | null; id?: string }>;
 }
 
 const suggestions = [
@@ -18,17 +25,45 @@ const suggestions = [
   "Connect with family weekly",
 ];
 
-export function SetFocusModal({ isOpen, onClose, onSave }: SetFocusModalProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+export function SetFocusModal({ isOpen, onClose, onSave, existingGoals = [] }: SetFocusModalProps) {
+  const [goals, setGoals] = useState<Goal[]>(() => {
+    if (existingGoals.length > 0) {
+      return existingGoals.map(g => ({ title: g.title, description: g.description || "" }));
+    }
+    return [{ title: "", description: "" }];
+  });
 
   if (!isOpen) return null;
 
+  const handleAddGoal = () => {
+    if (goals.length < 5) {
+      setGoals([...goals, { title: "", description: "" }]);
+    }
+  };
+
+  const handleRemoveGoal = (index: number) => {
+    if (goals.length > 1) {
+      setGoals(goals.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleUpdateGoal = (index: number, field: "title" | "description", value: string) => {
+    const updated = [...goals];
+    updated[index] = { ...updated[index], [field]: value };
+    setGoals(updated);
+  };
+
   const handleSave = () => {
-    if (title.trim()) {
-      onSave(title.trim(), description.trim() || undefined);
-      setTitle("");
-      setDescription("");
+    const validGoals = goals
+      .filter(g => g.title.trim())
+      .map(g => ({
+        title: g.title.trim(),
+        description: g.description.trim() || undefined
+      }));
+    
+    if (validGoals.length > 0) {
+      onSave(validGoals);
+      setGoals([{ title: "", description: "" }]);
       onClose();
     }
   };
@@ -49,11 +84,11 @@ export function SetFocusModal({ isOpen, onClose, onSave }: SetFocusModalProps) {
               <Target className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-serif font-semibold text-foreground">
-                {currentMonth} Focus
+              <h3 className="font-sans font-semibold text-foreground">
+                {currentMonth} Goals
               </h3>
               <p className="text-xs font-sans text-muted-foreground">
-                What's one thing to focus on this month?
+                Set up to 5 goals for this month
               </p>
             </div>
           </div>
@@ -66,69 +101,95 @@ export function SetFocusModal({ isOpen, onClose, onSave }: SetFocusModalProps) {
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="text-sm font-sans font-medium text-foreground mb-2 block">
-              Your focus
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Learn to code with AI"
-              className="w-full py-3 px-4 bg-muted rounded-xl text-foreground font-sans text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              autoFocus
-            />
-          </div>
+        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {goals.map((goal, index) => (
+            <div key={index} className="p-4 bg-muted/50 rounded-xl space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-sans font-medium text-muted-foreground">
+                  Goal {index + 1}
+                </span>
+                {goals.length > 1 && (
+                  <button
+                    onClick={() => handleRemoveGoal(index)}
+                    className="p-1 rounded-full hover:bg-background transition-colors"
+                    aria-label="Remove goal"
+                  >
+                    <Trash2 className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+              
+              <div>
+                <label className="text-sm font-sans font-medium text-foreground mb-2 block">
+                  Your focus
+                </label>
+                <input
+                  type="text"
+                  value={goal.title}
+                  onChange={(e) => handleUpdateGoal(index, "title", e.target.value)}
+                  placeholder="e.g., Learn to code with AI"
+                  className="w-full py-3 px-4 bg-background rounded-xl text-foreground font-sans text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  autoFocus={index === 0}
+                />
+              </div>
 
-          <div>
-            <label className="text-sm font-sans font-medium text-foreground mb-2 block">
-              Why is this important? <span className="text-muted-foreground">(optional)</span>
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="This will help you stay motivated..."
-              rows={2}
-              className="w-full py-3 px-4 bg-muted rounded-xl text-foreground font-sans text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-            />
-          </div>
+              <div>
+                <label className="text-sm font-sans font-medium text-foreground mb-2 block">
+                  Why is this important? <span className="text-muted-foreground">(optional)</span>
+                </label>
+                <textarea
+                  value={goal.description}
+                  onChange={(e) => handleUpdateGoal(index, "description", e.target.value)}
+                  placeholder="This will help you stay motivated..."
+                  rows={2}
+                  className="w-full py-3 px-4 bg-background rounded-xl text-foreground font-sans text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                />
+              </div>
+            </div>
+          ))}
+
+          {goals.length < 5 && (
+            <button
+              onClick={handleAddGoal}
+              className="w-full py-3 px-4 border-2 border-dashed border-muted-foreground/30 rounded-xl text-muted-foreground font-sans text-sm flex items-center justify-center gap-2 hover:border-primary/50 hover:text-primary transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add another goal ({goals.length}/5)
+            </button>
+          )}
 
           {/* Suggestions */}
-          <div>
-            <p className="text-xs font-sans font-medium text-muted-foreground mb-2 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              Suggestions
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((suggestion, i) => (
-                <button
-                  key={i}
-                  onClick={() => setTitle(suggestion)}
-                  className="px-3 py-1.5 bg-accent rounded-full text-xs font-sans text-accent-foreground hover:bg-accent/80 transition-colors"
-                >
-                  {suggestion}
-                </button>
-              ))}
+          {goals.length === 1 && goals[0].title === "" && (
+            <div>
+              <p className="text-xs font-sans font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                Suggestions
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((suggestion, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleUpdateGoal(0, "title", suggestion)}
+                    className="px-3 py-1.5 bg-accent rounded-full text-xs font-sans text-accent-foreground hover:bg-accent/80 transition-colors"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Actions */}
         <div className="p-4 border-t border-border">
-          <button
+          <Button
             onClick={handleSave}
-            disabled={!title.trim()}
-            className={cn(
-              "w-full py-3 px-4 rounded-xl font-sans font-medium text-sm flex items-center justify-center gap-2 transition-all",
-              title.trim()
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-muted text-muted-foreground"
-            )}
+            disabled={!goals.some(g => g.title.trim())}
+            className="w-full font-sans"
           >
-            <Target className="w-4 h-4" />
-            Set {currentMonth} Focus
-          </button>
+            <Target className="w-4 h-4 mr-2" />
+            Save {currentMonth} Goals
+          </Button>
         </div>
       </div>
     </div>

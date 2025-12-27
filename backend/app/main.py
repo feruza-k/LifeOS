@@ -368,7 +368,12 @@ class MonthlyFocusRequest(BaseModel):
     description: str | None = None
     progress: int | None = None
     id: str | None = None
+    order_index: int | None = None
     createdAt: str | None = None
+
+class MonthlyGoalsRequest(BaseModel):
+    month: str
+    goals: List[MonthlyFocusRequest]  # Up to 5 goals
 
 @app.options("/{full_path:path}")
 async def catch_all_options(request: Request, full_path: str):
@@ -2081,17 +2086,46 @@ async def get_monthly_focus(
     month: str = Query(..., description="Month in YYYY-MM format"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get monthly focus for a specific month (user-scoped)."""
+    """Get monthly focus for a specific month (user-scoped) - backward compatibility, returns first goal."""
     focus = await db_repo.get_monthly_focus(month, current_user["id"])
     if focus:
         return focus
     return None
 
+@app.get("/monthly-goals")
+async def get_monthly_goals(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all monthly goals for a specific month (up to 5)."""
+    goals = await db_repo.get_monthly_goals(month, current_user["id"])
+    return goals
+
 @app.post("/monthly-focus")
 async def save_monthly_focus(focus_data: MonthlyFocusRequest, current_user: dict = Depends(get_current_user)):
-    """Save or update monthly focus (user-scoped)."""
+    """Save or update a single monthly focus (user-scoped)."""
     result = await db_repo.save_monthly_focus(focus_data.model_dump(exclude_none=True), current_user["id"])
     return result
+
+@app.post("/monthly-goals")
+async def save_monthly_goals(goals_data: MonthlyGoalsRequest, current_user: dict = Depends(get_current_user)):
+    """Save multiple monthly goals (replaces all goals for the month, up to 5)."""
+    if len(goals_data.goals) > 5:
+        raise HTTPException(status_code=400, detail="Maximum of 5 monthly goals allowed")
+    result = await db_repo.save_monthly_goals(
+        [goal.model_dump(exclude_none=True) for goal in goals_data.goals],
+        goals_data.month,
+        current_user["id"]
+    )
+    return result
+
+@app.delete("/monthly-focus/{focus_id}")
+async def delete_monthly_focus(focus_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a monthly focus by id."""
+    success = await db_repo.delete_monthly_focus(focus_id, current_user["id"])
+    if success:
+        return {"success": True}
+    raise HTTPException(status_code=404, detail="Monthly focus not found")
 
 # Categories Endpoints
 
@@ -2477,8 +2511,9 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
     user_context = await get_user_context(current_user["id"])
     historical = user_context.get("historical", {})
     
-    # Get current month's focus
-    monthly_focus = await db_repo.get_monthly_focus(current_month, current_user["id"])
+    # Get current month's goals (all of them, up to 5)
+    monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
+    monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
     
     # Get tasks for pattern analysis (last 30 days)
     all_tasks = historical.get("all_tasks", [])
@@ -2642,10 +2677,22 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
                 "action": "apply"
             }
     
-    # Goals hierarchy
+    # Goals hierarchy - return all goals
+    goals_list = [
+        {
+            "title": goal.get("title"),
+            "description": goal.get("description"),
+            "progress": goal.get("progress"),
+            "id": goal.get("id"),
+            "order_index": goal.get("order_index", 0)
+        }
+        for goal in monthly_goals
+    ]
+    
     goals = {
         "year_theme": None,  # Future feature
-        "month_focus": {
+        "month_goals": goals_list,  # All goals (up to 5)
+        "month_focus": {  # Backward compatibility - first goal
             "title": monthly_focus.get("title") if monthly_focus else None,
             "description": monthly_focus.get("description") if monthly_focus else None,
             "progress": monthly_focus.get("progress") if monthly_focus else None,
@@ -2658,7 +2705,7 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
     is_new_user = (
         len(all_tasks) == 0 and
         len(checkins) == 0 and
-        monthly_focus is None
+        len(monthly_goals) == 0
     )
     
     return {
@@ -2760,7 +2807,8 @@ async def align_analytics(current_user: dict = Depends(get_current_user)):
             })
     
     # Get current month focus
-    monthly_focus = await db_repo.get_monthly_focus(current_month, current_user["id"])
+    monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
+    monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
     
     return {
         "weekly_trends": weekly_trends,

@@ -460,11 +460,23 @@ export const api = {
   getMonthlyFocus: (month: string) =>
     request(`/monthly-focus?month=${month}`),
 
+  getMonthlyGoals: (month: string) =>
+    request(`/monthly-goals?month=${month}`),
+
   saveMonthlyFocus: (focus: any) =>
     request("/monthly-focus", {
       method: "POST",
       body: JSON.stringify(focus),
     }),
+
+  saveMonthlyGoals: (month: string, goals: any[]) =>
+    request("/monthly-goals", {
+      method: "POST",
+      body: JSON.stringify({ month, goals }),
+    }),
+
+  deleteMonthlyFocus: (focusId: string) =>
+    request(`/monthly-focus/${focusId}`, { method: "DELETE" }),
 
   // --- Global Notes ---
   getGlobalNotes: (params?: { include_archived?: boolean; sort_by?: string; tags?: string; pinned_only?: boolean }) => {
