@@ -38,8 +38,8 @@ export default function Auth() {
     ? validatePassword(password) 
     : { isValid: true, errors: [] };
 
-  // CRITICAL: Set form action directly on DOM to prevent any base path rewriting
-  // This ensures Safari submits to the absolute URL without any path prefix
+  // CRITICAL: Check for base tag that could cause path rewriting
+  // Also verify the login form is properly configured for native submission
   useEffect(() => {
     // Check for base tag that could cause path rewriting
     const baseTag = document.querySelector("base");
@@ -49,15 +49,28 @@ export default function Auth() {
       baseTag.remove();
     }
 
+    // Verify login form is configured correctly for native submission
     if (formRef.current && mode === "login") {
-      // Set action directly on DOM element to bypass React/Vite rewriting
-      const absoluteUrl = "https://api.mylifeos.dev/auth/login";
-      formRef.current.action = absoluteUrl;
-      formRef.current.method = "POST";
-      // Log for debugging
-      console.log("[Auth] Form action set directly on DOM:", formRef.current.action);
-      console.log("[Auth] Current page URL:", window.location.href);
-      console.log("[Auth] Form action should be absolute:", absoluteUrl);
+      const form = formRef.current;
+      // Log for debugging - verify form is real and has correct attributes
+      console.log("[Auth] Login form detected in DOM:", {
+        action: form.action,
+        method: form.method,
+        hasOnSubmit: !!form.onsubmit,
+        formElement: form.tagName,
+      });
+      
+      // Double-check action is set correctly (safety measure)
+      if (form.action !== "https://api.mylifeos.dev/auth/login") {
+        console.warn("[Auth] Form action mismatch! Setting to correct URL.");
+        form.action = "https://api.mylifeos.dev/auth/login";
+      }
+      
+      // Ensure method is POST
+      if (form.method.toLowerCase() !== "post") {
+        console.warn("[Auth] Form method mismatch! Setting to POST.");
+        form.method = "POST";
+      }
     }
   }, [mode]);
 
@@ -238,13 +251,60 @@ export default function Auth() {
         </div>
 
         {/* Form */}
-        <form 
-          ref={formRef}
-          onSubmit={mode === "login" ? undefined : handleSubmit}
-          method={mode === "login" ? "POST" : undefined}
-          action={mode === "login" ? "https://api.mylifeos.dev/auth/login" : undefined}
-          className="space-y-5"
-        >
+        {/* CRITICAL: For login mode, use a REAL native HTML form with NO JavaScript handlers */}
+        {/* Safari requires genuine form submission - no onSubmit, no preventDefault */}
+        {mode === "login" ? (
+          <form 
+            ref={formRef}
+            method="POST"
+            action="https://api.mylifeos.dev/auth/login"
+            className="space-y-5"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-sm font-sans text-foreground">
+                Email
+              </Label>
+              <Input
+                id="username"
+                name="username"
+                type="email"
+                defaultValue={email}
+                placeholder="you@example.com"
+                className="h-12 bg-card border-border/50 focus:border-primary/50"
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-sans text-foreground">
+                Password
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                defaultValue={password}
+                placeholder="••••••••"
+                className="h-12 bg-card border-border/50 focus:border-primary/50"
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-12 text-base font-sans font-medium"
+              disabled={isLoading}
+            >
+              {isLoading ? "Please wait..." : "Continue"}
+            </Button>
+          </form>
+        ) : (
+          <form 
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
           {mode === "forgot-password" && (
             <>
               <div className="mb-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
@@ -386,42 +446,6 @@ export default function Auth() {
           )}
 
 
-          {mode === "login" && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-sm font-sans text-foreground">
-                  Email
-                </Label>
-                <Input
-                  id="username"
-                  name="username"
-                  type="email"
-                  defaultValue={email}
-                  placeholder="you@example.com"
-                  className="h-12 bg-card border-border/50 focus:border-primary/50"
-                  disabled={isLoading}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-sans text-foreground">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  defaultValue={password}
-                  placeholder="••••••••"
-                  className="h-12 bg-card border-border/50 focus:border-primary/50"
-                  disabled={isLoading}
-                  required
-                />
-              </div>
-            </>
-          )}
-
           <Button
             type="submit"
             className="w-full h-12 text-base font-sans font-medium"
@@ -437,7 +461,8 @@ export default function Auth() {
               ? "Create account"
               : "Continue"}
           </Button>
-        </form>
+          </form>
+        )}
 
         {/* Mode toggle */}
         <div className="mt-6 text-center space-y-2">
