@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { validatePassword, getPasswordRequirements } from "@/lib/passwordValidator";
 import { api } from "@/lib/api";
+import { BASE_URL } from "@/constants/config";
 
 type AuthMode = "login" | "signup" | "forgot-password" | "reset-password";
 
@@ -172,67 +173,10 @@ export default function Auth() {
       return;
     }
 
-    // Login mode - use form submission for Safari compatibility
-    if (!email.trim() || !password.trim()) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    // For login, we'll use a form submission to the backend
-    // This ensures cookies are set during navigation (required for Safari)
-    // The form will be submitted programmatically
-    setIsLoading(true);
-    
-    // Create a temporary form and submit it
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = `${BASE_URL}/auth/login`;
-    form.style.display = "none";
-    
-    const usernameInput = document.createElement("input");
-    usernameInput.type = "hidden";
-    usernameInput.name = "username";
-    usernameInput.value = email;
-    
-    const passwordInput = document.createElement("input");
-    passwordInput.type = "hidden";
-    passwordInput.name = "password";
-    passwordInput.value = password;
-    
-    form.appendChild(usernameInput);
-    form.appendChild(passwordInput);
-    document.body.appendChild(form);
-    
-    // Submit the form - this will trigger a navigation and Safari will accept cookies
-    form.submit();
-    
-    // Note: form.submit() triggers navigation, so code after this won't execute
-    // The backend will redirect to /?login=success, and we'll handle that in useEffect
-      const errorMessage = error?.message || "Something went wrong. Please try again.";
-      
-      // Check if it's a cookie/auth issue (common on Safari/mobile)
-      if (errorMessage.includes("Not authenticated") || errorMessage.includes("Could not validate credentials")) {
-        // Check if we're on Safari or mobile
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        if (isSafari || isMobile) {
-          toast.error("Login failed: Your browser is blocking cookies. Please enable third-party cookies or use Chrome desktop.");
-          console.warn("[Auth] Cookie blocking detected on Safari/mobile browser");
-        } else {
-          toast.error(errorMessage);
-        }
-      } else {
-        try {
-          const errorJson = JSON.parse(errorMessage);
-          toast.error(errorJson.detail || errorMessage);
-        } catch {
-          toast.error(errorMessage);
-        }
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    // Login mode - form submission is handled by the real HTML form
+    // No JavaScript intervention needed - Safari requires genuine form submission
+    // The form will submit naturally to the backend, which will redirect with cookies
+    // No code needed here - the form submits directly to the backend
   };
 
   const toggleMode = () => {
@@ -267,7 +211,12 @@ export default function Auth() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form 
+          onSubmit={mode === "login" ? undefined : handleSubmit}
+          method={mode === "login" ? "POST" : undefined}
+          action={mode === "login" ? `${BASE_URL}/auth/login` : undefined}
+          className="space-y-5"
+        >
           {mode === "forgot-password" && (
             <>
               <div className="mb-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
@@ -412,17 +361,18 @@ export default function Auth() {
           {mode === "login" && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-sans text-foreground">
+                <Label htmlFor="username" className="text-sm font-sans text-foreground">
                   Email
                 </Label>
                 <Input
-                  id="email"
+                  id="username"
+                  name="username"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  defaultValue={email}
                   placeholder="you@example.com"
                   className="h-12 bg-card border-border/50 focus:border-primary/50"
                   disabled={isLoading}
+                  required
                 />
               </div>
 
@@ -432,12 +382,13 @@ export default function Auth() {
                 </Label>
                 <Input
                   id="password"
+                  name="password"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  defaultValue={password}
                   placeholder="••••••••"
                   className="h-12 bg-card border-border/50 focus:border-primary/50"
                   disabled={isLoading}
+                  required
                 />
               </div>
             </>
