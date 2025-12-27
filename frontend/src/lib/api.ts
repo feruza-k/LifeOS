@@ -170,30 +170,46 @@ export const api = {
     // Ensure BASE_URL uses HTTPS in production (Railway redirects HTTP to HTTPS, causing 405)
     const loginUrl = `${BASE_URL}/auth/login`;
     console.log(`[API] Login request to: ${loginUrl}`);
+    console.log(`[API] BASE_URL value: ${BASE_URL}`);
+    console.log(`[API] Full login URL: ${loginUrl}`);
     
-    const res = await fetch(loginUrl, {
-      method: "POST",
-      body: formData,
-      credentials: "include",  // Include cookies
-      // Don't set Content-Type header - browser sets it automatically for FormData with boundary
-    });
-    
-    if (!res.ok) {
-      let errorMessage = "Login failed";
-      // Read response as text first (can only read once)
-      const responseText = await res.text();
-      try {
-        // Try to parse as JSON
-        const errorData = JSON.parse(responseText);
-        errorMessage = errorData.detail || errorMessage;
-      } catch {
-        // If not JSON, use the text as error message
-        errorMessage = responseText || errorMessage;
+    try {
+      const res = await fetch(loginUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",  // Include cookies
+        // Don't set Content-Type header - browser sets it automatically for FormData with boundary
+      });
+      
+      console.log(`[API] Login response status: ${res.status}, statusText: ${res.statusText}`);
+      console.log(`[API] Login response URL: ${res.url}`);
+      
+      if (!res.ok) {
+        let errorMessage = "Login failed";
+        // Read response as text first (can only read once)
+        const responseText = await res.text();
+        console.error(`[API] Login failed - Status: ${res.status}, Response: ${responseText}`);
+        try {
+          // Try to parse as JSON
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.detail || errorMessage;
+        } catch {
+          // If not JSON, use the text as error message
+          errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
-      throw new Error(errorMessage);
+      // For successful response, read as JSON
+      console.log(`[API] Login successful`);
+      return res.json();
+    } catch (error) {
+      // Log network errors
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        console.error(`[API] Network error during login:`, error);
+        throw new Error(`Network error: ${error.message}`);
+      }
+      throw error;
     }
-    // For successful response, read as JSON
-    return res.json();
   },
 
   signup: async (email: string, password: string, confirmPassword: string, username?: string) => {
@@ -212,6 +228,8 @@ export const api = {
       if (error?.message?.includes("network") || error?.message?.includes("fetch") || error?.message?.includes("connect")) {
         throw error;
       }
+      // Log the actual error for debugging
+      console.error("[API] getCurrentUser failed:", error?.message || error);
       // Otherwise, it's probably a 401 (not logged in) - throw a specific error
       throw new Error("Not authenticated");
     });

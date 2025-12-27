@@ -263,15 +263,15 @@ app.add_middleware(DevelopmentCORSMiddleware)
 # Request logging middleware for debugging 405 errors
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Log all requests in production for debugging
-        if IS_PRODUCTION and request.url.path.startswith("/auth"):
+        # Log ALL requests in production for debugging (not just /auth)
+        if IS_PRODUCTION:
             origin = request.headers.get("Origin")
-            logger.info(f"[REQUEST] {request.method} {request.url.path} - Origin: {origin}, Scheme: {request.url.scheme}, Headers: {dict(request.headers)}")
+            logger.info(f"[REQUEST] {request.method} {request.url.path} - Origin: {origin}, Scheme: {request.url.scheme}, Full URL: {request.url}")
         
         response = await call_next(request)
         
-        # Log response status for auth endpoints
-        if IS_PRODUCTION and request.url.path.startswith("/auth"):
+        # Log response status for all requests in production
+        if IS_PRODUCTION:
             logger.info(f"[RESPONSE] {request.method} {request.url.path} - Status: {response.status_code}")
         
         return response
@@ -716,8 +716,14 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
         success=True
     )
     
+    # Create response and set cookies
     json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
     set_auth_cookies(json_response, access_token, refresh_token)
+    
+    # Log cookie setting for debugging
+    if IS_PRODUCTION:
+        logger.info(f"[LOGIN] Success - cookies set for user {user['id']}, origin: {origin}")
+    
     return json_response
 
 class RefreshTokenRequest(BaseModel):
