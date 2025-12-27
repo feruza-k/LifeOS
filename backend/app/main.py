@@ -1757,7 +1757,7 @@ async def delete_photo_endpoint(
     # Delete the file (don't fail if file doesn't exist - might have been manually deleted)
     try:
         if photo_exists(filename):
-    delete_photo(filename)
+            delete_photo(filename)
     except Exception as e:
         logger.warning(f"Photo file {filename} not found or already deleted: {e}")
     
@@ -2310,7 +2310,7 @@ async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_
         
         # Return intelligent assistant's response
         if intelligent_reply.get("assistant_response"):
-    return {
+            return {
                 "assistant_response": intelligent_reply.get("assistant_response", "Something went wrong."),
                 "ui": intelligent_reply.get("ui")
             }
@@ -2347,7 +2347,7 @@ async def assistant_confirm(current_user: dict = Depends(get_current_user)):
     
     if pending:
         # Use rule-based assistant to handle pending action confirmation
-    return await generate_assistant_response("yes", current_user["id"])
+        return await generate_assistant_response("yes", current_user["id"])
     else:
         # No pending action - return helpful message
         return {

@@ -1801,28 +1801,29 @@ Deployment always takes longer than expected, but it's worth doing now. Having a
 
 Today was about moving from "it works on my machine" to "it works everywhere." Deployment is only half the battle; cross-browser stability, especially with cookies and mobile Safari, was the real challenge today.
 
-#### **Solving the Safari Cookie Trap**
+#### **Technical Deep Dive: The Safari Cookie Trap & Backend Hardening**
 
-Tracked down a critical auth failure where Safari/mobile browsers were blocking session cookies. Unlike Chrome, Safari requires cookies to be set during a **top-level navigation response**. I refactored the login flow from a JSON-based `fetch` to a **native HTML `<form>` submission** using a FastAPI `RedirectResponse`. This forces a first-party event that Safari accepts. Also fixed a Vite `base` path leak that was breaking URL routing on the custom domain.
+- **Auth Stability**: Refactored login to use a **native HTML `<form>` submission** with `RedirectResponse`. This bypasses Safari's XHR cookie restrictions by treating the session set as a top-level navigation event.
+- **Backend Resilience**: Performed a full syntax audit and resolved several `IndentationError` bugs in `main.py` that were blocking production startup. Standardized `MonthlyFocusRequest` to allow flexible bulk saving of goals.
+- **Vite Configuration**: Locked the `base` path to `/` to prevent domain-relative URL rewriting in production.
 
 #### **Explore: Strategic Reflection Layer**
 
-With production stable, I built the **Explore** page. This is the strategic brain of LifeOS, designed for reflection over productivity.
-
-- **SVG Completion Trends**: Replaced static bars with a dynamic **SVG Line Chart**. The backend calculates a 4-week moving completion rate by aggregating daily check-in data and task states, providing a visual narrative of consistency.
-- **Goals Carousel**: Implemented support for up to **5 monthly goals** (backed by a SQLAlchemy migration adding `order_index`). The UI uses React `useRef` and an auto-rotate timer (5s) with custom touch/swipe event handlers for a smooth mobile experience.
-- **Contextual Suggestions**: SolAI now uses a priority-based logic engine in the backend. It performs **category drift analysis** (identifying avoided areas like Health or Growth) and maps completion patterns to peak productivity windows to suggest one high-impact adjustment.
-
+The **Explore** page (formerly Align) is now the strategic brain of LifeOS.
+- **SVG Completion Trends**: Replaced static bars with a custom **SVG Line Chart**. It visualizes a 4-week moving completion average calculated from historical check-ins and task states.
+- **Goals Carousel**: Added support for up to **5 concurrent monthly goals**. The UI features an auto-rotating carousel (5s) with manual touch/swipe support and a smooth dot-indicator navigation.
+- **Smart Nudges**: The backend now uses a priority-weighted logic engine to suggest improvements based on **category drift** (e.g., when Health tasks are consistently moved) and peak productivity windows.
+- **Week Review Fix**: Resolved a critical infinite re-render loop in the Weekly Overview by stabilizing date dependencies with `useMemo`.
 
 #### **Reflection**
 
-Building for production is humbling. You think you've finished until you test on a real iPhone. Solving the Safari cookie issue felt like a proper senior engineering win. The Explore page finally feels like the "strategic brain" of the system, though there's still a massive amount of edge-case testing and feature depth to add before it's truly finished.
+Production is a stern teacher. The transition to a custom domain revealed several "invisible" bugs—from Safari's strict cookie policies to Vite's path handling. Resolving the backend indentation errors and stabilizing the frontend re-renders makes the OS feel significantly more professional. The Explore page is finally a place for meaningful insight, not just more data.
 
 ---
 
 ## **Next Steps:**
 
-- **Finish deployment polish**: Final production hardening and cross-device bug hunting.
-- **Leverage Memory & Context**: Build user-facing features like **morning briefings**, **weekly reflections**, and **habit reinforcement**.
-- **Goal Alignment**: Connect Explore goals directly to daily task suggestions and SolAI insights.
-- **Deep Reflection**: Build out the full "Review this week" flow with detailed AI narrative summaries.
+- **Habit Reinforcement**: Build a dedicated module for tracking recurring rituals and their impact on weekly energy.
+- **Goal-Task Alignment**: Create a tighter feedback loop where monthly goals directly influence the priority of daily task suggestions.
+- **Deep Reflection**: Complete the full "Review this week" flow with detailed, long-form AI narrative summaries.
+- **Performance Polish**: Optimize the loading states for the SVG charts and carousel transitions for a "native-app" feel.
