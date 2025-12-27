@@ -625,7 +625,7 @@ async def signup(request: Request, response: Response, user_data: UserCreate):
     )
     
     json_response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
-    set_auth_cookies(json_response, access_token, refresh_token)
+    set_auth_cookies(json_response, access_token, refresh_token, request=request)
     return json_response
 
 @app.post("/auth/login")
@@ -726,7 +726,7 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
     
     # Create redirect response and set cookies
     redirect_response = RedirectResponse(url=redirect_url, status_code=302)
-    set_auth_cookies(redirect_response, access_token, refresh_token)
+    set_auth_cookies(redirect_response, access_token, refresh_token, request=request)
     
     # Log cookie setting for debugging
     if IS_PRODUCTION:

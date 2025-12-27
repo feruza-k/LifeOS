@@ -3,16 +3,18 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import Request, Response
+from typing import Optional
 from fastapi.responses import JSONResponse
 import os
 
-IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "production") == "production"
 
 def set_auth_cookies(
     response: Response,
     access_token: str,
     refresh_token: str,
-    domain: Optional[str] = None
+    domain: Optional[str] = None,
+    request: Optional[Request] = None
 ):
     """
     Set httpOnly, secure cookies for access and refresh tokens.
@@ -21,26 +23,38 @@ def set_auth_cookies(
         response: FastAPI Response object
         access_token: JWT access token
         refresh_token: JWT refresh token
-        domain: Cookie domain (optional)
+        domain: Cookie domain (optional, overrides auto-detection)
+        request: Request object to detect origin (optional)
     """
     # Cookie settings for security
-    # With subdomain (api.mylifeos.dev), we use SameSite=Lax with domain=.mylifeos.dev
-    # This allows cookies to be shared between mylifeos.dev and api.mylifeos.dev
-    # Both are same-site (same root domain), so Safari and mobile browsers will accept them
     cookie_kwargs = {
         "httponly": True,
-        "samesite": "lax" if IS_PRODUCTION else "lax",  # Lax for same-site (subdomain setup)
+        "samesite": "lax",  # Lax for same-site (subdomain setup)
         "secure": True,  # Always True (required for HTTPS)
         "path": "/",
-        # Domain is REQUIRED for subdomain setup - allows cookies to be shared
-        # .mylifeos.dev (with leading dot) makes cookies available to:
-        # - mylifeos.dev (frontend)
-        # - api.mylifeos.dev (backend)
-        # - www.mylifeos.dev (if needed)
     }
     
-    # Set domain for production (subdomain setup)
-    if IS_PRODUCTION:
+    # Determine cookie domain based on request origin
+    if domain:
+        # Explicit domain provided
+        cookie_kwargs["domain"] = domain
+    elif IS_PRODUCTION and request:
+        # Auto-detect domain from request origin
+        origin = request.headers.get("Origin") or request.headers.get("Referer", "")
+        
+        # If origin is mylifeos.dev or subdomain, use .mylifeos.dev
+        if "mylifeos.dev" in origin:
+            cookie_kwargs["domain"] = ".mylifeos.dev"
+        # If origin is vercel.app, don't set domain (scoped to exact domain)
+        elif ".vercel.app" in origin:
+            # Don't set domain - cookies will be scoped to api.mylifeos.dev
+            # This won't work for vercel.app domains, but that's expected
+            pass
+        else:
+            # Default: use .mylifeos.dev for production
+            cookie_kwargs["domain"] = ".mylifeos.dev"
+    elif IS_PRODUCTION:
+        # Production but no request - default to .mylifeos.dev
         cookie_kwargs["domain"] = ".mylifeos.dev"
     
     # Access token: 30 minutes

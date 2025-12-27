@@ -7,7 +7,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { validatePassword, getPasswordRequirements } from "@/lib/passwordValidator";
 import { api } from "@/lib/api";
-import { BASE_URL } from "@/constants/config";
+
+// Hardcoded API base URL for login form (Safari requires genuine form submission)
+// This eliminates any ambiguity from environment variables
+const API_BASE = "https://api.mylifeos.dev";
 
 type AuthMode = "login" | "signup" | "forgot-password" | "reset-password";
 
@@ -214,7 +217,7 @@ export default function Auth() {
         <form 
           onSubmit={mode === "login" ? undefined : handleSubmit}
           method={mode === "login" ? "POST" : undefined}
-          action={mode === "login" ? `${BASE_URL}/auth/login` : undefined}
+          action={mode === "login" ? `${API_BASE}/auth/login` : undefined}
           className="space-y-5"
         >
           {mode === "forgot-password" && (
