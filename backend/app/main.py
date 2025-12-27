@@ -2586,11 +2586,14 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
                 "message": f"You may want to protect one uninterrupted {preferred_time} block next week.",
                 "action": "apply"
             }
-    elif rescheduled_count > 3:
-        nudge = {
-            "message": "Consider batching admin tasks into one session to reduce rescheduling.",
-            "action": "apply"
-        }
+    else:
+        # Check for high reschedule rate
+        rescheduled_count = sum(1 for t in week_tasks if t.get("moved_from") or t.get("rescheduled"))
+        if rescheduled_count > 3:
+            nudge = {
+                "message": "Consider batching admin tasks into one session to reduce rescheduling.",
+                "action": "apply"
+            }
     
     # Goals hierarchy
     goals = {
@@ -2626,6 +2629,110 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
             "total_tasks": week_stats.get("total_tasks", 0),
             "completed": completed_tasks,
             "total": total_week_tasks
+        }
+    }
+
+# Comprehensive Align Analytics Endpoint
+@app.get("/align/analytics")
+async def align_analytics(current_user: dict = Depends(get_current_user)):
+    """
+    Get comprehensive analytics for Align page.
+    Returns: historical trends, week/month comparisons, completion rates, category analysis, energy patterns.
+    """
+    from datetime import datetime, timedelta, date
+    import pytz
+    from app.ai.analytics import (
+        calculate_completion_trends,
+        calculate_monthly_trends,
+        compare_weeks,
+        compare_months,
+        detect_category_drift,
+        calculate_consistency_metrics,
+        calculate_energy_patterns,
+        get_week_boundaries
+    )
+    from app.ai.intelligent_assistant import get_user_context
+    from app.logic.week_engine import get_week_stats
+    from collections import defaultdict
+    
+    tz = pytz.timezone("Europe/London")
+    today = datetime.now(tz)
+    current_month = today.strftime("%Y-%m")
+    
+    # Get user's historical data
+    user_context = await get_user_context(current_user["id"])
+    historical = user_context.get("historical", {})
+    
+    all_tasks = historical.get("all_tasks", [])
+    checkins = historical.get("checkins", [])
+    
+    # Calculate completion trends (last 4 weeks)
+    weekly_trends = calculate_completion_trends(all_tasks, checkins, weeks=4)
+    
+    # Calculate monthly trends (last 2 months)
+    monthly_trends = calculate_monthly_trends(all_tasks, checkins, months=2)
+    
+    # Week-over-week comparison
+    current_week_start, current_week_end = get_week_boundaries(today.date())
+    current_week_metrics = None
+    previous_week_metrics = None
+    
+    if len(weekly_trends) >= 2:
+        current_week_metrics = weekly_trends[-1]  # Most recent week
+        previous_week_metrics = weekly_trends[-2]  # Previous week
+    
+    week_comparison = compare_weeks(current_week_metrics or {}, previous_week_metrics or {}) if current_week_metrics else {}
+    
+    # Month-over-month comparison
+    month_comparison = {}
+    if len(monthly_trends) >= 2:
+        current_month_metrics = monthly_trends[-1]
+        previous_month_metrics = monthly_trends[-2]
+        month_comparison = compare_months(current_month_metrics, previous_month_metrics)
+    
+    # Category drift detection
+    drift_analysis = detect_category_drift(all_tasks, checkins, weeks=4)
+    
+    # Consistency metrics
+    consistency = calculate_consistency_metrics(checkins, days_back=30)
+    
+    # Energy patterns
+    energy_patterns = calculate_energy_patterns(all_tasks, checkins, weeks=4)
+    
+    # Current week stats (from week_engine for consistency)
+    week_stats = await get_week_stats(current_user["id"])
+    
+    # Calculate category distribution trends (last 4 weeks)
+    category_trends = defaultdict(list)
+    for week_data in weekly_trends:
+        week_cats = week_data.get("categories", {})
+        for cat, count in week_cats.items():
+            category_trends[cat].append({
+                "week": week_data.get("week_start"),
+                "count": count
+            })
+    
+    # Get current month focus
+    monthly_focus = await db_repo.get_monthly_focus(current_month, current_user["id"])
+    
+    return {
+        "weekly_trends": weekly_trends,
+        "monthly_trends": monthly_trends,
+        "week_comparison": week_comparison,
+        "month_comparison": month_comparison,
+        "category_trends": dict(category_trends),
+        "drift_analysis": drift_analysis,
+        "consistency": consistency,
+        "energy_patterns": energy_patterns,
+        "current_week": {
+            "total_tasks": week_stats.get("total_tasks", 0),
+            "week_start": week_stats.get("week_start"),
+            "week_end": week_stats.get("week_end")
+        },
+        "monthly_focus": {
+            "title": monthly_focus.get("title") if monthly_focus else None,
+            "progress": monthly_focus.get("progress") if monthly_focus else None,
+            "month": current_month
         }
     }
 

@@ -502,8 +502,17 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
         from app.logic.today_engine import calculate_energy
         formatted_tasks = []
         for task in today_tasks_raw:
+            # Safely extract time from datetime string
+            time_value = task.get("time")
+            if not time_value and task.get("datetime"):
+                datetime_str = task.get("datetime")
+                if isinstance(datetime_str, str) and " " in datetime_str:
+                    parts = datetime_str.split(" ")
+                    if len(parts) > 1:
+                        time_value = parts[1]
+            
             formatted_task = {
-                "time": task.get("time") or (task.get("datetime") and task["datetime"].split(" ")[1] if isinstance(task.get("datetime"), str) else None),
+                "time": time_value,
                 "duration_minutes": task.get("duration_minutes", 60),
                 "completed": task.get("completed", False)
             }

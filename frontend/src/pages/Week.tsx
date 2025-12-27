@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { BottomNav } from "@/components/lifeos/BottomNav";
@@ -10,11 +10,28 @@ import { useCoreAI } from "@/hooks/useCoreAI";
 
 const Week = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [loading, setLoading] = useState(true);
   const today = new Date();
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+  const weekEnd = addDays(weekStart, 6);
 
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
+
+  // Load tasks for the week when component mounts or week changes
+  useEffect(() => {
+    const loadWeekTasks = async () => {
+      try {
+        setLoading(true);
+        await store.loadTasksForDateRange(weekStart, weekEnd);
+      } catch (error) {
+        console.error("Failed to load week tasks:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadWeekTasks();
+  }, [weekStart, weekEnd, store]);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
@@ -28,6 +45,18 @@ const Week = () => {
   const navigateWeek = (direction: number) => {
     setCurrentWeek(prev => addDays(prev, direction * 7));
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center pb-24">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground font-sans">Loading week...</p>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24">

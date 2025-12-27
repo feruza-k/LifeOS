@@ -595,4 +595,5 @@ export const api = {
 
   // Align endpoints
   getAlignSummary: () => request("/align/summary"),
+  getAlignAnalytics: () => request("/align/analytics"),
 };
