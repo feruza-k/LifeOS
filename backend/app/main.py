@@ -1179,7 +1179,7 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     success = await db_repo.delete_user_account(user_id)
     
     if success:
-    return {"message": "Account deleted successfully"}
+        return {"message": "Account deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="User not found")
 
