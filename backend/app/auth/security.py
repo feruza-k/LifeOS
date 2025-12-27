@@ -24,18 +24,24 @@ def set_auth_cookies(
         domain: Cookie domain (optional)
     """
     # Cookie settings for security
-    # For cross-domain (mylifeos.dev -> railway.app), use SameSite=None
-    # Once subdomain (api.mylifeos.dev) is set up, we can switch to SameSite=Lax with domain=.mylifeos.dev
-    # For now, use SameSite=None to work with current cross-domain setup
+    # With subdomain (api.mylifeos.dev), we use SameSite=Lax with domain=.mylifeos.dev
+    # This allows cookies to be shared between mylifeos.dev and api.mylifeos.dev
+    # Both are same-site (same root domain), so Safari and mobile browsers will accept them
     cookie_kwargs = {
         "httponly": True,
-        "samesite": "none" if IS_PRODUCTION else "lax",  # None for cross-domain, Lax for same-origin
-        "secure": True,  # Always True (required for SameSite=None and HTTPS)
+        "samesite": "lax" if IS_PRODUCTION else "lax",  # Lax for same-site (subdomain setup)
+        "secure": True,  # Always True (required for HTTPS)
         "path": "/",
-        # Do NOT set domain attribute for cross-domain cookies
-        # Setting domain prevents cookies from being sent cross-domain
-        # Once subdomain is set up, we can add domain=".mylifeos.dev"
+        # Domain is REQUIRED for subdomain setup - allows cookies to be shared
+        # .mylifeos.dev (with leading dot) makes cookies available to:
+        # - mylifeos.dev (frontend)
+        # - api.mylifeos.dev (backend)
+        # - www.mylifeos.dev (if needed)
     }
+    
+    # Set domain for production (subdomain setup)
+    if IS_PRODUCTION:
+        cookie_kwargs["domain"] = ".mylifeos.dev"
     
     # Access token: 30 minutes
     response.set_cookie(
@@ -57,11 +63,14 @@ def clear_auth_cookies(response: Response, domain: Optional[str] = None):
     """Clear authentication cookies."""
     cookie_kwargs = {
         "httponly": True,
-        "samesite": "none" if IS_PRODUCTION else "lax",  # Match the setting used when setting cookies
+        "samesite": "lax" if IS_PRODUCTION else "lax",  # Match the setting used when setting cookies
         "secure": True,  # Always True (required for HTTPS)
         "path": "/",  # Match the path used when setting cookies
-        # Do NOT set domain - match the setting used when setting cookies
     }
+    
+    # Match the domain setting used when setting cookies
+    if IS_PRODUCTION:
+        cookie_kwargs["domain"] = ".mylifeos.dev"
     
     response.set_cookie(key="access_token", value="", max_age=0, **cookie_kwargs)
     response.set_cookie(key="refresh_token", value="", max_age=0, **cookie_kwargs)

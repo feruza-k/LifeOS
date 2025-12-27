@@ -160,11 +160,26 @@ export default function Auth() {
       navigate("/", { replace: true });
     } catch (error: any) {
       const errorMessage = error?.message || "Something went wrong. Please try again.";
-      try {
-        const errorJson = JSON.parse(errorMessage);
-        toast.error(errorJson.detail || errorMessage);
-      } catch {
-        toast.error(errorMessage);
+      
+      // Check if it's a cookie/auth issue (common on Safari/mobile)
+      if (errorMessage.includes("Not authenticated") || errorMessage.includes("Could not validate credentials")) {
+        // Check if we're on Safari or mobile
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isSafari || isMobile) {
+          toast.error("Login failed: Your browser is blocking cookies. Please enable third-party cookies or use Chrome desktop.");
+          console.warn("[Auth] Cookie blocking detected on Safari/mobile browser");
+        } else {
+          toast.error(errorMessage);
+        }
+      } else {
+        try {
+          const errorJson = JSON.parse(errorMessage);
+          toast.error(errorJson.detail || errorMessage);
+        } catch {
+          toast.error(errorMessage);
+        }
       }
     } finally {
       setIsLoading(false);

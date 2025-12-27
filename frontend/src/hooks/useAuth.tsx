@@ -77,8 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     await api.login(email, password);
     // Tokens are now in httpOnly cookies, get user info
-    // Wait a bit for cookies to be set
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Wait a bit for cookies to be set (longer for Safari/mobile)
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const delay = (isSafari || isMobile) ? 500 : 200; // Longer delay for Safari/mobile
+    await new Promise(resolve => setTimeout(resolve, delay));
     const userData = await api.getCurrentUser();
     setUser(userData);
     setIsAuthenticated(true);
