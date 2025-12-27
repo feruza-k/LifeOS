@@ -592,4 +592,7 @@ export const api = {
 
   deleteCategory: (id: string) =>
     request(`/categories/${id}`, { method: "DELETE" }),
+
+  // Align endpoints
+  getAlignSummary: () => request("/align/summary"),
 };

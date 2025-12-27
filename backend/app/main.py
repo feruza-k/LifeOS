@@ -2455,6 +2455,180 @@ async def assistant_reschedule_options(task_id: str, current_user: dict = Depend
     suggestions = generate_reschedule_suggestions(task_id)
     return {"task": task, "suggestions": suggestions.get("suggestions", [])}
 
+# Align Endpoint - Strategic Reflection Layer
+@app.get("/align/summary")
+async def align_summary(current_user: dict = Depends(get_current_user)):
+    """
+    Get comprehensive alignment summary for the Align page.
+    Returns: Direction narrative, goals hierarchy, patterns, value alignment, progress, and gentle nudge.
+    """
+    from datetime import datetime, timedelta, date
+    import pytz
+    from app.ai.pattern_analyzer import analyze_task_patterns, analyze_checkin_patterns, generate_pattern_summary
+    from app.ai.intelligent_assistant import get_user_context, _build_weekly_summary
+    from app.logic.week_engine import get_week_stats
+    from collections import defaultdict
+    
+    tz = pytz.timezone("Europe/London")
+    today = datetime.now(tz)
+    current_month = today.strftime("%Y-%m")
+    
+    # Get user's historical data
+    user_context = await get_user_context(current_user["id"])
+    historical = user_context.get("historical", {})
+    
+    # Get current month's focus
+    monthly_focus = await db_repo.get_monthly_focus(current_month, current_user["id"])
+    
+    # Get tasks for pattern analysis (last 30 days)
+    all_tasks = historical.get("all_tasks", [])
+    task_patterns = analyze_task_patterns(all_tasks, days_back=30)
+    
+    # Get check-ins for pattern analysis
+    checkins = historical.get("checkins", [])
+    checkin_patterns = analyze_checkin_patterns(checkins, days_back=30)
+    
+    # Get week stats (current week)
+    week_stats = await get_week_stats(current_user["id"])
+    
+    # Calculate value alignment from task categories (current week from week_stats)
+    week_tasks_from_stats = []
+    for day in week_stats.get("days", []):
+        day_tasks = day.get("tasks", [])
+        if day_tasks:
+            week_tasks_from_stats.extend(day_tasks)
+    
+    # Also get tasks from historical for category analysis
+    week_start = today.date() - timedelta(days=7)
+    week_tasks = [
+        t for t in all_tasks
+        if t.get("date") and date.fromisoformat(t["date"][:10]) >= week_start
+    ]
+    
+    category_distribution = defaultdict(int)
+    for task in week_tasks:
+        category = task.get("category")
+        if category:
+            category_distribution[category] += 1
+    
+    total_week_tasks = len(week_tasks)
+    value_alignment = {}
+    if total_week_tasks > 0:
+        for cat, count in category_distribution.items():
+            value_alignment[cat] = {
+                "count": count,
+                "percentage": round((count / total_week_tasks) * 100)
+            }
+    
+    # Build direction narrative from patterns and week data
+    direction_parts = []
+    
+    # Week overview
+    if week_stats.get("total_tasks", 0) > 0:
+        direction_parts.append(f"You planned {week_stats.get('total_tasks', 0)} task(s) this week.")
+    
+    # Completion pattern from check-ins
+    if checkin_patterns.get("average_completion", 0) > 0:
+        completion = checkin_patterns["average_completion"]
+        if completion >= 0.7:
+            direction_parts.append("You stayed consistent with planned work.")
+        elif completion < 0.5:
+            direction_parts.append("Some tasks were postponed, suggesting mild drift.")
+    
+    # Category drift pattern
+    if task_patterns.get("category_usage"):
+        # Check if certain categories were postponed more
+        health_tasks = [t for t in week_tasks if t.get("category") == "health" and not t.get("completed", False)]
+        if len(health_tasks) > 2:
+            direction_parts.append("Tasks related to Health were postponed more often.")
+    
+    # Build final direction narrative
+    if direction_parts:
+        direction_narrative = " ".join(direction_parts[:3])  # Max 3 insights
+    else:
+        direction_narrative = "Building patterns as you use LifeOS more. Set a monthly focus to begin aligning your actions."
+    
+    # Generate patterns & insights (max 3, real only)
+    patterns = []
+    if task_patterns.get("preferred_times"):
+        times = task_patterns["preferred_times"][:2]
+        if times:
+            time_str = " and ".join(times)
+            patterns.append(f"Peak focus window: {time_str}")
+    
+    if task_patterns.get("category_usage"):
+        top_category = max(task_patterns["category_usage"].items(), key=lambda x: x[1], default=None)
+        if top_category:
+            category_label = top_category[0].capitalize()
+            patterns.append(f"Most active area: {category_label}")
+    
+    if checkin_patterns.get("average_completion", 0) > 0:
+        completion = checkin_patterns["average_completion"]
+        if completion >= 0.7:
+            patterns.append(f"Strong daily completion: {completion:.0%}")
+    
+    # Progress snapshot (minimal) - use check-in data if available
+    completed_tasks = sum(1 for t in week_tasks if t.get("completed", False))
+    if completed_tasks == 0 and checkin_patterns.get("average_completion", 0) > 0:
+        # Estimate from check-in patterns
+        avg_completion = checkin_patterns["average_completion"]
+        estimated_completed = int(total_week_tasks * avg_completion)
+        progress_snapshot = f"You completed approximately {estimated_completed} of {total_week_tasks} planned tasks this week." if total_week_tasks > 0 else "No tasks planned this week yet."
+    else:
+        progress_snapshot = f"You completed {completed_tasks} of {total_week_tasks} planned tasks this week." if total_week_tasks > 0 else "No tasks planned this week yet."
+    
+    # Gentle nudge (single recommendation)
+    nudge = None
+    if task_patterns.get("preferred_times"):
+        preferred_time = task_patterns["preferred_times"][0] if task_patterns["preferred_times"] else None
+        if preferred_time:
+            nudge = {
+                "message": f"You may want to protect one uninterrupted {preferred_time} block next week.",
+                "action": "apply"
+            }
+    elif rescheduled_count > 3:
+        nudge = {
+            "message": "Consider batching admin tasks into one session to reduce rescheduling.",
+            "action": "apply"
+        }
+    
+    # Goals hierarchy
+    goals = {
+        "year_theme": None,  # Future feature
+        "month_focus": {
+            "title": monthly_focus.get("title") if monthly_focus else None,
+            "description": monthly_focus.get("description") if monthly_focus else None,
+            "progress": monthly_focus.get("progress") if monthly_focus else None,
+            "month": current_month
+        },
+        "week_intent": None  # Could be derived from monthly focus
+    }
+    
+    # Determine if new user (no data)
+    is_new_user = (
+        len(all_tasks) == 0 and
+        len(checkins) == 0 and
+        monthly_focus is None
+    )
+    
+    return {
+        "direction": {
+            "narrative": direction_narrative,
+            "has_data": not is_new_user
+        },
+        "goals": goals,
+        "patterns": patterns[:3],  # Max 3
+        "value_alignment": value_alignment,
+        "progress": progress_snapshot,
+        "nudge": nudge,
+        "is_new_user": is_new_user,
+        "week_stats": {
+            "total_tasks": week_stats.get("total_tasks", 0),
+            "completed": completed_tasks,
+            "total": total_week_tasks
+        }
+    }
+
 # Meta Endpoints
 
 @app.get("/meta/categories")

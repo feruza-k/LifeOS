@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Calendar from "./pages/Calendar";
-import Explore from "./pages/Explore";
+import Align from "./pages/Align";
 import Notes from "./pages/Notes";
 import Reminders from "./pages/Reminders";
 import Settings from "./pages/Settings";
@@ -107,10 +107,18 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="/align"
+          element={
+            <ProtectedRoute>
+              <Align />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/explore"
           element={
             <ProtectedRoute>
-              <Explore />
+              <Align />
             </ProtectedRoute>
           }
         />
