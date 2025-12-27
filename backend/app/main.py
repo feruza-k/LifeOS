@@ -363,7 +363,7 @@ class ReminderRequest(BaseModel):
     createdAt: str | None = None
 
 class MonthlyFocusRequest(BaseModel):
-    month: str
+    month: str | None = None
     title: str
     description: str | None = None
     progress: int | None = None
@@ -1179,7 +1179,7 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     success = await db_repo.delete_user_account(user_id)
     
     if success:
-        return {"message": "Account deleted successfully"}
+    return {"message": "Account deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -1757,7 +1757,7 @@ async def delete_photo_endpoint(
     # Delete the file (don't fail if file doesn't exist - might have been manually deleted)
     try:
         if photo_exists(filename):
-            delete_photo(filename)
+    delete_photo(filename)
     except Exception as e:
         logger.warning(f"Photo file {filename} not found or already deleted: {e}")
     
@@ -2310,7 +2310,7 @@ async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_
         
         # Return intelligent assistant's response
         if intelligent_reply.get("assistant_response"):
-            return {
+    return {
                 "assistant_response": intelligent_reply.get("assistant_response", "Something went wrong."),
                 "ui": intelligent_reply.get("ui")
             }
@@ -2334,7 +2334,7 @@ async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_
         return {
             "assistant_response": "I'm having trouble processing that request. Please try again.",
             "ui": None
-        }
+    }
 
 @app.post("/assistant/confirm")
 async def assistant_confirm(current_user: dict = Depends(get_current_user)):
@@ -2347,7 +2347,7 @@ async def assistant_confirm(current_user: dict = Depends(get_current_user)):
     
     if pending:
         # Use rule-based assistant to handle pending action confirmation
-        return await generate_assistant_response("yes", current_user["id"])
+    return await generate_assistant_response("yes", current_user["id"])
     else:
         # No pending action - return helpful message
         return {
@@ -2617,6 +2617,9 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
     
     # Calculate completion rate for this week
     week_completion_rate = completed_tasks / total_week_tasks if total_week_tasks > 0 else 0
+    
+    # Simple reschedule count (for nudge logic)
+    rescheduled_count = 0 
     
     # Check for category drift (tasks being postponed)
     drifted_categories = []

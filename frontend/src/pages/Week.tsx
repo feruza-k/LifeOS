@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { BottomNav } from "@/components/lifeos/BottomNav";
@@ -12,8 +12,9 @@ const Week = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const today = new Date();
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
-  const weekEnd = addDays(weekStart, 6);
+  
+  const weekStart = useMemo(() => startOfWeek(currentWeek, { weekStartsOn: 1 }), [currentWeek]);
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
 
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
@@ -23,6 +24,8 @@ const Week = () => {
     const loadWeekTasks = async () => {
       try {
         setLoading(true);
+        // We only depend on the values of weekStart and weekEnd, not the objects themselves
+        // startOfWeek and addDays return new objects, but useMemo keeps them stable
         await store.loadTasksForDateRange(weekStart, weekEnd);
       } catch (error) {
         console.error("Failed to load week tasks:", error);
@@ -31,7 +34,7 @@ const Week = () => {
       }
     };
     loadWeekTasks();
-  }, [weekStart, weekEnd, store]);
+  }, [weekStart, weekEnd, store.loadTasksForDateRange]);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);

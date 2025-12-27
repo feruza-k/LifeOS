@@ -22,7 +22,7 @@ import { TopBrand } from "@/components/lifeos/TopBrand";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
 import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
-import { useLifeOSStore } from "@/hooks/useLifeOSStore";
+import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { cn } from "@/lib/utils";
 import {
@@ -124,7 +124,7 @@ export default function Settings() {
   const handleExportData = () => {
     const data = {
       tasks: store.tasks,
-      notes: store.notes,
+      note: store.note,
       reminders: store.reminders,
       settings: store.settings,
       exportedAt: new Date().toISOString(),
