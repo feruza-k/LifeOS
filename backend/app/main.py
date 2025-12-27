@@ -832,7 +832,13 @@ async def options_auth_me(request: Request):
     return Response(status_code=200)
 
 @app.get("/auth/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+async def get_current_user_info(request: Request, current_user: dict = Depends(get_current_user)):
+    # Debug logging for cookie issues
+    if IS_PRODUCTION:
+        from app.auth.security import get_token_from_cookie
+        cookie_token = get_token_from_cookie(request, "access")
+        all_cookies = request.cookies
+        logger.info(f"[AUTH/ME] Cookies received: {list(all_cookies.keys())}, access_token present: {bool(cookie_token)}, User ID: {current_user.get('id')}")
     return {
         "id": current_user["id"],
         "email": current_user["email"],

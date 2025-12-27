@@ -6,7 +6,16 @@ let refreshHasFailed = false;
 let hasRedirected = false;
 
 async function request(path: string, options: RequestInit = {}, retryCount = 0, skipRefresh = false): Promise<any> {
-  const url = `${BASE_URL}${path}`;
+  // Ensure BASE_URL has protocol
+  let baseUrl = BASE_URL;
+  if (!baseUrl.match(/^https?:\/\//) && typeof window !== 'undefined') {
+    // If no protocol, add https:// in production
+    const isDev = import.meta.env.DEV;
+    baseUrl = isDev ? `http://${baseUrl}` : `https://${baseUrl}`;
+    console.warn(`[API] BASE_URL missing protocol, added: ${baseUrl}`);
+  }
+  
+  const url = `${baseUrl}${path}`;
   
   const headers: HeadersInit = {
     "Content-Type": "application/json",
