@@ -225,10 +225,15 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
                     allowed = True
             # In production, allow Vercel domains and mylifeos.dev (including subdomains)
             elif IS_PRODUCTION:
+                # Explicitly check for mylifeos.dev domains
+                is_mylifeos_domain = (
+                    origin == "https://mylifeos.dev" or
+                    origin == "https://www.mylifeos.dev" or
+                    origin.endswith(".mylifeos.dev") or  # Matches api.mylifeos.dev, etc.
+                    "mylifeos.dev" in origin  # Fallback for any subdomain
+                )
                 if (origin.endswith(".vercel.app") or 
-                    origin.endswith("mylifeos.dev") or  # Matches mylifeos.dev and api.mylifeos.dev
-                    origin.endswith("www.mylifeos.dev") or
-                    "mylifeos.dev" in origin or  # Also match any subdomain
+                    is_mylifeos_domain or
                     origin in ALLOWED_ORIGINS):
                     allowed = True
         
@@ -724,15 +729,41 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
     frontend_url = get_frontend_url_from_request(request)
     redirect_url = f"{frontend_url}/?login=success"
     
+    # For form submissions, Origin header might not be set, so use Referer or infer from redirect URL
+    # This ensures cookies are set with the correct domain
+    form_origin = origin or request.headers.get("Referer", "")
+    if not form_origin and IS_PRODUCTION:
+        # Infer from redirect URL (should be mylifeos.dev or www.mylifeos.dev)
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(redirect_url)
+            form_origin = f"{parsed.scheme}://{parsed.netloc}"
+        except:
+            form_origin = "https://mylifeos.dev"
+    
     # Create redirect response and set cookies
+    # In production, always use .mylifeos.dev domain for cookies (works for all subdomains)
     redirect_response = RedirectResponse(url=redirect_url, status_code=302)
-    set_auth_cookies(redirect_response, access_token, refresh_token, request=request)
+    if IS_PRODUCTION:
+        # Explicitly set domain to .mylifeos.dev for production
+        set_auth_cookies(redirect_response, access_token, refresh_token, domain=".mylifeos.dev", request=request)
+    else:
+        set_auth_cookies(redirect_response, access_token, refresh_token, request=request)
+    
+    # CRITICAL: Set CORS headers on redirect response to prevent CORS errors
+    # For form submissions, we need to infer the origin from the redirect URL
+    if form_origin:
+        # Only set CORS headers if origin is allowed (prevents wildcard issues)
+        if form_origin in ALLOWED_ORIGINS or "mylifeos.dev" in form_origin or ".vercel.app" in form_origin:
+            redirect_response.headers["Access-Control-Allow-Origin"] = form_origin
+            redirect_response.headers["Access-Control-Allow-Credentials"] = "true"
     
     # Log cookie setting for debugging
     if IS_PRODUCTION:
-        logger.info(f"[LOGIN] Success - cookies set for user {user['id']}, origin: {origin}")
+        logger.info(f"[LOGIN] Success - cookies set for user {user['id']}, origin: {origin}, form_origin: {form_origin}")
         logger.info(f"[LOGIN] Cookie domain will be: .mylifeos.dev, SameSite: lax")
         logger.info(f"[LOGIN] Redirecting to: {redirect_url}")
+        logger.info(f"[LOGIN] CORS headers set: Access-Control-Allow-Origin={redirect_response.headers.get('Access-Control-Allow-Origin')}")
     
     return redirect_response
 
