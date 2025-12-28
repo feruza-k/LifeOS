@@ -773,13 +773,13 @@ class DatabaseRepo:
                     )
                 )
                 focus = result.scalar_one_or_none()
-            if focus:
+                if focus:
                     focus.title = focus_dict.get("title", focus.title)
                     focus.description = focus_dict.get("description", focus.description)
                     focus.progress = focus_dict.get("progress", focus.progress)
                     if "order_index" in focus_dict:
                         focus.order_index = focus_dict.get("order_index", focus.order_index)
-            else:
+                else:
                     return None
             else:
                 # Create new - check limit of 5 goals per month
