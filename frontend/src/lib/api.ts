@@ -17,8 +17,14 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
   
   const url = `${baseUrl}${path}`;
   
+  // Auto-detect timezone from browser
+  const timezone = typeof window !== 'undefined' 
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone 
+    : 'UTC';
+
   const headers: HeadersInit = {
     "Content-Type": "application/json",
+    "X-Timezone": timezone, // Send timezone to backend
     ...(options.headers || {}),
   };
 

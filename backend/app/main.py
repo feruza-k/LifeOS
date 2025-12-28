@@ -2504,13 +2504,13 @@ async def get_context_actions(
     return {"actions": actions}
 
 @app.get("/assistant/bootstrap")
-async def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
+async def assistant_bootstrap(request: Request, current_user: dict = Depends(get_current_user)):
     """Bootstrap endpoint: returns all initial data needed by frontend (user-scoped)."""
     from datetime import datetime
-    import pytz
+    from app.utils.timezone import get_timezone_from_request
     from app.logic.today_engine import calculate_energy
     
-    tz = pytz.timezone("Europe/London")
+    tz = get_timezone_from_request(request)
     today = datetime.now(tz).strftime("%Y-%m-%d")
     
     # Get today's tasks using the database query (more efficient)
@@ -2558,15 +2558,16 @@ async def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
 
 @app.get("/assistant/today")
 async def assistant_today(
+    request: Request,
     date: str | None = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
     current_user: dict = Depends(get_current_user)
 ):
     """Get tasks for a specific date or today, with energy calculation (user-scoped)."""
     from datetime import datetime
-    import pytz
+    from app.utils.timezone import get_timezone_from_request
     from app.logic.today_engine import calculate_energy
     
-    tz = pytz.timezone("Europe/London")
+    tz = get_timezone_from_request(request)
     
     # If date provided, use it; otherwise use today
     if not date:
@@ -2635,19 +2636,19 @@ async def assistant_reschedule_options(task_id: str, current_user: dict = Depend
 
 # Align Endpoint - Strategic Reflection Layer
 @app.get("/align/summary")
-async def align_summary(current_user: dict = Depends(get_current_user)):
+async def align_summary(request: Request, current_user: dict = Depends(get_current_user)):
     """
     Get comprehensive alignment summary for the Align page.
     Returns: Direction narrative, goals hierarchy, patterns, value alignment, progress, and gentle nudge.
     """
     from datetime import datetime, timedelta, date
-    import pytz
+    from app.utils.timezone import get_timezone_from_request
     from app.ai.pattern_analyzer import analyze_task_patterns, analyze_checkin_patterns, generate_pattern_summary
     from app.ai.intelligent_assistant import get_user_context, _build_weekly_summary
     from app.logic.week_engine import get_week_stats
     from collections import defaultdict
     
-    tz = pytz.timezone("Europe/London")
+    tz = get_timezone_from_request(request)
     today = datetime.now(tz)
     current_month = today.strftime("%Y-%m")
     
@@ -2875,13 +2876,12 @@ async def align_summary(current_user: dict = Depends(get_current_user)):
 
 # Comprehensive Align Analytics Endpoint
 @app.get("/align/analytics")
-async def align_analytics(current_user: dict = Depends(get_current_user)):
+async def align_analytics(request: Request, current_user: dict = Depends(get_current_user)):
     """
     Get comprehensive analytics for Align page.
     Returns: historical trends, week/month comparisons, completion rates, category analysis, energy patterns.
     """
     from datetime import datetime, timedelta, date
-    import pytz
     from app.ai.analytics import (
         calculate_completion_trends,
         calculate_monthly_trends,
@@ -2896,7 +2896,9 @@ async def align_analytics(current_user: dict = Depends(get_current_user)):
     from app.logic.week_engine import get_week_stats
     from collections import defaultdict
     
-    tz = pytz.timezone("Europe/London")
+    from app.utils.timezone import get_timezone_from_request
+    
+    tz = get_timezone_from_request(request)
     today = datetime.now(tz)
     current_month = today.strftime("%Y-%m")
     

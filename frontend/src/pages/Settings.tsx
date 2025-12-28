@@ -109,11 +109,18 @@ export default function Settings() {
   const [showSideMenu, setShowSideMenu] = useState(false);
   
   const [name, setName] = useState("User");
-  const [timezone, setTimezone] = useState("America/New_York");
   const [language, setLanguage] = useState("en");
   const [weekStart, setWeekStart] = useState("monday");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [defaultReminderTime, setDefaultReminderTime] = useState("09:00");
+  
+  // Auto-detect timezone
+  const [timezone] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+    return 'UTC';
+  });
 
   const handleClearData = () => {
     localStorage.clear();
@@ -159,21 +166,8 @@ export default function Settings() {
         <SettingsGroup title="Profile" icon={User}>
           <SettingsRow label="User Profile" description="Manage your account settings" onClick={() => navigate("/profile")} />
           
-          <SettingsRow label="Timezone">
-            <Select value={timezone} onValueChange={setTimezone}>
-              <SelectTrigger className="w-40 h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                <SelectItem value="America/Chicago">Central Time</SelectItem>
-                <SelectItem value="America/Denver">Mountain Time</SelectItem>
-                <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                <SelectItem value="Europe/London">London</SelectItem>
-                <SelectItem value="Europe/Paris">Paris</SelectItem>
-                <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
-              </SelectContent>
-            </Select>
+          <SettingsRow label="Timezone" description={`Automatically detected: ${timezone}`}>
+            <span className="text-sm text-muted-foreground">{timezone}</span>
           </SettingsRow>
 
           <SettingsRow label="Language">
