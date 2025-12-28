@@ -11,6 +11,7 @@ import { format, parseISO, isToday, isTomorrow } from "date-fns";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { TimePicker } from "./TimePicker";
 import { toast } from "sonner";
+import { i18n } from "@/utils/i18n";
 import {
   Dialog,
   DialogContent,
@@ -733,7 +734,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
               }}
               className="rounded-xl font-sans border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
             >
-              Delete
+              {i18n.t("common.delete")}
             </Button>
           )}
           <Button 
@@ -742,7 +743,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
             onClick={onClose} 
             className={cn("rounded-xl font-sans", task && onDelete ? "flex-1" : "flex-1")}
           >
-            Cancel
+            {i18n.t("common.cancel")}
           </Button>
           <Button 
             type="button"
@@ -750,7 +751,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
             className="flex-1 rounded-xl bg-primary text-primary-foreground font-sans"
             disabled={!title.trim() || isSubmitting}
           >
-            {isSubmitting ? "Adding..." : task ? "Save" : "Add Task"}
+            {isSubmitting ? (task ? i18n.t("common.save") : i18n.t("common.add")) : task ? i18n.t("common.save") : i18n.t("task.add")}
           </Button>
         </div>
       </div>

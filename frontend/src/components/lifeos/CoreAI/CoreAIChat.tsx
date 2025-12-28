@@ -8,6 +8,7 @@ import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { api } from "@/lib/api";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { toast } from "sonner";
+import { i18n } from "@/utils/i18n";
 
 interface CoreAIChatProps {
   isOpen: boolean;
@@ -27,7 +28,7 @@ export function CoreAIChat({
   isOpen, 
   onClose, 
   messages, 
-  onSendMessage,
+  onSendMessage, 
   onConfirmAction,
   isLoading = false,
   aiName = "SolAI",
@@ -171,6 +172,11 @@ export function CoreAIChat({
   }, [isOpen]);
 
   if (!isOpen) return null;
+  
+  // Ensure voice buttons are always visible - check if speech APIs are available
+  const hasSpeechRecognition = typeof window !== 'undefined' && 
+    (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window));
+  const hasSpeechSynthesis = typeof window !== 'undefined' && ('speechSynthesis' in window);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -539,14 +545,14 @@ export function CoreAIChat({
             >
               <HelpCircle className="w-4 h-4 text-muted-foreground" />
             </button>
-            <button
-              onClick={onClose}
+        <button
+          onClick={onClose}
               className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
-            >
-              <X className="w-5 h-5 text-muted-foreground" />
-            </button>
+        >
+          <X className="w-5 h-5 text-muted-foreground" />
+        </button>
           </div>
-        </header>
+      </header>
 
         {/* Help Modal */}
         {showHelp && (
@@ -583,25 +589,25 @@ export function CoreAIChat({
           </div>
         )}
 
-        {/* Messages */}
+      {/* Messages */}
         <div 
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-3 relative"
         >
-          {messages.length === 0 ? (
-            <div className="text-center py-8">
+        {messages.length === 0 ? (
+          <div className="text-center py-8">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20">
-                <Sparkles className="w-8 h-8 text-primary" />
-              </div>
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
               <h3 className="font-sans text-lg font-bold text-foreground mb-2">
-                Hey there! I'm {aiName}
-              </h3>
+              Hey there! I'm {aiName}
+            </h3>
               <p className="text-base text-muted-foreground font-sans max-w-xs mx-auto mb-6">
-                I can help you manage tasks, set goals, track your progress, and more. What would you like to do?
-              </p>
-              
+                {i18n.t("solai.greeting")}
+            </p>
+            
               {/* Context-aware quick actions */}
-              <div className="space-y-2 max-w-sm mx-auto">
+            <div className="space-y-2 max-w-sm mx-auto">
                 {contextActions.length > 0 ? (
                   contextActions.slice(0, 3).map((action) => (
                     <button
@@ -618,31 +624,31 @@ export function CoreAIChat({
                     { label: "Show my progress this week" },
                     { label: "Add a new task" },
                   ].map((action, i) => (
-                    <button
-                      key={i}
+                <button
+                  key={i}
                       onClick={() => onSendMessage(action.label)}
                       className="w-full p-3 text-left text-base font-sans bg-muted/50 rounded-xl hover:bg-muted transition-colors border border-border/30"
-                    >
-                      <span className="text-foreground">{action.label}</span>
-                    </button>
+                >
+                  <span className="text-foreground">{action.label}</span>
+                </button>
                   ))
                 )}
               </div>
-            </div>
-          ) : (
-            <>
-              {messages.map((msg) => (
+          </div>
+        ) : (
+          <>
+            {messages.map((msg) => (
                 <div key={msg.id} className="space-y-1.5 group">
-                  <div
-                    className={cn(
-                      "flex",
-                      msg.role === "user" ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    <div
-                      className={cn(
+              <div
+                className={cn(
+                  "flex",
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                )}
+              >
+                <div
+                  className={cn(
                         "max-w-[80%] rounded-xl px-3 py-2.5 font-sans text-sm border relative",
-                        msg.role === "user"
+                    msg.role === "user"
                           ? "bg-primary/10 text-foreground border-primary/20"
                           : "bg-card text-foreground border-border/30 shadow-soft"
                       )}
@@ -741,15 +747,15 @@ export function CoreAIChat({
                       ))}
                     </div>
                   )}
-                </div>
-              ))}
+              </div>
+            ))}
               
-              {isLoading && (
-                <div className="flex justify-start">
+            {isLoading && (
+              <div className="flex justify-start">
                   <div className="bg-card rounded-2xl p-4 border border-border/30 shadow-soft">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      <span className="text-xs font-sans text-muted-foreground">Thinking...</span>
+                      <span className="text-xs font-sans text-muted-foreground">{i18n.t("solai.thinking")}</span>
                     </div>
                   </div>
                 </div>
@@ -769,46 +775,48 @@ export function CoreAIChat({
                 </button>
               )}
               
-              <div ref={messagesEndRef} />
-            </>
-          )}
-        </div>
+            <div ref={messagesEndRef} />
+          </>
+        )}
+      </div>
 
-        {/* Input */}
+      {/* Input */}
         <form onSubmit={handleSubmit} className="p-4 border-t border-border/50 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask me anything..."
+        <div className="flex items-center gap-2">
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask me anything..."
                 disabled={isLoading || isListening}
                 className="w-full py-3 px-4 pr-12 bg-muted/50 rounded-xl text-foreground font-sans text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-border/30"
-              />
-              {/* Voice input button */}
-              <button
-                type="button"
-                onClick={isListening ? stopVoiceInput : startVoiceInput}
-                disabled={isLoading}
-                className={cn(
-                  "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                  isListening
-                    ? "bg-destructive text-destructive-foreground animate-pulse"
-                    : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-                )}
-                title={isListening ? "Stop listening" : "Voice input"}
-              >
-                {isListening ? (
-                  <MicOff className="w-4 h-4" />
-                ) : (
-                  <Mic className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-            {/* Speak button for last assistant message */}
-            {messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+            />
+              {/* Voice input button - only show if supported */}
+              {hasSpeechRecognition && (
+            <button
+              type="button"
+                  onClick={isListening ? stopVoiceInput : startVoiceInput}
+                  disabled={isLoading}
+                  className={cn(
+                    "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10",
+                    isListening
+                      ? "bg-destructive text-destructive-foreground animate-pulse"
+                      : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                  )}
+                  title={isListening ? "Stop listening" : "Voice input"}
+                >
+                  {isListening ? (
+                    <MicOff className="w-4 h-4" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+            </button>
+              )}
+          </div>
+            {/* Speak button for last assistant message - only show if supported */}
+            {hasSpeechSynthesis && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
               <button
                 type="button"
                 onClick={isSpeaking ? stopSpeaking : () => speakText(messages[messages.length - 1].content)}
@@ -828,26 +836,26 @@ export function CoreAIChat({
                 )}
               </button>
             )}
-            <button
-              type="submit"
+          <button
+            type="submit"
               disabled={!input.trim() || isLoading || isListening}
-              className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
+            className={cn(
+              "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
                 input.trim() && !isLoading && !isListening
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
+                : "bg-muted text-muted-foreground"
+            )}
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </div>
           {isListening && (
             <div className="mt-2 flex items-center gap-2 text-sm text-primary">
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span className="font-sans">Listening...</span>
+              <span className="font-sans">{i18n.t("solai.voice.listen")}</span>
             </div>
           )}
-        </form>
+      </form>
       </div>
     </div>
   );

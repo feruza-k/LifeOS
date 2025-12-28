@@ -1,11 +1,12 @@
 import { CalendarDays, Compass, Sun, Calendar, Bell } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { i18n } from "@/utils/i18n";
 
 const navItems = [
-  { to: "/calendar", icon: Calendar, label: "Calendar" },
-  { to: "/", icon: Sun, label: "Today" },
-  { to: "/explore", icon: Compass, label: "Explore" },
+  { to: "/calendar", icon: Calendar, key: "nav.calendar" },
+  { to: "/", icon: Sun, key: "nav.today" },
+  { to: "/explore", icon: Compass, key: "nav.explore" },
 ];
 
 export function BottomNav() {
@@ -33,7 +34,7 @@ export function BottomNav() {
                 "text-xs font-sans font-medium",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}>
-                {item.label}
+                {i18n.t(item.key)}
               </span>
             </Link>
           );

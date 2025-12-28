@@ -83,29 +83,7 @@ const Index = () => {
             store.loadReminders(),
           ]);
           
-          // Check if we should show morning briefing (first visit today)
-          const lastBriefingDate = localStorage.getItem("last_briefing_date");
-          const today = format(new Date(), "yyyy-MM-dd");
-          const isFirstVisitToday = lastBriefingDate !== today;
-          
-          if (isFirstVisitToday) {
-            try {
-              // Get user's language preference
-              const userLanguage = localStorage.getItem("lifeos_language") || "en";
-              // Send language in Accept-Language header
-              const briefing = await api.getMorningBriefing();
-              if (briefing && briefing.greeting) {
-                // Show briefing as a notification tooltip in SolAI FAB
-                // The CoreAIFAB component will display it
-                localStorage.setItem("last_briefing_date", today);
-                // Store briefing for CoreAIFAB to display
-                localStorage.setItem("morning_briefing", JSON.stringify(briefing));
-              }
-            } catch (error) {
-              // Silent fail - briefing is nice to have, not critical
-              console.log("Could not load morning briefing:", error);
-            }
-          }
+          // Removed morning briefing - was too intrusive
         } catch (err) {
           setError(err instanceof Error ? err.message : "Failed to load data");
         } finally {

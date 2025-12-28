@@ -11,6 +11,7 @@ import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
 import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
+import { i18n } from "@/utils/i18n";
 import { Reminder } from "@/types/lifeos";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -270,12 +271,12 @@ export default function Reminders() {
         <div className="flex items-center gap-3 mb-6">
           <SideMenuButton onClick={() => setShowSideMenu(true)} />
           <div className="flex-1">
-            <h1 className="text-2xl text-foreground font-sans font-semibold">Reminders</h1>
+            <h1 className="text-2xl text-foreground font-sans font-semibold">{i18n.t("nav.reminders")}</h1>
             <p className="text-sm text-muted-foreground mt-1">Never miss what matters</p>
           </div>
           <Button onClick={() => setIsAddingReminder(true)} size="sm" className="rounded-full gap-1">
             <Plus className="w-4 h-4" />
-            Add
+            {i18n.t("common.add")}
           </Button>
         </div>
 
@@ -290,7 +291,7 @@ export default function Reminders() {
         {!isLoadingReminders && todayReminders.length > 0 && (
           <div className="mb-6">
             <h2 className="text-xs font-sans font-medium text-muted-foreground uppercase tracking-wide mb-3">
-              Today
+              {i18n.t("common.today")}
             </h2>
             <div className="space-y-2">
               {todayReminders.map(reminder => <ReminderCard key={reminder.id} reminder={reminder} />)}
