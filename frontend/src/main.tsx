@@ -15,9 +15,11 @@ window.addEventListener("unhandledrejection", (event) => {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("/sw.js", { updateViaCache: 'none' }) // Always check for updates
       .then((registration) => {
         console.log("Service Worker registered:", registration.scope);
+        // Force update check
+        registration.update();
       })
       .catch((error) => {
         console.log("Service Worker registration failed:", error);

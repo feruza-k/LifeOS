@@ -40,8 +40,27 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests and API calls
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+  const url = new URL(event.request.url);
+  
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
+  // Skip API calls - don't intercept requests to API domain or /api/ paths
+  if (url.hostname.includes('api.') || 
+      url.pathname.includes('/api/') ||
+      url.pathname.startsWith('/auth/') ||
+      url.pathname.startsWith('/assistant/') ||
+      url.pathname.startsWith('/align/') ||
+      url.pathname.startsWith('/categories/') ||
+      url.pathname.startsWith('/tasks/') ||
+      url.pathname.startsWith('/reminders/') ||
+      url.pathname.startsWith('/notes/') ||
+      url.pathname.startsWith('/checkin/') ||
+      url.pathname.startsWith('/photos/') ||
+      url.pathname.startsWith('/audio/')) {
+    // Let API requests pass through to network without interception
     return;
   }
 
