@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "@/lib/api";
 import { Category } from "@/types/lifeos";
+import { normalizeDate } from "@/utils/dateUtils";
 
 interface LifeOSStore {
   // State
@@ -105,7 +106,7 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       const d =
         typeof date === "string"
           ? date
-          : date.toISOString().slice(0, 10);
+          : api.formatDate(date);
 
       const res = await api.getToday(d);
       const todayTasks = res.tasks || [];
@@ -114,9 +115,12 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         // Merge today's tasks with existing tasks (update existing, add new)
         const existingTaskMap = new Map(state.tasks.map(t => [t.id, t]));
         
-        // Update or add today's tasks
+        // Update or add today's tasks, normalizing dates
         todayTasks.forEach(task => {
-          existingTaskMap.set(task.id, task);
+          if (task && task.id) {
+            const normalizedDate = normalizeDate(task.date);
+            existingTaskMap.set(task.id, { ...task, date: normalizedDate || task.date });
+          }
         });
         
         return {
@@ -143,12 +147,8 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       // Normal task creation - ensure date is in YYYY-MM-DD format
       const created = response;
       if (created) {
-        if (!created.date && task.date) {
-          created.date = typeof task.date === 'string' ? task.date : task.date.toISOString().slice(0, 10);
-        }
-        if (created.date && created.date.includes('T')) {
-          created.date = created.date.split('T')[0];
-        }
+        // Normalize the date to ensure consistency
+        created.date = normalizeDate(created.date || task.date) || created.date;
       }
       
       set((state) => {
@@ -172,11 +172,13 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   updateTask: async (id: string, updates: any) => {
     const updated = await api.updateTask(id, updates);
     if (updated) {
+      // Normalize the date in the updated task
+      const normalizedDate = normalizeDate(updated.date);
       set((state) => ({
-        tasks: state.tasks.map(t => t.id === id ? updated : t)
+        tasks: state.tasks.map(t => t.id === id ? { ...updated, date: normalizedDate || updated.date } : t)
       }));
     }
-    const taskDate = updates.date || get().today?.date || new Date().toISOString().slice(0, 10);
+    const taskDate = updates.date || get().today?.date || normalizeDate(new Date()) || new Date().toISOString().slice(0, 10);
     await get().loadToday(taskDate);
   },
 
@@ -203,7 +205,7 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   moveTask: async (id: string, newDate: Date | string) => {
     const dateStr = typeof newDate === "string" 
       ? newDate 
-      : newDate.toISOString().slice(0, 10);
+      : api.formatDate(newDate);
     const updated = await api.moveTask(id, dateStr);
     if (updated) {
       set((state) => ({
@@ -217,33 +219,28 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
     const d =
       typeof date === "string"
         ? date
-        : date.toISOString().slice(0, 10);
+        : api.formatDate(date);
     const tasks = await api.getTasksByDate(d);
     return tasks;
   },
 
   // Synchronous getter for tasks by date (uses cached tasks)
   getTasksForDateSync: (date: string | Date) => {
-    const d =
-      typeof date === "string"
-        ? date
-        : date.toISOString().slice(0, 10);
+    const normalizedDate = normalizeDate(date);
+    if (!normalizedDate) return [];
     
     return get().tasks.filter(t => {
       if (!t.date) return false;
-      // Normalize task date for comparison
-      const taskDate = typeof t.date === 'string' && t.date.includes('T') 
-        ? t.date.split('T')[0] 
-        : t.date;
-      return taskDate === d;
+      const taskDate = normalizeDate(t.date);
+      return taskDate === normalizedDate;
     });
   },
 
   // Load tasks for a date range (for calendar views)
   loadTasksForDateRange: async (start: Date | string, end: Date | string) => {
     try {
-      const startStr = typeof start === "string" ? start : start.toISOString().slice(0, 10);
-      const endStr = typeof end === "string" ? end : end.toISOString().slice(0, 10);
+      const startStr = typeof start === "string" ? start : api.formatDate(start);
+      const endStr = typeof end === "string" ? end : api.formatDate(end);
       
       const tasks = await api.getTasksByDateRange(startStr, endStr);
       
@@ -255,18 +252,11 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         .map(task => {
           if (!task || !task.id) return null;
           
-          let taskDate = task.date;
-          if (taskDate) {
-            if (typeof taskDate === 'string') {
-              if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
-              if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
-              if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
-            } else if (taskDate instanceof Date) {
-              taskDate = taskDate.toISOString().slice(0, 10);
-            }
-          }
+          // Normalize the date to ensure consistency
+          const normalizedDate = normalizeDate(task.date);
+          if (!normalizedDate) return null;
           
-          return { ...task, date: taskDate };
+          return { ...task, date: normalizedDate };
         })
         .filter(task => task && task.date);
       
@@ -382,7 +372,7 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   ) => {
     const dateStr = typeof date === "string" 
       ? date 
-      : date.toISOString().slice(0, 10);
+      : api.formatDate(date);
     await api.saveCheckIn({
       date: dateStr,
       completedTaskIds: completedIds,
@@ -538,34 +528,37 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
 
   addCategory: async (label: string, color: string) => {
     try {
-      await api.createCategory({ label, color });
-      // Reload categories and bootstrap to ensure all task mappings are updated
+      const result = await api.createCategory({ label, color });
+      // Reload categories from server to get the new category with proper ID
       await get().loadCategories();
-      await get().loadBootstrap();
+      return result;
     } catch (error) {
+      console.error("Failed to add category:", error);
       throw error;
     }
   },
 
   updateCategory: async (id: string, updates: Partial<Omit<Category, 'id'>>) => {
     try {
-      await api.updateCategory(id, updates);
-      // Reload categories and bootstrap to ensure all task mappings are updated
+      const result = await api.updateCategory(id, updates);
+      // Reload categories from server to ensure consistency
       // especially important if a global category was converted to a user category (ID changes)
       await get().loadCategories();
-      await get().loadBootstrap();
+      return result;
     } catch (error) {
+      console.error("Failed to update category:", error);
       throw error;
     }
   },
 
   deleteCategory: async (id: string) => {
     try {
-      await api.deleteCategory(id);
-      // Reload categories and bootstrap to ensure all task mappings are updated
+      const result = await api.deleteCategory(id);
+      // Reload categories from server to ensure consistency
       await get().loadCategories();
-      await get().loadBootstrap();
+      return result;
     } catch (error) {
+      console.error("Failed to delete category:", error);
       throw error;
     }
   },

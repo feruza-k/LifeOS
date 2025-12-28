@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Task } from "../TaskItem";
 import { ValueType } from "../ValueTag";
 import { Category } from "@/types/lifeos";
+import { normalizeDate } from "@/utils/dateUtils";
 
 interface CalendarTask extends Task {
   date?: string;
@@ -74,20 +75,16 @@ export function MonthCalendar({
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
   const getTasksForDate = (date: Date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
+    const dateStr = normalizeDate(date);
+    if (!dateStr) return [];
+    
     const allDateTasks = tasks.filter((task) => {
       if (!task || !task.date) {
         return false;
       }
       // Normalize task date for comparison
-      let taskDate = task.date;
-      if (typeof taskDate === 'string') {
-        if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
-        if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
-        if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
-      } else if (taskDate instanceof Date) {
-        taskDate = taskDate.toISOString().slice(0, 10);
-      }
+      const taskDate = normalizeDate(task.date);
+      if (!taskDate) return false;
       
       // Date must match
       if (taskDate !== dateStr) {

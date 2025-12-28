@@ -142,7 +142,12 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
       throw new Error(errorMessage);
     }
     // For successful response, read as JSON
-    return res.json();
+    const data = await res.json();
+    // Safety check: if response contains an error field, treat it as an error
+    if (data && typeof data === 'object' && 'error' in data) {
+      throw new Error(data.error || 'An error occurred');
+    }
+    return data;
   } catch (error: any) {
     // Enhanced error logging for debugging
     console.error(`[API Error] URL: ${url}`, error);
@@ -608,4 +613,10 @@ export const api = {
   // Align endpoints
   getAlignSummary: () => request("/align/summary"),
   getAlignAnalytics: () => request("/align/analytics"),
+  formatDate: (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 };

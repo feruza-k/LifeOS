@@ -61,12 +61,16 @@ export default function Categories() {
       try {
         await store.updateCategory(id, { label: editValue.trim() });
         toast.success("Category updated");
-      } catch (error) {
-        toast.error("Failed to update category");
+        setEditingId(null);
+        setEditValue("");
+      } catch (error: any) {
+        console.error("Failed to update category:", error);
+        toast.error(error?.message || "Failed to update category");
       }
+    } else {
+      setEditingId(null);
+      setEditValue("");
     }
-    setEditingId(null);
-    setEditValue("");
   };
 
   const handleColorChange = async (id: string, color: string) => {
@@ -74,8 +78,10 @@ export default function Categories() {
       await store.updateCategory(id, { color });
       setOpenColorPicker(null);
       toast.success("Color updated");
-    } catch (error) {
-      toast.error("Failed to update color");
+    } catch (error: any) {
+      console.error("Failed to update color:", error);
+      toast.error(error?.message || "Failed to update color");
+      setOpenColorPicker(null);
     }
   };
 
@@ -83,8 +89,9 @@ export default function Categories() {
     try {
       await store.deleteCategory(id);
       toast.success("Category deleted");
-    } catch (error) {
-      toast.error("Failed to delete category");
+    } catch (error: any) {
+      console.error("Failed to delete category:", error);
+      toast.error(error?.message || "Failed to delete category");
     }
   };
 
@@ -94,8 +101,9 @@ export default function Categories() {
     try {
       await store.addCategory("New Category", availableColor);
       toast.success("Category added");
-    } catch (error) {
-      toast.error("Failed to add category");
+    } catch (error: any) {
+      console.error("Failed to add category:", error);
+      toast.error(error?.message || "Failed to add category");
     }
   };
 

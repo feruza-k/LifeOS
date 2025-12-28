@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, addDays, subDays, isSameMonth } from "date-fns";
+import { normalizeDate } from "@/utils/dateUtils";
 import { LayoutGrid, Calendar as CalendarIcon } from "lucide-react";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CalendarFilters } from "@/components/lifeos/calendar/CalendarFilters";
@@ -116,24 +117,9 @@ const CalendarPage = () => {
     const normalized = store.tasks
       .filter(t => t && t.id && t.date) // Filter out invalid tasks and tasks without dates
       .map(t => {
-        let taskDate = t.date;
-        // Normalize date format to YYYY-MM-DD
-        if (taskDate) {
-          if (typeof taskDate === 'string') {
-            // Handle ISO datetime strings (remove time portion)
-            if (taskDate.includes('T')) {
-              taskDate = taskDate.split('T')[0];
-            } else if (taskDate.includes(' ')) {
-              taskDate = taskDate.split(' ')[0];
-            }
-            // Ensure it's exactly 10 characters (YYYY-MM-DD)
-            if (taskDate.length > 10) {
-              taskDate = taskDate.substring(0, 10);
-            }
-          } else if (taskDate instanceof Date) {
-            taskDate = taskDate.toISOString().slice(0, 10);
-          }
-        }
+        const taskDate = normalizeDate(t.date);
+        if (!taskDate) return null;
+        
         return {
           id: t.id,
           title: t.title || '',
@@ -144,7 +130,7 @@ const CalendarPage = () => {
           date: taskDate,
         };
       })
-      .filter(t => t.date && t.date.length === 10);
+      .filter(t => t && t.date && t.date.length === 10);
     
     return normalized;
   }, [store.tasks]);
@@ -343,6 +329,20 @@ const CalendarPage = () => {
           onToggleTask={async (id) => {
             await store.toggleTask(id);
             // Reload tasks for current month after toggle
+            const monthStart = startOfMonth(currentMonth);
+            const monthEnd = endOfMonth(currentMonth);
+            await store.loadTasksForDateRange(monthStart, monthEnd);
+          }}
+          onDeleteTask={async (id) => {
+            await store.deleteTask(id);
+            // Reload tasks for current month after delete
+            const monthStart = startOfMonth(currentMonth);
+            const monthEnd = endOfMonth(currentMonth);
+            await store.loadTasksForDateRange(monthStart, monthEnd);
+          }}
+          onUpdateTask={async (id, updates) => {
+            await store.updateTask(id, updates);
+            // Reload tasks for current month after update
             const monthStart = startOfMonth(currentMonth);
             const monthEnd = endOfMonth(currentMonth);
             await store.loadTasksForDateRange(monthStart, monthEnd);

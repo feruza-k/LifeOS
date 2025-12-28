@@ -6,6 +6,7 @@ import { Category } from "@/types/lifeos";
 import { cn } from "@/lib/utils";
 import { useSwipeable } from "react-swipeable";
 import { AddTaskModal } from "../AddTaskModal";
+import { normalizeDate } from "@/utils/dateUtils";
 
 interface CalendarTask extends Task {
   date?: string;
@@ -121,7 +122,8 @@ export function WeekScheduleView({
   // Get tasks for a specific date (Week View = Scheduled Tasks Only)
   const getTasksForDate = (dateStr: string) => {
     // Normalize date string for comparison
-    const normalizedDateStr = dateStr.length > 10 ? dateStr.substring(0, 10) : dateStr;
+    const normalizedDateStr = normalizeDate(dateStr);
+    if (!normalizedDateStr) return { scheduled: [], anytime: [] };
     
     const allTasks = tasks.filter(
       (task) => {
@@ -129,14 +131,8 @@ export function WeekScheduleView({
         if (!task.date || !task.time) return false;
         
         // Normalize task date for comparison
-        let taskDate = task.date;
-        if (typeof taskDate === 'string') {
-          if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
-          if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
-          if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
-        } else if (taskDate instanceof Date) {
-          taskDate = taskDate.toISOString().slice(0, 10);
-        }
+        const taskDate = normalizeDate(task.date);
+        if (!taskDate) return false;
         
         // Date must match
         if (taskDate !== normalizedDateStr) return false;

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useSwipeable } from "react-swipeable";
 import { api } from "@/lib/api";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
+import { AddTaskModal } from "../AddTaskModal";
 
 interface DayModalProps {
   date: Date;
@@ -21,6 +22,8 @@ interface DayModalProps {
   totalTasksCount?: number;
   onClose: () => void;
   onToggleTask: (id: string) => void;
+  onDeleteTask?: (id: string) => void;
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   onSaveNote: (content: string) => void;
   onDateChange?: (date: Date) => void;
   onAddTask?: (date: Date) => void;
@@ -40,6 +43,8 @@ export function DayModal({
   totalTasksCount = 0,
   onClose, 
   onToggleTask,
+  onDeleteTask,
+  onUpdateTask,
   onSaveNote,
   onDateChange,
   onAddTask,
@@ -78,6 +83,7 @@ export function DayModal({
   const [dayPhoto, setDayPhoto] = useState<{ filename: string; uploadedAt: string } | null>(photo);
   const [isUploading, setIsUploading] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update note content when note or checkIn prop changes (but not when editing)
@@ -294,51 +300,85 @@ export function DayModal({
                     // If both are same type, maintain original order
                     return 0;
                   }).map((task) => (
-                    <button
+                    <div
                       key={task.id}
-                      onClick={() => onToggleTask(task.id)}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-xl bg-muted/50 transition-all text-left",
-                        task.completed && "opacity-50"
-                      )}
+                      className="w-full flex items-center gap-2 p-3 rounded-xl bg-muted/50 transition-all group"
                     >
-                      <div
+                      <button
+                        onClick={() => onToggleTask(task.id)}
                         className={cn(
-                          "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
-                          task.completed
-                            ? "bg-primary border-primary"
-                            : "border-muted-foreground/40"
+                          "flex items-center gap-3 flex-1 text-left",
+                          task.completed && "opacity-50"
                         )}
                       >
-                        {task.completed && (
-                          <Check className="w-3 h-3 text-primary-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 relative">
-                        {/* Subtle category accent bar */}
-                        {(() => {
-                          const category = store.categories.find(c => c.id === task.value);
-                          const categoryColor = category?.color;
-                          return categoryColor ? (
-                            <div 
-                              className="absolute left-0 top-0 bottom-0 w-0.5 rounded-full"
-                              style={{ backgroundColor: categoryColor }}
-                            />
-                          ) : null;
-                        })()}
-                        <div className="pl-2">
-                          <p className={cn(
-                            "font-sans text-sm font-medium text-foreground truncate",
-                            task.completed && "line-through text-muted-foreground"
-                          )}>
-                            {task.title}
-                          </p>
-                          {task.time && (
-                            <p className="text-xs text-muted-foreground">{task.time}</p>
+                        <div
+                          className={cn(
+                            "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                            task.completed
+                              ? "bg-primary border-primary"
+                              : "border-muted-foreground/40"
+                          )}
+                        >
+                          {task.completed && (
+                            <Check className="w-3 h-3 text-primary-foreground" />
                           )}
                         </div>
-                      </div>
-                    </button>
+                        <div className="flex-1 min-w-0 relative">
+                          {/* Subtle category accent bar */}
+                          {(() => {
+                            const category = store.categories.find(c => c.id === task.value);
+                            const categoryColor = category?.color;
+                            return categoryColor ? (
+                              <div 
+                                className="absolute left-0 top-0 bottom-0 w-0.5 rounded-full"
+                                style={{ backgroundColor: categoryColor }}
+                              />
+                            ) : null;
+                          })()}
+                          <div className="pl-2">
+                            <p className={cn(
+                              "font-sans text-sm font-medium text-foreground truncate",
+                              task.completed && "line-through text-muted-foreground"
+                            )}>
+                              {task.title}
+                            </p>
+                            {task.time && (
+                              <p className="text-xs text-muted-foreground">{task.time}</p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                      {(onUpdateTask || onDeleteTask) && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {onUpdateTask && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTask(task);
+                              }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"
+                              title="Edit task"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
+                            </button>
+                          )}
+                          {onDeleteTask && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete "${task.title}"?`)) {
+                                  await onDeleteTask(task.id);
+                                }
+                              }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-destructive/10 transition-colors"
+                              title="Delete task"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ))}
                   {onAddTask && (
                     <button
@@ -553,6 +593,19 @@ export function DayModal({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingTask && onUpdateTask && (
+        <AddTaskModal
+          isOpen={!!editingTask}
+          onClose={() => setEditingTask(null)}
+          task={editingTask}
+          date={editingTask.date || format(date, "yyyy-MM-dd")}
+          onUpdate={onUpdateTask}
+          onDelete={onDeleteTask}
+          onAdd={() => {}} // Not used when editing
+        />
       )}
     </div>
   );

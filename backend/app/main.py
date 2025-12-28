@@ -2269,7 +2269,7 @@ async def get_category(category_id: str, current_user: dict = Depends(get_curren
     category = await db_repo.get_category(category_id, current_user["id"])
     if category:
         return category
-    return {"error": "Category not found"}
+    raise HTTPException(status_code=404, detail="Category not found")
 
 @app.post("/categories")
 async def create_category(category_data: CategoryRequest, current_user: dict = Depends(get_current_user)):
@@ -2290,7 +2290,7 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
     # Verify category exists
     category = await db_repo.get_category(category_id, current_user["id"])
     if not category:
-        return {"error": "Category not found"}
+        raise HTTPException(status_code=404, detail="Category not found")
     
     # Use the real UUID from the retrieved category (in case category_id was a label)
     real_category_id = category["id"]
@@ -2327,12 +2327,12 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
         return result
     
     if category.get("user_id") != current_user["id"]:
-        return {"error": "Unauthorized: Cannot update other users' categories"}
+        raise HTTPException(status_code=403, detail="Unauthorized: Cannot update other users' categories")
     
     result = await db_repo.update_category(real_category_id, updates_dict)
     if result:
         return result
-    return {"error": "Category not found"}
+    raise HTTPException(status_code=404, detail="Category not found")
 
 @app.delete("/categories/{category_id}")
 async def delete_category(category_id: str, current_user: dict = Depends(get_current_user)):
@@ -2340,20 +2340,20 @@ async def delete_category(category_id: str, current_user: dict = Depends(get_cur
     # Verify category belongs to user before deleting
     category = await db_repo.get_category(category_id, current_user["id"])
     if not category:
-        return {"error": "Category not found"}
+        raise HTTPException(status_code=404, detail="Category not found")
     
     # Use the real UUID
     real_category_id = category["id"]
     
     if category.get("user_id") and category["user_id"] != current_user["id"]:
-        return {"error": "Unauthorized: Cannot delete other users' categories"}
+        raise HTTPException(status_code=403, detail="Unauthorized: Cannot delete other users' categories")
     # Global categories (user_id is None) cannot be deleted by users
     if not category.get("user_id"):
-        return {"error": "Cannot delete global categories"}
+        raise HTTPException(status_code=400, detail="Cannot delete global categories")
     success = await db_repo.delete_category(real_category_id)
     if success:
         return {"status": "deleted", "id": real_category_id}
-    return {"error": "Category not found"}
+    raise HTTPException(status_code=404, detail="Category not found")
 
 # Weekly & Calendar Views (Used by Frontend)
 

@@ -721,11 +721,26 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
 
         {/* Actions */}
         <div className="flex gap-2 p-4 border-t border-border/50">
+          {task && onDelete && (
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={async () => {
+                if (confirm("Are you sure you want to delete this task?")) {
+                  onDelete(task.id);
+                  onClose();
+                }
+              }}
+              className="rounded-xl font-sans border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            >
+              Delete
+            </Button>
+          )}
           <Button 
             type="button" 
             variant="outline" 
             onClick={onClose} 
-            className="flex-1 rounded-xl font-sans"
+            className={cn("rounded-xl font-sans", task && onDelete ? "flex-1" : "flex-1")}
           >
             Cancel
           </Button>
@@ -735,7 +750,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
             className="flex-1 rounded-xl bg-primary text-primary-foreground font-sans"
             disabled={!title.trim() || isSubmitting}
           >
-            {isSubmitting ? "Adding..." : "Add Task"}
+            {isSubmitting ? "Adding..." : task ? "Save" : "Add Task"}
           </Button>
         </div>
       </div>

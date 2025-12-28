@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { RichTextEditor } from "@/components/lifeos/RichTextEditor";
+import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
+import { useCoreAI } from "@/hooks/useCoreAI";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +53,7 @@ const triggerHaptic = (type: "light" | "medium" | "heavy" = "light") => {
 
 export default function Notes() {
   const navigate = useNavigate();
+  const coreAI = useCoreAI();
   const [notes, setNotes] = useState<GlobalNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -61,8 +64,6 @@ export default function Notes() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [swipingNoteId, setSwipingNoteId] = useState<string | null>(null);
-  const [fabLongPressTimer, setFabLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const fabRef = useRef<HTMLButtonElement>(null);
 
   // Check if user has seen onboarding
   useEffect(() => {
@@ -181,22 +182,6 @@ export default function Notes() {
     
     setSwipeStartX(null);
     setSwipingNoteId(null);
-  };
-
-  // Quick capture: swipe down or long-press FAB
-  const handleFabMouseDown = () => {
-    const timer = setTimeout(() => {
-      triggerHaptic("medium");
-      setSelectedNoteId("new");
-    }, 500);
-    setFabLongPressTimer(timer);
-  };
-
-  const handleFabMouseUp = () => {
-    if (fabLongPressTimer) {
-      clearTimeout(fabLongPressTimer);
-      setFabLongPressTimer(null);
-    }
   };
 
   const handleSwipeDown = useCallback((e: TouchEvent) => {
@@ -452,7 +437,7 @@ export default function Notes() {
                 </div>
                 <p className="text-xl text-foreground font-sans font-medium mb-2">No notes yet</p>
                 <p className="text-base text-muted-foreground mb-4">Start capturing your thoughts and ideas</p>
-                <p className="text-sm text-muted-foreground/70 mb-8">Swipe down from the top or long-press the + button for quick capture</p>
+                <p className="text-sm text-muted-foreground/70 mb-8">Swipe down from the top or tap the New button to create your first note</p>
                 <Button
                   onClick={() => {
                     setSelectedNoteId("new");
@@ -577,27 +562,17 @@ export default function Notes() {
         )}
       </div>
 
-      {/* Floating New Note Button */}
-      {notes.length > 0 && (
-        <button
-          ref={fabRef}
-          onMouseDown={handleFabMouseDown}
-          onMouseUp={handleFabMouseUp}
-          onMouseLeave={handleFabMouseUp}
-          onClick={() => {
-            if (!fabLongPressTimer) {
-              setSelectedNoteId("new");
-              triggerHaptic("light");
-            }
-          }}
-          className="fixed bottom-28 right-6 w-16 h-16 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all hover:scale-105 active:scale-95 flex items-center justify-center z-30 animate-in zoom-in-95"
-          aria-label="New note"
-        >
-          <Plus className="w-7 h-7" />
-        </button>
-      )}
-
       <BottomNav />
+      
+      <CoreAIFAB
+        messages={coreAI.messages}
+        onSendMessage={coreAI.sendMessage}
+        onConfirmAction={coreAI.confirmAction}
+        isLoading={coreAI.isLoading}
+        aiName="SolAI"
+        onClearHistory={coreAI.clearHistory}
+        currentView="notes"
+      />
     </div>
   );
 }
