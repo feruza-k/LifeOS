@@ -110,18 +110,19 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       const res = await api.getToday(d);
       const todayTasks = res.tasks || [];
       
-      // Merge today's tasks with existing tasks (update existing, add new)
-      const existingTasks = get().tasks;
-      const existingTaskMap = new Map(existingTasks.map(t => [t.id, t]));
-      
-      // Update or add today's tasks
-      todayTasks.forEach(task => {
-        existingTaskMap.set(task.id, task);
-      });
-      
-      set({
-        today: res,
-        tasks: Array.from(existingTaskMap.values()),
+      set((state) => {
+        // Merge today's tasks with existing tasks (update existing, add new)
+        const existingTaskMap = new Map(state.tasks.map(t => [t.id, t]));
+        
+        // Update or add today's tasks
+        todayTasks.forEach(task => {
+          existingTaskMap.set(task.id, task);
+        });
+        
+        return {
+          today: res,
+          tasks: Array.from(existingTaskMap.values()),
+        };
       });
     } catch (error) {
       // Keep existing state on error
@@ -136,7 +137,6 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       
       // Check if backend returned a conflict response
       if (response && response.conflict === true) {
-        // Return conflict response so caller can handle it (show dialog, etc.)
         return response;
       }
       
@@ -146,51 +146,46 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         if (!created.date && task.date) {
           created.date = typeof task.date === 'string' ? task.date : task.date.toISOString().slice(0, 10);
         }
-        // Normalize date format to YYYY-MM-DD if it's in a different format
         if (created.date && created.date.includes('T')) {
           created.date = created.date.split('T')[0];
         }
       }
       
-      // Add to store.tasks immediately for calendar views
-      const existingTasks = get().tasks;
-      const taskExists = existingTasks.some(t => t.id === created.id);
-      if (!taskExists) {
-        set({ tasks: [...existingTasks, created] });
-      } else {
-        // Update existing task if it exists
-        set({ tasks: existingTasks.map(t => t.id === created.id ? created : t) });
-      }
+      set((state) => {
+        const existingTasks = state.tasks;
+        const taskExists = existingTasks.some(t => t.id === created.id);
+        const updatedTasks = taskExists 
+          ? existingTasks.map(t => t.id === created.id ? created : t)
+          : [...existingTasks, created];
+          
+        return { tasks: updatedTasks };
+      });
+
       // Reload today to get fresh data from server
       await get().loadToday(task.date);
       return created;
     } catch (error) {
-      throw error; // Re-throw so caller can handle it
+      throw error;
     }
   },
 
   updateTask: async (id: string, updates: any) => {
     const updated = await api.updateTask(id, updates);
-    // Update task in store.tasks immediately
     if (updated) {
-      const existingTasks = get().tasks;
-      set({
-        tasks: existingTasks.map(t => t.id === id ? updated : t)
-      });
+      set((state) => ({
+        tasks: state.tasks.map(t => t.id === id ? updated : t)
+      }));
     }
-    // Reload tasks for the date
     const taskDate = updates.date || get().today?.date || new Date().toISOString().slice(0, 10);
     await get().loadToday(taskDate);
   },
 
   toggleTask: async (id: string) => {
     const response = await api.completeTask(id);
-    // Update task in store.tasks immediately
     if (response && response.task) {
-      const existingTasks = get().tasks;
-      set({
-        tasks: existingTasks.map(t => t.id === id ? response.task : t)
-      });
+      set((state) => ({
+        tasks: state.tasks.map(t => t.id === id ? response.task : t)
+      }));
     }
     const currentDate = get().today?.date || new Date().toISOString().slice(0, 10);
     await get().loadToday(currentDate);
@@ -198,11 +193,9 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
 
   deleteTask: async (id: string) => {
     await api.deleteTask(id);
-    // Remove from store.tasks immediately
-    const existingTasks = get().tasks;
-    set({
-      tasks: existingTasks.filter(t => t.id !== id)
-    });
+    set((state) => ({
+      tasks: state.tasks.filter(t => t.id !== id)
+    }));
     const currentDate = get().today?.date || new Date().toISOString().slice(0, 10);
     await get().loadToday(currentDate);
   },
@@ -212,12 +205,10 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       ? newDate 
       : newDate.toISOString().slice(0, 10);
     const updated = await api.moveTask(id, dateStr);
-    // Update task in store.tasks immediately
     if (updated) {
-      const existingTasks = get().tasks;
-      set({
-        tasks: existingTasks.map(t => t.id === id ? updated : t)
-      });
+      set((state) => ({
+        tasks: state.tasks.map(t => t.id === id ? updated : t)
+      }));
     }
     await get().loadToday(dateStr);
   },
@@ -228,7 +219,7 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         ? date
         : date.toISOString().slice(0, 10);
     const tasks = await api.getTasksByDate(d);
-    return tasks; // Returns array directly
+    return tasks;
   },
 
   // Synchronous getter for tasks by date (uses cached tasks)
@@ -237,7 +228,15 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       typeof date === "string"
         ? date
         : date.toISOString().slice(0, 10);
-    return get().tasks.filter(t => t.date === d);
+    
+    return get().tasks.filter(t => {
+      if (!t.date) return false;
+      // Normalize task date for comparison
+      const taskDate = typeof t.date === 'string' && t.date.includes('T') 
+        ? t.date.split('T')[0] 
+        : t.date;
+      return taskDate === d;
+    });
   },
 
   // Load tasks for a date range (for calendar views)
@@ -254,42 +253,31 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       
       const normalizedTasks = tasks
         .map(task => {
-          if (!task || !task.id) {
-            return null;
-          }
+          if (!task || !task.id) return null;
           
           let taskDate = task.date;
           if (taskDate) {
             if (typeof taskDate === 'string') {
-              if (taskDate.includes('T')) {
-                taskDate = taskDate.split('T')[0];
-              } else if (taskDate.includes(' ')) {
-                taskDate = taskDate.split(' ')[0];
-              }
-              if (taskDate.length > 10) {
-                taskDate = taskDate.substring(0, 10);
-              }
+              if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
+              if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
+              if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
             } else if (taskDate instanceof Date) {
               taskDate = taskDate.toISOString().slice(0, 10);
             }
           }
           
-          return {
-            ...task,
-            date: taskDate,
-          };
+          return { ...task, date: taskDate };
         })
         .filter(task => task && task.date);
       
-      const existingTasks = get().tasks;
-      const existingTaskMap = new Map(existingTasks.map(t => [t.id, t]));
-      
-      normalizedTasks.forEach(task => {
-        existingTaskMap.set(task.id, task);
+      set((state) => {
+        const existingTaskMap = new Map(state.tasks.map(t => [t.id, t]));
+        normalizedTasks.forEach(task => {
+          existingTaskMap.set(task.id, task);
+        });
+        return { tasks: Array.from(existingTaskMap.values()) };
       });
       
-      const allTasks = Array.from(existingTaskMap.values());
-      set({ tasks: allTasks });
       return normalizedTasks;
     } catch (error) {
       return [];
@@ -551,8 +539,9 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   addCategory: async (label: string, color: string) => {
     try {
       await api.createCategory({ label, color });
-      // Reload categories from server to ensure consistency and get the new category with proper ID
+      // Reload categories and bootstrap to ensure all task mappings are updated
       await get().loadCategories();
+      await get().loadBootstrap();
     } catch (error) {
       throw error;
     }
@@ -561,8 +550,10 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   updateCategory: async (id: string, updates: Partial<Omit<Category, 'id'>>) => {
     try {
       await api.updateCategory(id, updates);
-      // Reload categories from server to ensure consistency
+      // Reload categories and bootstrap to ensure all task mappings are updated
+      // especially important if a global category was converted to a user category (ID changes)
       await get().loadCategories();
+      await get().loadBootstrap();
     } catch (error) {
       throw error;
     }
@@ -571,8 +562,9 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   deleteCategory: async (id: string) => {
     try {
       await api.deleteCategory(id);
-      // Reload categories from server to ensure consistency
+      // Reload categories and bootstrap to ensure all task mappings are updated
       await get().loadCategories();
+      await get().loadBootstrap();
     } catch (error) {
       throw error;
     }

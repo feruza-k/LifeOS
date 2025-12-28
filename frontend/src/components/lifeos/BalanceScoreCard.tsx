@@ -46,7 +46,7 @@ export function BalanceScoreCard({
             <p className="text-foreground/60 text-sm font-sans font-medium">
               {config.subtitle}
             </p>
-            <h2 className="text-foreground text-xl font-semibold mt-0.5 font-serif">
+            <h2 className="text-foreground text-xl font-bold mt-0.5 font-sans">
               {config.label}
             </h2>
           </div>

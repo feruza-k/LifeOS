@@ -237,27 +237,37 @@ def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "ev
     Backend: {id, type, title, date, time, duration_minutes?, end_datetime?, category, completed, ...}
     """
     # Map frontend ValueType to backend category
-    # Frontend: "health" | "growth" | "family" | "work" | "creativity"
-    # Backend: "health", "work", "personal", "social", etc.
+    # Frontend value can be a UUID (new) or a legacy string like "health", "work", etc.
     frontend_value = frontend_task.get("value", "growth")
-    value_to_category = {
-        "health": "health",
-        "work": "work",
-        "family": "family",
-        "growth": "personal",  # Growth -> personal development
-        "creativity": "creativity",
-    }
-    category = value_to_category.get(frontend_value, "personal")
+    
+    # Check if value is a UUID
+    category_id = None
+    category = "personal"
+    
+    if isinstance(frontend_value, str) and len(frontend_value) == 36 and frontend_value.count("-") == 4:
+        # It's a UUID
+        category_id = frontend_value
+        # We don't have the label here, so we set a generic category label
+        # The database will use the category_id as the source of truth
+        category = "custom"
+    else:
+        # Legacy label mapping
+        value_to_category = {
+            "health": "health",
+            "work": "work",
+            "family": "family",
+            "growth": "personal",
+            "creativity": "creativity",
+        }
+        category = value_to_category.get(frontend_value, "personal")
     
     datetime_str = None
     if frontend_task.get("date") and frontend_task.get("time"):
         datetime_str = f"{frontend_task['date']} {frontend_task['time']}"
-    # Do NOT set datetime to 00:00 for anytime tasks - leave it as None
 
     # Extract time explicitly
     task_time = frontend_task.get("time")
     if not task_time and datetime_str:
-        # fallback from datetime
         try:
             task_time = datetime_str.split(" ")[1][:5]
         except:
@@ -272,8 +282,12 @@ def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "ev
         "completed": frontend_task.get("completed", False),
         "category": category,
     }
+    
+    if category_id:
+        backend_task["category_id"] = category_id
 
-    backend_task["date"] = frontend_task["date"][:10]
+    if frontend_task.get("date"):
+        backend_task["date"] = frontend_task["date"][:10]
     
     # Add id if provided
     if frontend_task.get("id"):

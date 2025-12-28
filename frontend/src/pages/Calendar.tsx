@@ -318,9 +318,11 @@ const CalendarPage = () => {
                     if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
                       return; // Let AddTaskModal handle the conflict dialog
                     }
-                    // Reload tasks for current month
-                    const monthStart = startOfMonth(currentMonth);
-                    const monthEnd = endOfMonth(currentMonth);
+                    
+                    // Reload tasks for the relevant month
+                    const taskDateObj = parseISO(taskData.date);
+                    const monthStart = startOfMonth(taskDateObj);
+                    const monthEnd = endOfMonth(taskDateObj);
                     await store.loadTasksForDateRange(monthStart, monthEnd);
                   }}
             />
@@ -453,12 +455,24 @@ const CalendarPage = () => {
             if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
               return result; // Return conflict so AddTaskModal knows to keep modal open
             }
-            // Only close modal and reload if task was successfully created
+            
+            // Success - clear everything and reload the month
             setShowAddTaskModal(false);
+            
             // Reload tasks for current month to ensure new task appears
-            const monthStart = startOfMonth(currentMonth);
-            const monthEnd = endOfMonth(currentMonth);
+            // We use the task's date to determine which month to refresh if it's different
+            const taskDateObj = parseISO(taskData.date);
+            const refreshMonth = isSameMonth(taskDateObj, currentMonth) ? currentMonth : taskDateObj;
+            
+            const monthStart = startOfMonth(refreshMonth);
+            const monthEnd = endOfMonth(refreshMonth);
             await store.loadTasksForDateRange(monthStart, monthEnd);
+            
+            // If we moved to a new month, update the view
+            if (!isSameMonth(taskDateObj, currentMonth)) {
+              setCurrentMonth(startOfMonth(taskDateObj));
+            }
+            
             return result;
           }}
         />

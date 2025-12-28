@@ -31,7 +31,12 @@ async def get_week_view(user_id: str = None):
     # Wait, repo.get_tasks_by_date_range returns [self._task_to_dict(t) for t in tasks]
     # But those dicts need to be converted to frontend format.
     from app.logic.frontend_adapter import backend_task_to_frontend
-    frontend_tasks = [backend_task_to_frontend(t) for t in tasks]
+    
+    # Get categories for mapping
+    categories_list = await db_repo.get_categories(user_id)
+    category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
+    
+    frontend_tasks = [backend_task_to_frontend(t, category_label_to_id) for t in tasks]
 
     days = []
     for offset in range(7):
@@ -69,8 +74,12 @@ async def get_tasks_in_range(start_date_str: str, end_date_str: str, user_id: st
     from db.repo import db_repo
     tasks = await db_repo.get_tasks_by_date_range(user_id, start_date, end_date)
     
+    # Get categories for mapping
+    categories_list = await db_repo.get_categories(user_id)
+    category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
+    
     from app.logic.frontend_adapter import backend_task_to_frontend
-    frontend_tasks = [backend_task_to_frontend(t) for t in tasks]
+    frontend_tasks = [backend_task_to_frontend(t, category_label_to_id) for t in tasks]
     
     days = []
 

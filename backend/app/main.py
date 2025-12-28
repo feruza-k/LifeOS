@@ -2264,9 +2264,9 @@ async def get_all_categories(current_user: dict = Depends(get_current_user)):
     return await db_repo.get_categories(current_user["id"])
 
 @app.get("/categories/{category_id}")
-async def get_category(category_id: str):
+async def get_category(category_id: str, current_user: dict = Depends(get_current_user)):
     """Get a specific category by ID."""
-    category = await db_repo.get_category(category_id)
+    category = await db_repo.get_category(category_id, current_user["id"])
     if category:
         return category
     return {"error": "Category not found"}
@@ -2288,9 +2288,12 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
     """
     updates_dict = updates.model_dump(exclude_none=True)
     # Verify category exists
-    category = await db_repo.get_category(category_id)
+    category = await db_repo.get_category(category_id, current_user["id"])
     if not category:
         return {"error": "Category not found"}
+    
+    # Use the real UUID from the retrieved category (in case category_id was a label)
+    real_category_id = category["id"]
     
     # If it's a global category (user_id = NULL), create or update a user-specific copy
     if not category.get("user_id"):
@@ -2308,7 +2311,7 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
             # User already has a custom version, update it instead
             result = await db_repo.update_category(existing_user_category["id"], updates_dict)
             # Also update tasks that reference the old global category
-            updated_count = await db_repo.update_tasks_category(category_id, existing_user_category["id"], current_user["id"])
+            updated_count = await db_repo.update_tasks_category(real_category_id, existing_user_category["id"], current_user["id"])
             logger.info(f"Updated existing user category and {updated_count} tasks")
         else:
             new_category = {
@@ -2318,7 +2321,7 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
             }
             result = await db_repo.add_category(new_category)
             
-            updated_count = await db_repo.update_tasks_category(category_id, result["id"], current_user["id"])
+            updated_count = await db_repo.update_tasks_category(real_category_id, result["id"], current_user["id"])
             logger.info(f"Created new user category and updated {updated_count} tasks")
         
         return result
@@ -2326,7 +2329,7 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
     if category.get("user_id") != current_user["id"]:
         return {"error": "Unauthorized: Cannot update other users' categories"}
     
-    result = await db_repo.update_category(category_id, updates_dict)
+    result = await db_repo.update_category(real_category_id, updates_dict)
     if result:
         return result
     return {"error": "Category not found"}
@@ -2335,17 +2338,21 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
 async def delete_category(category_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a category (user-scoped - can only delete own categories)."""
     # Verify category belongs to user before deleting
-    category = await db_repo.get_category(category_id)
+    category = await db_repo.get_category(category_id, current_user["id"])
     if not category:
         return {"error": "Category not found"}
+    
+    # Use the real UUID
+    real_category_id = category["id"]
+    
     if category.get("user_id") and category["user_id"] != current_user["id"]:
         return {"error": "Unauthorized: Cannot delete other users' categories"}
     # Global categories (user_id is None) cannot be deleted by users
     if not category.get("user_id"):
         return {"error": "Cannot delete global categories"}
-    success = await db_repo.delete_category(category_id)
+    success = await db_repo.delete_category(real_category_id)
     if success:
-        return {"status": "deleted", "id": category_id}
+        return {"status": "deleted", "id": real_category_id}
     return {"error": "Category not found"}
 
 # Weekly & Calendar Views (Used by Frontend)
@@ -2512,8 +2519,12 @@ async def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
     # Calculate energy using backend format
     energy = calculate_energy(today_tasks)
     
+    # Get categories for mapping
+    categories_list = await db_repo.get_categories(current_user["id"])
+    category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
+    
     # Convert to frontend format
-    frontend_tasks = [backend_task_to_frontend(t) for t in today_tasks]
+    frontend_tasks = [backend_task_to_frontend(t, category_label_to_id) for t in today_tasks]
     
     # Calculate load
     total_tasks = len(frontend_tasks)
@@ -2565,8 +2576,12 @@ async def assistant_today(
     # Get tasks for the specific date using the database query (more efficient)
     date_tasks = await db_repo.get_tasks_by_date_and_user(date, current_user["id"])
     
+    # Get categories for mapping
+    categories_list = await db_repo.get_categories(current_user["id"])
+    category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
+    
     # Convert to frontend format first
-    frontend_tasks = [backend_task_to_frontend(t) for t in date_tasks]
+    frontend_tasks = [backend_task_to_frontend(t, category_label_to_id) for t in date_tasks]
     
     # Sort: tasks with time first (by time), then tasks without time
     tasks_with_time = sorted(

@@ -134,7 +134,7 @@ export function CoreAIFAB({
                   <Sparkles className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="font-serif font-semibold text-foreground">{aiName}</h2>
+                  <h2 className="font-sans font-bold text-foreground">{aiName}</h2>
                   <p className="text-xs font-sans text-muted-foreground">Your personal assistant</p>
                 </div>
               </div>
@@ -174,7 +174,7 @@ export function CoreAIFAB({
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <Sparkles className="w-8 h-8 text-primary" />
                   </div>
-                  <h3 className="font-serif text-lg font-semibold text-foreground mb-2">
+                  <h3 className="font-sans text-lg font-bold text-foreground mb-2">
                     Hey there! I'm {aiName}
                   </h3>
                   <p className="text-sm text-muted-foreground font-sans max-w-xs mx-auto mb-6">

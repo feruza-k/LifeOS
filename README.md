@@ -1813,6 +1813,7 @@ The **Explore** page (formerly Align) is now the strategic brain of LifeOS.
 - **SVG Completion Trends**: Replaced static bars with a custom **SVG Line Chart**. It visualizes a 4-week moving completion average calculated from historical check-ins and task states.
 - **Goals Carousel**: Added support for up to **5 concurrent monthly goals**. The UI features an auto-rotating carousel (5s) with manual touch/swipe support and a smooth dot-indicator navigation.
 - **Smart Nudges**: The backend now uses a priority-weighted logic engine to suggest improvements based on **category drift** (e.g., when Health tasks are consistently moved) and peak productivity windows.
+- **SolAI Precision**: Hardened the assistant's date resolution with explicit **Calendar Guidance** for relative dates (e.g., "next week"). Enforced a strict category selection policy where SolAI guesses but always asks for confirmation, ensuring better data integrity.
 - **Week Review Fix**: Resolved a critical infinite re-render loop in the Weekly Overview by stabilizing date dependencies with `useMemo`.
 
 #### **Reflection**

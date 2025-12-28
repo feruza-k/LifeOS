@@ -3,11 +3,28 @@ import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { api } from "@/lib/api";
 import { ConversationMessage } from "@/types/lifeos";
 
+import { startOfMonth, endOfMonth, parseISO } from "date-fns";
+
 // SolAI hook - connects to backend assistant
 export function useCoreAI() {
   const store = useLifeOSStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const refreshCalendarIfNeeded = async (dateStr: string) => {
+    // If the user is on the calendar view, we should refresh the whole month
+    // to ensure any new tasks or moves are reflected in the grid
+    if (window.location.pathname === "/calendar") {
+      try {
+        const date = parseISO(dateStr);
+        const monthStart = startOfMonth(date);
+        const monthEnd = endOfMonth(date);
+        await store.loadTasksForDateRange(monthStart, monthEnd);
+      } catch (e) {
+        console.error("Failed to refresh calendar after assistant action:", e);
+      }
+    }
+  };
 
   const sendMessage = useCallback(async (userMessage: string) => {
     // Add user message to conversation
@@ -40,14 +57,17 @@ export function useCoreAI() {
           // Task was created - reload today view to show new task
           const taskDate = uiAction.task.date || new Date().toISOString().slice(0, 10);
           await store.loadToday(taskDate);
+          await refreshCalendarIfNeeded(taskDate);
         } else if (uiAction.action === "update_task" || uiAction.action === "apply_reschedule") {
           // Task was updated/rescheduled - reload today view
           const currentDate = store.today?.date || new Date().toISOString().slice(0, 10);
           await store.loadToday(currentDate);
+          await refreshCalendarIfNeeded(currentDate);
         } else if (uiAction.action === "refresh") {
           // Refresh current view
           const currentDate = store.today?.date || new Date().toISOString().slice(0, 10);
           await store.loadToday(currentDate);
+          await refreshCalendarIfNeeded(currentDate);
         }
         // "confirm_create" and "confirm_reschedule" are handled by confirmation UI
       }
@@ -89,12 +109,15 @@ export function useCoreAI() {
         if (uiAction.action === "add_task" && uiAction.task) {
           const taskDate = uiAction.task.date || new Date().toISOString().slice(0, 10);
           await store.loadToday(taskDate);
+          await refreshCalendarIfNeeded(taskDate);
         } else if (uiAction.action === "update_task" || uiAction.action === "apply_reschedule") {
           const currentDate = store.today?.date || new Date().toISOString().slice(0, 10);
           await store.loadToday(currentDate);
+          await refreshCalendarIfNeeded(currentDate);
         } else if (uiAction.action === "refresh") {
           const currentDate = store.today?.date || new Date().toISOString().slice(0, 10);
           await store.loadToday(currentDate);
+          await refreshCalendarIfNeeded(currentDate);
         }
       }
     } catch (error: any) {

@@ -131,16 +131,20 @@ Your capabilities:
 - Provide insights that aren't obvious from just today's view
 
 Current context:
-- Today's date: {today_str}
+- Today's date: {today_str} ({today.strftime('%A')})
 - Current time: {current_time}
 - Timezone: Europe/London
+- Calendar Guidance: 
+  * "this week" = week of {today_str}
+  * "next week" = week starting {(today + timedelta(days=(7-today.weekday()))).strftime('%Y-%m-%d')}
+  * "Wednesday next week" = {(today + timedelta(days=(7-today.weekday()) + 2)).strftime('%Y-%m-%d')}
 
 User's current state:
 - Tasks today ({len(tasks_today)}): {chr(10).join(today_tasks_summary) if today_tasks_summary else "No tasks scheduled"}
 - Upcoming tasks: {chr(10).join(upcoming_summary) if upcoming_summary else "None"}
 - Conflicts: {chr(10).join(conflicts_summary) if conflicts_summary else "No conflicts detected"}
 - Energy level: {energy.get('status', 'unknown')} (effective load: {energy.get('effectiveLoad', 0)})
-- Categories: {', '.join([c.get('label', '') for c in categories[:5]]) if categories else "None"}
+- Available Categories: {', '.join([c.get('label', '') for c in categories]) if categories else "Health, Work, Family, Growth, Creativity"}
 
 Historical context (past 30 days):
 {chr(10).join(historical_summary) if historical_summary else "Just getting started - limited historical data available"}
@@ -167,44 +171,28 @@ Behavioral guidance from memories:
 - PATTERNS: Use these to inform defaults, but user's explicit intent always overrides patterns. Patterns are hints, not rules.
 
 When responding:
-- Be BRIEF and concise - aim for 1-2 sentences for most responses, only expand when specifically asked for details or complex analysis
-- Mobile-friendly: Keep responses short and scannable - users are often on phones
-- Use the user's FULL context (current + historical + patterns + context signals + user context) to give relevant advice, but express it concisely
-- Adapt your tone and suggestions based on context signals: reduce pressure when user is overloaded, be gentler during strained periods, align with expressed themes
-- Let memories SHAPE your behavior silently: preferences bias suggestions, constraints limit proposals, values influence tone. Never mention memories explicitly - they simply make you feel more aligned with the user.
-- NEVER mention that you're analyzing notes, reflections, patterns, or memories - these signals exist only for your internal reasoning
-- User intent always overrides memories: if user explicitly wants something that conflicts with a memory, honor the explicit intent
-- Provide insights that go beyond what's obvious from today's view, but keep them brief
-- Default to brevity: If unsure whether to expand, choose the shorter response
-- For progress questions ("How am I doing?", "How did my last week go?"):
-  * Focus on meaningful insights: trends, improvements, patterns, not just raw numbers
-  * Highlight what's working well and what could be improved
-  * Compare current performance to past patterns when relevant
-  * Be specific but brief: "You completed 8/10 tasks (80%), up from 60% last week" is better than listing every task
-  * Use the "Last week summary" and "Patterns and insights" sections above
-  * Reference notes, diary entries, and photos when relevant to provide richer context
-- When analyzing progress, consider ALL data sources: tasks, notes, diary entries, photos, check-ins
-- If notes or diary entries mention specific themes, goals, or concerns, incorporate those into your insights
-- NEVER say "I don't have enough data" - instead, work with what's available and be helpful
-- If you need to perform an action (create task, reschedule, etc.), clearly state what you'll do in one sentence
-- For task creation/scheduling: Use preferences to bias time suggestions (e.g., if user prefers mornings, suggest morning times). Use constraints to avoid violating boundaries (e.g., don't suggest times user cannot work). Do this naturally without explaining why.
-- For confirmations, ask naturally but clearly in one sentence
-- Match the calm, intentional tone of LifeOS
-- Use patterns to suggest improvements when available, but keep suggestions brief
-- Memories inform your judgment - they make you feel more aligned with the user. The user should feel understood, not managed.
+- Be BRIEF and concise - aim for 1-2 sentences for most responses.
+- Mobile-friendly: scannable and short.
+- CATEGORIES: Every task MUST have a category. If the user doesn't specify one, GUESS based on the title and categories list, but then ASK the user if that category is correct or if they'd like to change it.
+- PROMPTING: If a task request is vague (no time, no category), ask the user for the missing details in a helpful way.
+- For task creation/scheduling: Resolve relative dates (e.g., "next Wednesday") accurately based on the Guidance above.
+- Resolve "next week" relative to {today_str}.
+- Match the calm, intentional tone of LifeOS.
 
 You must respond in JSON format with this structure:
 {{
-  "response": "Your natural, conversational response text",
+  "response": "Your natural, conversational response text. If creating a task, confirm the date/time/category you've chosen and ask if it looks right.",
   "action": "create_task" | "reschedule" | "confirm_create" | "apply_reschedule" | "suggest" | null,
   "action_data": {{
     // Only include if action is not null
-    // For create_task: {{"title": "...", "date": "...", "time": "...", ...}}
+    // For create_task: {{"title": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "value": "category_label", "notes": "..."}}
     // For reschedule: {{"task_id": "...", "new_datetime": "..."}}
     // For confirm_create: {{"task_preview": {{...}}}}
     // For apply_reschedule: {{"task_id": "...", "new_time": "..."}}
   }}
 }}
+
+Always respond with valid JSON. No markdown, no code blocks.
 
 Always respond with valid JSON. No markdown, no code blocks."""
 
@@ -486,8 +474,13 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
     today_str = now.strftime("%Y-%m-%d")
     
     today_tasks_raw = await db_repo.get_tasks_by_date_and_user(today_str, user_id)
+    
+    # Get categories for mapping
+    categories_list = await db_repo.get_categories(user_id)
+    category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
+    
     from app.logic.frontend_adapter import backend_task_to_frontend
-    today_tasks = [backend_task_to_frontend(t) for t in today_tasks_raw]
+    today_tasks = [backend_task_to_frontend(t, category_label_to_id) for t in today_tasks_raw]
     
     # Optimize: Fetch all upcoming tasks in one DB call instead of 7
     week_start_upcoming = now.date() + timedelta(days=1)
@@ -501,7 +494,7 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
     for t in all_upcoming_raw:
         task_date = t.get("date")
         if task_date:
-            upcoming_by_date[task_date].append(backend_task_to_frontend(t))
+            upcoming_by_date[task_date].append(backend_task_to_frontend(t, category_label_to_id))
             
     for i in range(1, 8):
         date_str = (now + timedelta(days=i)).strftime("%Y-%m-%d")
@@ -534,7 +527,7 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
         logger.error(f"Error calculating energy: {e}")
         energy = {"status": "unknown", "effectiveLoad": 0}
     
-    categories = await db_repo.get_categories(user_id)
+    categories = categories_list
     
     try:
         historical_context = await _get_historical_context(user_id)
@@ -549,7 +542,7 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
             week_end
         )
         
-        last_week_tasks = [backend_task_to_frontend(t) for t in last_week_tasks_raw]
+        last_week_tasks = [backend_task_to_frontend(t, category_label_to_id) for t in last_week_tasks_raw]
         
         if "all_tasks" not in historical_context:
             historical_context["all_tasks"] = []

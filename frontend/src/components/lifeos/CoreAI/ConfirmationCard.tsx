@@ -33,6 +33,11 @@ export function ConfirmationCard({
           {preview.date && (
             <p className="text-xs font-sans text-muted-foreground leading-tight">
               {preview.time ? `${preview.date} at ${preview.time}` : preview.date}
+              {preview.value && (
+                <span className="ml-1 opacity-70">
+                  • {preview.value.charAt(0).toUpperCase() + preview.value.slice(1)}
+                </span>
+              )}
             </p>
           )}
         </div>

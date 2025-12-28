@@ -854,13 +854,15 @@ class DatabaseRepo:
         async with AsyncSessionLocal() as session:
             if user_id:
                 # Return global categories (user_id IS NULL) + user's specific categories
+                # Order by user_id DESC so that user-specific categories (non-NULL) come before global categories (NULL)
+                # This ensures deduplication prefers user-specific versions.
                 result = await session.execute(
                     select(Category).where(
                         or_(
                             Category.user_id.is_(None),
                             Category.user_id == UUID(user_id)
                         )
-                    ).order_by(Category.user_id, Category.label)
+                    ).order_by(Category.user_id.desc(), Category.label)
                 )
             else:
                 # If no user_id, return only global categories
@@ -869,14 +871,14 @@ class DatabaseRepo:
                 )
             categories = result.scalars().all()
             
-            # Convert to dict and deduplicate by (user_id, label) to avoid duplicates
-            seen = set()
+            # Convert to dict and deduplicate by label to avoid duplicates
+            # Since we ordered by user_id DESC, the user-specific version of a label will be seen first
+            seen_labels = set()
             unique_categories = []
             for c in categories:
-                # Use (user_id, label) as unique key to prevent duplicates
-                key = (str(c.user_id) if c.user_id else None, c.label.lower())
-                if key not in seen:
-                    seen.add(key)
+                label_lower = c.label.lower()
+                if label_lower not in seen_labels:
+                    seen_labels.add(label_lower)
                     unique_categories.append({
                         "id": str(c.id),
                         "label": c.label,
@@ -886,16 +888,41 @@ class DatabaseRepo:
             
             return unique_categories
     
-    async def get_category(self, category_id: str) -> Optional[Dict]:
+    async def get_category(self, category_id: str, user_id: Optional[str] = None) -> Optional[Dict]:
         async with AsyncSessionLocal() as session:
-            category = await session.get(Category, UUID(category_id))
-            if category:
-                return {
-                    "id": str(category.id),
-                    "label": category.label,
-                    "color": category.color,
-                    "user_id": str(category.user_id) if category.user_id else None,
-                }
+            try:
+                # Try to parse as UUID
+                cat_uuid = UUID(category_id)
+                category = await session.get(Category, cat_uuid)
+                if category:
+                    return {
+                        "id": str(category.id),
+                        "label": category.label,
+                        "color": category.color,
+                        "user_id": str(category.user_id) if category.user_id else None,
+                    }
+            except (ValueError, AttributeError):
+                # If not a UUID, it might be a label (legacy fallback)
+                if user_id:
+                    result = await session.execute(
+                        select(Category).where(
+                            and_(
+                                Category.label.ilike(category_id),
+                                or_(
+                                    Category.user_id.is_(None),
+                                    Category.user_id == UUID(user_id)
+                                )
+                            )
+                        ).order_by(Category.user_id.desc())
+                    )
+                    category = result.scalar_one_or_none()
+                    if category:
+                        return {
+                            "id": str(category.id),
+                            "label": category.label,
+                            "color": category.color,
+                            "user_id": str(category.user_id) if category.user_id else None,
+                        }
             return None
     
     async def add_category(self, category_dict: dict) -> Dict:
