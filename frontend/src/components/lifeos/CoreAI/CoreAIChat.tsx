@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Sparkles, Loader2, Trash2, MessageSquare, Plus, Copy, Check, ThumbsUp, ThumbsDown, Download, Search, HelpCircle, Wifi, WifiOff, Mic, MicOff, Volume2 } from "lucide-react";
+import { X, Send, Sparkles, Loader2, Trash2, MessageSquare, Plus, Copy, Check, ThumbsUp, ThumbsDown, Download, Search, HelpCircle, Wifi, WifiOff, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConversationMessage } from "@/types/lifeos";
 import { formatMessageTime } from "@/utils/timeUtils";
@@ -50,12 +50,10 @@ export function CoreAIChat({
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Load chat history from store
   const chatHistory = store.chatHistory || [];
@@ -230,65 +228,11 @@ export function CoreAIChat({
     }
   };
 
-  // Voice Output (Text-to-Speech)
-  const speakText = (text: string) => {
-    if (!("speechSynthesis" in window)) {
-      toast.error("Text-to-speech not supported in this browser");
-      return;
-    }
-
-    // Stop any ongoing speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = navigator.language || "en-US";
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 0.8;
-
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-    };
-
-    utterance.onend = () => {
-      setIsSpeaking(false);
-    };
-
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      toast.error("Failed to speak text");
-    };
-
-    synthesisRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const stopSpeaking = () => {
-    window.speechSynthesis.cancel();
-    setIsSpeaking(false);
-  };
-
-  // Auto-speak assistant responses (optional, can be toggled)
-  // DISABLED by default - user can enable via settings if desired
-  // useEffect(() => {
-  //   if (messages.length > 0) {
-  //     const lastMessage = messages[messages.length - 1];
-  //     // Only speak if it's an assistant message and user has explicitly enabled it
-  //     const autoSpeakEnabled = localStorage.getItem("solai_auto_speak") === "true";
-  //     if (lastMessage.role === "assistant" && autoSpeakEnabled && !isLoading) {
-  //       // Small delay to let UI update
-  //       setTimeout(() => {
-  //         speakText(lastMessage.content);
-  //       }, 500);
-  //     }
-  //   }
-  // }, [messages.length]); // Only trigger on new messages
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopVoiceInput();
-      stopSpeaking();
     };
   }, []);
 
@@ -356,10 +300,9 @@ export function CoreAIChat({
     conflicts: store.today.conflicts || []
   } : null;
 
-  // Ensure voice buttons are always visible - check if speech APIs are available
+  // Check if speech recognition is available
   const hasSpeechRecognition = typeof window !== 'undefined' && 
     (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window));
-  const hasSpeechSynthesis = typeof window !== 'undefined' && ('speechSynthesis' in window);
 
   if (!isOpen) return null;
 
@@ -634,7 +577,7 @@ export function CoreAIChat({
                 </button>
                   ))
                 )}
-              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -746,7 +689,7 @@ export function CoreAIChat({
                           {suggestion}
                         </button>
                       ))}
-                    </div>
+                </div>
                   )}
               </div>
             ))}
@@ -819,28 +762,7 @@ export function CoreAIChat({
             </button>
               )}
           </div>
-            {/* Speak button for last assistant message - only show if supported */}
-            {hasSpeechSynthesis && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
-              <button
-                type="button"
-                onClick={isSpeaking ? stopSpeaking : () => speakText(messages[messages.length - 1].content)}
-                disabled={isLoading}
-                className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
-                  isSpeaking
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-                )}
-                title={isSpeaking ? "Stop speaking" : "Read last response"}
-              >
-                {isSpeaking ? (
-                  <MicOff className="w-5 h-5" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </button>
-            )}
-          <button
+            <button
             type="submit"
               disabled={!input.trim() || isLoading || isListening}
             className={cn(

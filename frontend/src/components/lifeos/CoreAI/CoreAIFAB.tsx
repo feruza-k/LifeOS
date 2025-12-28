@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { Sparkles, X, MessageCircle, Maximize2, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Sparkles, X, MessageCircle, Maximize2, Trash2, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { CoreAIChat } from "./CoreAIChat";
 import { ConfirmationCard } from "./ConfirmationCard";
 import { ConversationMessage } from "@/types/lifeos";
@@ -36,6 +37,13 @@ export function CoreAIFAB({
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [contextActions, setContextActions] = useState<any[]>([]);
+  const [isListening, setIsListening] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  
+  // Check if speech recognition is available
+  const hasSpeechRecognition = typeof window !== 'undefined' && 
+    (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window));
 
   // Load context actions
   useEffect(() => {
@@ -61,6 +69,64 @@ export function CoreAIFAB({
   const handleSendMessage = (message: string) => {
     onSendMessage(message);
   };
+
+  // Voice Input (Speech-to-Text) for quick view
+  const startVoiceInput = () => {
+    if (!hasSpeechRecognition) {
+      toast.error("Speech recognition not supported in this browser");
+      return;
+    }
+
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = navigator.language || "en-US";
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      if (inputRef.current) {
+        inputRef.current.value = transcript;
+      }
+      setIsListening(false);
+      recognition.stop();
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+      if (event.error === "no-speech") {
+        toast.error("No speech detected. Please try again.");
+      } else {
+        toast.error("Speech recognition failed. Please try again.");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopVoiceInput();
+    };
+  }, []);
 
   return (
     <>
@@ -251,7 +317,7 @@ export function CoreAIFAB({
               <form 
                 onSubmit={(e) => {
                   e.preventDefault();
-                  const input = e.currentTarget.querySelector('input');
+                  const input = e.currentTarget.querySelector('input') as HTMLInputElement;
                   if (input?.value.trim()) {
                     handleSendMessage(input.value.trim());
                     input.value = '';
@@ -259,20 +325,53 @@ export function CoreAIFAB({
                 }}
                 className="flex gap-2"
               >
-                <input
-                  type="text"
-                  placeholder="Ask me anything..."
-                  disabled={isLoading}
-                  className="flex-1 py-3 px-4 bg-muted/50 rounded-xl text-foreground font-sans text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-border/30"
-                />
+                <div className="flex-1 relative">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Ask me anything..."
+                    disabled={isLoading || isListening}
+                    className={cn(
+                      "w-full py-3 px-4 bg-muted/50 rounded-xl text-foreground font-sans text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-border/30",
+                      hasSpeechRecognition ? "pr-12" : "pr-4"
+                    )}
+                  />
+                  {/* Voice input button - only show if supported */}
+                  {hasSpeechRecognition && (
+                    <button
+                      type="button"
+                      onClick={isListening ? stopVoiceInput : startVoiceInput}
+                      disabled={isLoading}
+                      className={cn(
+                        "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10",
+                        isListening
+                          ? "bg-destructive text-destructive-foreground animate-pulse"
+                          : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                      )}
+                      title={isListening ? "Stop listening" : "Voice input"}
+                    >
+                      {isListening ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || isListening}
                   className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   <Sparkles className="w-5 h-5" />
                 </button>
               </form>
+              {isListening && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <span className="font-sans">Listening...</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
