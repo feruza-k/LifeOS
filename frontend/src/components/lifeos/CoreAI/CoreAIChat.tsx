@@ -171,12 +171,6 @@ export function CoreAIChat({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-  
-  // Ensure voice buttons are always visible - check if speech APIs are available
-  const hasSpeechRecognition = typeof window !== 'undefined' && 
-    (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window));
-  const hasSpeechSynthesis = typeof window !== 'undefined' && ('speechSynthesis' in window);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -361,6 +355,13 @@ export function CoreAIChat({
     energy: store.today.energy,
     conflicts: store.today.conflicts || []
   } : null;
+
+  // Ensure voice buttons are always visible - check if speech APIs are available
+  const hasSpeechRecognition = typeof window !== 'undefined' && 
+    (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window));
+  const hasSpeechSynthesis = typeof window !== 'undefined' && ('speechSynthesis' in window);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex bg-background">
@@ -790,8 +791,11 @@ export function CoreAIChat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask me anything..."
-                disabled={isLoading || isListening}
-                className="w-full py-3 px-4 pr-12 bg-muted/50 rounded-xl text-foreground font-sans text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-border/30"
+              disabled={isLoading || isListening}
+              className={cn(
+                "w-full py-3 px-4 bg-muted/50 rounded-xl text-foreground font-sans text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-border/30",
+                hasSpeechRecognition ? "pr-12" : "pr-4"
+              )}
             />
               {/* Voice input button - only show if supported */}
               {hasSpeechRecognition && (

@@ -35,27 +35,7 @@ export function CoreAIFAB({
 }: CoreAIFABProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
   const [contextActions, setContextActions] = useState<any[]>([]);
-  
-  // Simple greeting for tooltip - show once when FAB is first hovered/clicked
-  const [greeting, setGreeting] = useState<string | null>(null);
-  
-  useEffect(() => {
-    // Simple greeting - only show on first interaction
-    if (!greeting && !isOpen) {
-      const hour = new Date().getHours();
-      let timeGreeting = "Hello";
-      if (hour < 12) timeGreeting = "Good morning";
-      else if (hour < 17) timeGreeting = "Good afternoon";
-      else timeGreeting = "Good evening";
-      
-      setGreeting(`${timeGreeting}! How can I help you today?`);
-      setShowTooltip(true);
-      // Auto-hide after 5 seconds
-      setTimeout(() => setShowTooltip(false), 5000);
-    }
-  }, [greeting, isOpen]);
 
   // Load context actions
   useEffect(() => {
@@ -87,25 +67,6 @@ export function CoreAIFAB({
       {/* FAB Button - Bottom right */}
       {!isOpen && (
         <div className="fixed bottom-20 right-4 z-40">
-          {/* Simple Greeting Tooltip */}
-          {showTooltip && greeting && !isOpen && (
-            <div 
-              className="absolute bottom-16 right-0 w-64 p-3 bg-card rounded-2xl shadow-card border border-border/50 animate-scale-in mb-2 z-50"
-            >
-              <button
-                onClick={() => setShowTooltip(false)}
-                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
-              >
-                <X className="w-3 h-3 text-muted-foreground" />
-              </button>
-              <div className="flex items-start gap-2">
-                <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm font-sans text-foreground leading-relaxed">
-                  {greeting}
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* FAB Button */}
           <button
