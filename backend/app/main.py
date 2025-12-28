@@ -1865,7 +1865,6 @@ async def delete_photo_endpoint(
         photo_matches = any(p.get("filename") == filename for p in note["photos"])
     
     if not photo_matches:
-        # Photo not in note - might already be deleted, return success anyway
         # Try to delete file if it exists, but don't fail if it doesn't
         try:
             if photo_exists(filename):
@@ -1881,7 +1880,7 @@ async def delete_photo_endpoint(
     except Exception as e:
         logger.warning(f"Photo file {filename} not found or already deleted: {e}")
     
-    # Remove photo reference from note (always do this, even if file deletion failed)
+    # Remove photo reference from note
     if "photo" in note and note["photo"] and note["photo"].get("filename") == filename:
         note["photo"] = None
         await db_repo.save_note(note, current_user["id"])

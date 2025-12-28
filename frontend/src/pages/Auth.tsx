@@ -38,7 +38,7 @@ export default function Auth() {
     ? validatePassword(password) 
     : { isValid: true, errors: [] };
 
-  // CRITICAL: Check for base tag that could cause path rewriting
+  // Check for base tag that could cause path rewriting
   // Also verify the login form is properly configured for native submission
   useEffect(() => {
     // Check for base tag that could cause path rewriting

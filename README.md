@@ -1,7 +1,7 @@
 # "LifeOS" - AI-Powered Personal Operating System
 
 **Status:** Building in Public (31-Day AI Challenge)  
-**Current Date:** December 27, 2025
+**Current Date:** December 28, 2025
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -34,6 +34,7 @@
   - [Day 25: Selective Memory Injection & Memory-Informed Behavior](#day-25-selective-memory-injection--memory-informed-behavior-dec-25-2025)
   - [Day 26: Deployment & Production Setup](#day-26-deployment--production-setup-dec-26-2025)
   - [Day 27: Cross-Browser Stability & Explore Page](#day-27-cross-browser-stability--explore-page-dec-27-2025)
+  - [Day 28: Goal-Aware Intelligence & Voice Input](#day-28-goal-aware-intelligence--voice-input-dec-28-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1823,9 +1824,37 @@ Production is a stern teacher. The transition to a custom domain revealed severa
 
 ---
 
+### **Day 28**: Goal-Aware Intelligence & Voice Input (Dec 28, 2025)
+
+Today I built a goal-aware intelligence system that connects monthly goals to daily tasks, and added voice input capabilities to SolAI.
+
+#### **Goal-Aware Intelligence System**
+
+The system automatically matches completed tasks to monthly goals using semantic similarity, calculating progress without manual input. When you complete a task like "Reading a book 20 pp", it recognizes it relates to your goal "Read 2 books" and updates progress automatically.
+
+SolAI now acknowledges goals when you create related tasks via chat ("Scheduled! This aligns with your goal to Read 2 books."). For manual task creation or completion, the floating assistant shows subtle popup notifications that auto-hide after 2 minutes - celebrating progress without being intrusive.
+
+The goal matching engine uses keyword overlap, substring matching, and category inference to connect tasks to goals. Progress updates happen in the background when you complete tasks, and the system provides smart suggestions for neglected goals (only when contextually relevant).
+
+#### **Voice Input Integration**
+
+Added speech-to-text to both the quick SolAI view and full-screen chat. Users can tap the microphone button to speak instead of typing, making task creation faster on mobile. The system checks browser compatibility and gracefully handles unsupported environments.
+
+#### **Technical Details**
+
+- Created `goal_engine.py` for semantic task-goal matching and progress calculation
+- Integrated goal awareness into SolAI's system prompt for natural acknowledgments
+- Added temporary notification system in `CoreAIFAB` with 2-minute auto-hide
+- Implemented frontend goal matching utility for real-time detection
+- Fixed category management issues (global categories can now be edited, proper persistence)
+
+The goal system is subtle and helpful - it recognizes your work, celebrates progress, and suggests next steps only when it makes sense. No nagging, just intelligent support.
+
+---
+
 ## **Next Steps:**
 
-- **Habit Reinforcement**: Build a dedicated module for tracking recurring rituals and their impact on weekly energy.
+- **Habit Reinforcement**: Build a dedicated module for tracking recurring tasks and their impact on weekly energy.
 - **Goal-Task Alignment**: Create a tighter feedback loop where monthly goals directly influence the priority of daily task suggestions.
 - **Deep Reflection**: Complete the full "Review this week" flow with detailed, long-form AI narrative summaries.
 - **Performance Polish**: Optimize the loading states for the SVG charts and carousel transitions for a "native-app" feel.
