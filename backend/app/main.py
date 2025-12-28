@@ -192,7 +192,7 @@ class PreCORSMiddleware(BaseHTTPMiddleware):
                         headers={
                             "Access-Control-Allow-Origin": origin,
                             "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-                            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Timezone",
                             "Access-Control-Allow-Credentials": "true",
                             "Access-Control-Max-Age": "3600",
                         }
@@ -989,7 +989,7 @@ async def options_auth_me(request: Request):
         return Response(status_code=200, headers={
             "Access-Control-Allow-Origin": origin if origin != "*" else "*",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Timezone",
             "Access-Control-Allow-Credentials": "true",
         })
     return Response(status_code=200)
@@ -2986,5 +2986,7 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
 async def meta_categories(current_user: dict = Depends(get_current_user)):
     """Get category color mapping."""
     return await get_category_colors(current_user["id"])
+
+
 
 

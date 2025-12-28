@@ -63,11 +63,23 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
   }
 
   try {
-    const res = await fetch(url, {
+    // Build fetch options - ensure we don't override headers or credentials
+    const fetchOptions: RequestInit = {
       ...options,
-      headers,
-      credentials: "include",  // Include cookies (httpOnly tokens)
+      headers,  // Our merged headers (with timezone) override any in options
+      credentials: "include",  // Always include cookies (httpOnly tokens)
+    };
+    
+    console.log(`[API] Making ${fetchOptions.method || 'GET'} request to ${url}`, {
+      hasHeaders: !!fetchOptions.headers,
+      headerKeys: fetchOptions.headers ? Object.keys(fetchOptions.headers as Record<string, string>) : [],
+      hasBody: !!fetchOptions.body,
+      credentials: fetchOptions.credentials
     });
+    
+    const res = await fetch(url, fetchOptions);
+    
+    console.log(`[API] Response: ${res.status} ${res.statusText} for ${url}`);
     
     if (res.status === 401) {
       // If we should skip refresh (e.g., for signup, session checks), read the actual error
@@ -621,6 +633,41 @@ export const api = {
     const params = new URLSearchParams();
     if (currentView) params.append("current_view", currentView);
     if (selectedTaskId) params.append("selected_task_id", selectedTaskId);
+    if (selectedDate) params.append("selected_date", selectedDate);
+    return request(`/assistant/context-actions?${params.toString()}`);
+  },
+
+  // --- Categories ---
+  getAllCategories: () => request("/categories"),
+
+  getCategory: (id: string) => request(`/categories/${id}`),
+
+  createCategory: (category: any) =>
+    request("/categories", {
+      method: "POST",
+      body: JSON.stringify(category),
+    }),
+
+  updateCategory: (id: string, updates: any) =>
+    request(`/categories/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+
+  deleteCategory: (id: string) =>
+    request(`/categories/${id}`, { method: "DELETE" }),
+
+  // Align endpoints
+  getAlignSummary: () => request("/align/summary"),
+  getAlignAnalytics: () => request("/align/analytics"),
+  formatDate: (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+};
+
     if (selectedDate) params.append("selected_date", selectedDate);
     return request(`/assistant/context-actions?${params.toString()}`);
   },
