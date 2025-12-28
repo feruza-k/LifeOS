@@ -660,6 +660,15 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
         except Exception as e:
             logger.error(f"Error getting relevant memories: {e}", exc_info=True)
     
+    # Get monthly goals for goal-aware suggestions
+    monthly_goals = []
+    try:
+        current_month = now.strftime("%Y-%m")
+        monthly_goals = await db_repo.get_monthly_goals(current_month, user_id)
+    except Exception as e:
+        logger.error(f"Error getting monthly goals: {e}", exc_info=True)
+        monthly_goals = []
+    
     return {
         "tasks_today": today_tasks,
         "upcoming_tasks": upcoming_tasks,
