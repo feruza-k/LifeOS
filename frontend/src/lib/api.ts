@@ -17,16 +17,45 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
   
   const url = `${baseUrl}${path}`;
   
-  // Auto-detect timezone from browser
-  const timezone = typeof window !== 'undefined' 
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone 
-    : 'UTC';
+  // Auto-detect timezone from browser (with fallback)
+  let timezone = 'UTC';
+  try {
+    if (typeof window !== 'undefined') {
+      const resolved = Intl.DateTimeFormat().resolvedOptions();
+      timezone = resolved.timeZone || 'UTC';
+    }
+  } catch (error) {
+    // Fallback to UTC if timezone detection fails
+    console.warn('Failed to detect timezone, using UTC:', error);
+    timezone = 'UTC';
+  }
 
+  // Build headers - don't set Content-Type for FormData (browser sets it with boundary)
+  const isFormData = options.body instanceof FormData;
+  
+  // Start with timezone header
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    "X-Timezone": timezone, // Send timezone to backend
-    ...(options.headers || {}),
+    "X-Timezone": timezone,
   };
+  
+  // Merge existing headers if provided
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      // Convert Headers object to plain object
+      options.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else {
+      // Merge plain object
+      Object.assign(headers, options.headers);
+    }
+  }
+  
+  // Only set Content-Type if it's not FormData and not already set
+  // FormData requests must let the browser set Content-Type with boundary
+  if (!isFormData && !("Content-Type" in headers) && !("content-type" in headers)) {
+    headers["Content-Type"] = "application/json";
+  }
 
   // Debug logging for mobile
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
