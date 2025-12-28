@@ -14,7 +14,7 @@ def _env_bool(name: str, default: bool = True) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-EMAIL_FROM = os.getenv("EMAIL_FROM", "LifeOS <noreply@mylifeos.dev>")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "LifeOS <noreply@mylifeos.dev>").strip().strip("'\"")
 EMAIL_ENABLED = _env_bool("EMAIL_ENABLED", True)
 
 RESEND_URL = "https://api.resend.com/emails"

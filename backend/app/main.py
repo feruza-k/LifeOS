@@ -705,6 +705,7 @@ async def signup_form(
 
     # 4. Send verification email (non-blocking)
     frontend_url = get_frontend_url_from_request(request)
+    verification_url = f"{frontend_url}/verify-email?token={verification_token}"
     try:
         subject, html, text = render_verification_email(
             email_normalized,
@@ -713,8 +714,12 @@ async def signup_form(
             username=username or user.get("username")
         )
         send_email(email_normalized, subject, html, text)
+        logger.info(f"✅ Verification email sent to {email_normalized}")
     except Exception as e:
-        logger.error(f"Failed to send verification email during form signup: {e}")
+        logger.error(f"❌ Failed to send verification email during form signup: {e}")
+        logger.error("=" * 70)
+        logger.error(f"   Verification link for manual use: {verification_url}")
+        logger.error("=" * 70)
 
     # 5. Create tokens and set cookies
     from app.auth.auth import create_refresh_token
@@ -1105,10 +1110,13 @@ async def resend_verification(request: Request, req: ResendVerificationRequest):
             username=username
         )
         send_email(req.email, subject, html, text)
-        logger.info(f"Verification email sent to {req.email}")
+        logger.info(f"✅ Verification email sent to {req.email}")
     except Exception as e:
-        logger.error(f"Failed to send verification email to {req.email}: {e}", exc_info=True)
-        # Still return success message for security (don't reveal if email exists)
+        verification_url = f"{frontend_url}/verify-email?token={verification_token}"
+        logger.error(f"❌ Failed to send verification email to {req.email}: {e}")
+        logger.error("=" * 70)
+        logger.error(f"   Verification link for manual use: {verification_url}")
+        logger.error("=" * 70)
     
     return {"message": "If the email exists, a verification token has been sent"}
 
