@@ -16,6 +16,14 @@ export default function VerifyEmail() {
   // Automatically verify if token is in URL
   useEffect(() => {
     const urlToken = searchParams.get("token");
+    const signupSuccess = searchParams.get("signup");
+
+    if (signupSuccess === "success") {
+      toast.success("Welcome to LifeOS! Please verify your email.");
+      // Refresh user immediately to show the email in the instructions
+      refreshUser().catch(() => {});
+    }
+
     if (urlToken && !isLoading && !isVerified) {
       setToken(urlToken);
       handleVerifyToken(urlToken);

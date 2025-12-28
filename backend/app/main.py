@@ -638,6 +638,119 @@ async def signup(request: Request, response: Response, user_data: UserCreate):
     set_auth_cookies(json_response, access_token, refresh_token, request=request)
     return json_response
 
+@app.post("/auth/signup-form")
+async def signup_form(
+    request: Request,
+    response: Response,
+    email: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    username: str = Form(None)
+):
+    """Handle signup via native HTML form for Safari/mobile compatibility."""
+    from fastapi.responses import RedirectResponse
+    from app.auth.password_validator import validate_password_strength
+    
+    # 1. Basic validation
+    if password != confirm_password:
+        return RedirectResponse(
+            url=f"{get_frontend_url_from_request(request)}/auth?mode=signup&error=mismatch",
+            status_code=303
+        )
+    
+    is_valid, error_msg = validate_password_strength(password)
+    if not is_valid:
+        return RedirectResponse(
+            url=f"{get_frontend_url_from_request(request)}/auth?mode=signup&error=weak_password",
+            status_code=303
+        )
+        
+    # 2. Check for existing user
+    email_normalized = email.lower().strip()
+    existing_user = await db_repo.get_user_by_email(email_normalized)
+    
+    if existing_user:
+        existing_user_data = await db_repo.get_user_by_id(existing_user["id"])
+        if existing_user_data and existing_user_data.get("email_verified", False):
+            return RedirectResponse(
+                url=f"{get_frontend_url_from_request(request)}/auth?mode=login&error=exists",
+                status_code=303
+            )
+
+    # 3. Create or update user (logic from standard signup)
+    from app.auth.auth import generate_verification_token
+    verification_token = generate_verification_token()
+    verification_expires = (datetime.utcnow() + timedelta(hours=24)).isoformat()
+    
+    if existing_user:
+        hashed_password = get_password_hash(password)
+        await db_repo.update_user(existing_user["id"], {
+            "password": hashed_password,
+            "username": username or existing_user.get("username"),
+            "verification_token": verification_token,
+            "verification_token_expires": verification_expires
+        })
+        user = await db_repo.get_user_by_id(existing_user["id"])
+    else:
+        hashed_password = get_password_hash(password)
+        user = await db_repo.create_user(
+            email=email_normalized,
+            hashed_password=hashed_password,
+            username=username,
+            verification_token=verification_token
+        )
+        await db_repo.update_user(user["id"], {
+            "verification_token_expires": verification_expires
+        })
+
+    # 4. Send verification email (non-blocking)
+    frontend_url = get_frontend_url_from_request(request)
+    try:
+        subject, html, text = render_verification_email(
+            email_normalized,
+            verification_token,
+            frontend_url,
+            username=username or user.get("username")
+        )
+        send_email(email_normalized, subject, html, text)
+    except Exception as e:
+        logger.error(f"Failed to send verification email during form signup: {e}")
+
+    # 5. Create tokens and set cookies
+    from app.auth.auth import create_refresh_token
+    from app.auth.security import set_auth_cookies
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["id"]}, expires_delta=access_token_expires
+    )
+    refresh_token = create_refresh_token(user["id"])
+    
+    refresh_token_expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
+    await db_repo.update_user(user["id"], {
+        "refresh_token": refresh_token,
+        "refresh_token_expires": refresh_token_expires
+    })
+    
+    # 6. Redirect to verify-email page with success
+    redirect_url = f"{frontend_url}/verify-email?signup=success"
+    redirect_response = RedirectResponse(url=redirect_url, status_code=303)
+    
+    # Set cookies on the redirect response
+    set_auth_cookies(redirect_response, access_token, refresh_token, request=request)
+    
+    ip, user_agent = get_client_info(request)
+    log_auth_event(
+        "signup_form_success",
+        user_id=user["id"],
+        email=email_normalized,
+        ip=ip,
+        user_agent=user_agent,
+        success=True
+    )
+    
+    return redirect_response
+
 @app.post("/auth/login")
 @limiter.limit("6/15minutes", key_func=get_ip_rate_limit_key)  # 6 attempts allows account lockout at 5 to trigger first
 async def login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):

@@ -79,6 +79,7 @@ export default function Auth() {
     const urlMode = searchParams.get("mode");
     const urlToken = searchParams.get("token");
     const loginSuccess = searchParams.get("login");
+    const signupSuccess = searchParams.get("signup");
     const error = searchParams.get("error");
 
     // Handle login errors from form submission
@@ -90,6 +91,18 @@ export default function Auth() {
       toast.error("Incorrect email or password");
       navigate("/auth", { replace: true });
       setIsLoading(false);
+    } else if (error === "mismatch") {
+      toast.error("Passwords do not match");
+      setMode("signup");
+      navigate("/auth?mode=signup", { replace: true });
+    } else if (error === "weak_password") {
+      toast.error("Password is too weak. Please check requirements.");
+      setMode("signup");
+      navigate("/auth?mode=signup", { replace: true });
+    } else if (error === "exists") {
+      toast.error("Email already registered. Please log in.");
+      setMode("login");
+      navigate("/auth", { replace: true });
     }
 
     // Handle login success redirect (from form submission)
@@ -298,6 +311,90 @@ export default function Auth() {
               disabled={isLoading}
             >
               {isLoading ? "Please wait..." : "Continue"}
+            </Button>
+          </form>
+        ) : mode === "signup" ? (
+          <form 
+            method="POST"
+            action="https://api.mylifeos.dev/auth/signup-form"
+            className="space-y-5"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-sans text-foreground">
+                Email
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                className="h-12 bg-card border-border/50 focus:border-primary/50"
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-sm font-sans text-foreground">
+                Username
+              </Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="username"
+                className="h-12 bg-card border-border/50 focus:border-primary/50"
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-sans text-foreground">
+                Password
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                className="h-12 bg-card border-border/50 focus:border-primary/50"
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirm_password" className="text-sm font-sans text-foreground">
+                Confirm Password
+              </Label>
+              <Input
+                id="confirm_password"
+                name="confirm_password"
+                type="password"
+                placeholder="••••••••"
+                className="h-12 bg-card border-border/50 focus:border-primary/50"
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            {/* Password requirements */}
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p className="font-medium">Password requirements:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {getPasswordRequirements().map((req, i) => (
+                  <li key={i}>{req}</li>
+                ))}
+              </ul>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-12 text-base font-sans font-medium"
+              disabled={isLoading}
+            >
+              {isLoading ? "Please wait..." : "Create account"}
             </Button>
           </form>
         ) : (
