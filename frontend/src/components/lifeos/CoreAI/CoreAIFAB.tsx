@@ -160,6 +160,32 @@ export function CoreAIFAB({
 
   return (
     <>
+      {/* Goal Notification Popup - Fixed position above FAB */}
+      {showGoalNotification && goalNotificationText && (
+        <div className="fixed bottom-32 right-4 z-50 max-w-xs animate-slide-up">
+          <div className="bg-card border border-primary/20 rounded-xl shadow-lg p-4">
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+              <p className="text-sm font-sans text-foreground leading-relaxed flex-1">
+                {goalNotificationText}
+              </p>
+              <button
+                onClick={() => {
+                  setShowGoalNotification(false);
+                  setGoalNotificationText("");
+                  if (goalNotificationTimeoutRef.current) {
+                    clearTimeout(goalNotificationTimeoutRef.current);
+                  }
+                }}
+                className="w-5 h-5 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors flex-shrink-0"
+              >
+                <X className="w-3 h-3 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* FAB Button - Bottom right */}
       {!isOpen && (
         <div className="fixed bottom-20 right-4 z-40">
@@ -168,7 +194,6 @@ export function CoreAIFAB({
           <button
             onClick={() => {
               setIsOpen(true);
-              setShowTooltip(false);
             }}
             className={cn(
               "w-14 h-14 rounded-full flex items-center justify-center shadow-fab transition-all duration-300",

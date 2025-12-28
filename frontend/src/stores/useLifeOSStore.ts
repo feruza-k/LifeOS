@@ -161,9 +161,26 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         return { tasks: updatedTasks };
       });
 
+      // Check for goal match
+      let goalMatch: string | undefined;
+      try {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const goals = await api.getMonthlyGoals(currentMonth);
+        if (goals && goals.length > 0 && created?.title) {
+          const { findMatchingGoal } = await import("@/utils/goalMatching");
+          const matchedGoal = findMatchingGoal(created.title, goals);
+          if (matchedGoal) {
+            goalMatch = `Great! This aligns with your goal "${matchedGoal.title}"`;
+          }
+        }
+      } catch (error) {
+        // Silently fail goal matching - not critical
+        console.warn("Failed to check goal match:", error);
+      }
+
       // Reload today to get fresh data from server
       await get().loadToday(task.date);
-      return created;
+      return { task: created, goalMatch };
     } catch (error) {
       throw error;
     }
@@ -183,6 +200,10 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
   },
 
   toggleTask: async (id: string) => {
+    // Get task before toggling to check if it's being completed
+    const taskBefore = get().tasks.find(t => t.id === id);
+    const wasCompleted = taskBefore?.completed || false;
+    
     const response = await api.completeTask(id);
     if (response && response.task) {
       set((state) => ({
@@ -190,14 +211,17 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
       }));
     }
     
-    // Check for goal match
+    // Check for goal match only if task was just completed (not uncompleted)
     let goalMatch: string | undefined;
     try {
       const task = get().tasks.find(t => t.id === id);
-      if (task && response?.task?.completed) {
+      const isNowCompleted = response?.task?.completed || false;
+      
+      // Only show notification if task was just completed (transitioned from incomplete to complete)
+      if (task && !wasCompleted && isNowCompleted) {
         const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
         const goals = await api.getMonthlyGoals(currentMonth);
-        if (goals && goals.length > 0) {
+        if (goals && goals.length > 0 && task.title) {
           const { findMatchingGoal } = await import("@/utils/goalMatching");
           const matchedGoal = findMatchingGoal(task.title, goals);
           if (matchedGoal) {

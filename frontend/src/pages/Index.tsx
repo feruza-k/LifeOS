@@ -177,7 +177,8 @@ const Index = () => {
         setGoalNotification(result.goalMatch);
       }
       // Task created successfully - modal will close automatically
-      return result;
+      // Return the task object for compatibility
+      return result?.task || result;
     } catch (error: any) {
       toast.error(error?.message || "Failed to add task. Please try again.");
       throw error; // Re-throw so AddTaskModal can handle it
