@@ -19,24 +19,19 @@ def get_current_week_boundaries():
 async def get_week_view(user_id: str = None):
     """
     Return tasks grouped by day for the current week (Mon–Sun).
-
-    Shape:
-
-    {
-      "week_start": "2025-12-01",
-      "week_end": "2025-12-07",
-      "days": [
-        {
-          "date": "2025-12-01",
-          "weekday": "Monday",
-          "tasks": [ ... ]
-        },
-        ...
-      ]
-    }
     """
     week_start, week_end = get_current_week_boundaries()
-    tasks = await get_all_tasks(user_id)  # already sorted + status from task_engine
+    
+    # Optimize: Fetch only tasks in range from database
+    from db.repo import db_repo
+    tasks = await db_repo.get_tasks_by_date_range(user_id, week_start, week_end)
+    
+    # Already in frontend format because DatabaseRepo.get_tasks_by_date_range 
+    # might not be - let's check. Actually repo returns backend format usually.
+    # Wait, repo.get_tasks_by_date_range returns [self._task_to_dict(t) for t in tasks]
+    # But those dicts need to be converted to frontend format.
+    from app.logic.frontend_adapter import backend_task_to_frontend
+    frontend_tasks = [backend_task_to_frontend(t) for t in tasks]
 
     days = []
     for offset in range(7):
@@ -44,7 +39,7 @@ async def get_week_view(user_id: str = None):
         day_str = day.strftime("%Y-%m-%d")
         weekday_name = day.strftime("%A")
 
-        day_tasks = [t for t in tasks if t.get("date") == day_str]
+        day_tasks = [t for t in frontend_tasks if t.get("date") == day_str]
 
         days.append(
             {
@@ -63,19 +58,6 @@ async def get_week_view(user_id: str = None):
 async def get_tasks_in_range(start_date_str: str, end_date_str: str, user_id: str = None):
     """
     Generic calendar range helper.
-
-    Inputs are date strings: 'YYYY-MM-DD'
-    Returns tasks grouped by day between start and end (inclusive).
-
-    Shape:
-    {
-      "start": "...",
-      "end": "...",
-      "days": [
-        { "date": "...", "weekday": "...", "tasks": [...] },
-        ...
-      ]
-    }
     """
     start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
     end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
@@ -83,7 +65,13 @@ async def get_tasks_in_range(start_date_str: str, end_date_str: str, user_id: st
     if end_date < start_date:
         raise ValueError("end_date must be on or after start_date")
 
-    tasks = await get_all_tasks(user_id)
+    # Optimize: Fetch only tasks in range from database
+    from db.repo import db_repo
+    tasks = await db_repo.get_tasks_by_date_range(user_id, start_date, end_date)
+    
+    from app.logic.frontend_adapter import backend_task_to_frontend
+    frontend_tasks = [backend_task_to_frontend(t) for t in tasks]
+    
     days = []
 
     current = start_date
@@ -91,7 +79,7 @@ async def get_tasks_in_range(start_date_str: str, end_date_str: str, user_id: st
         day_str = current.strftime("%Y-%m-%d")
         weekday_name = current.strftime("%A")
 
-        day_tasks = [t for t in tasks if t.get("date") == day_str]
+        day_tasks = [t for t in frontend_tasks if t.get("date") == day_str]
 
         days.append(
             {

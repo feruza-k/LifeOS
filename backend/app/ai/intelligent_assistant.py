@@ -489,11 +489,23 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
     from app.logic.frontend_adapter import backend_task_to_frontend
     today_tasks = [backend_task_to_frontend(t) for t in today_tasks_raw]
     
+    # Optimize: Fetch all upcoming tasks in one DB call instead of 7
+    week_start_upcoming = now.date() + timedelta(days=1)
+    week_end_upcoming = now.date() + timedelta(days=7)
+    all_upcoming_raw = await db_repo.get_tasks_by_date_range(user_id, week_start_upcoming, week_end_upcoming)
+    
     upcoming_tasks = []
+    # Group by date to maintain the "limit per day" logic
+    from collections import defaultdict
+    upcoming_by_date = defaultdict(list)
+    for t in all_upcoming_raw:
+        task_date = t.get("date")
+        if task_date:
+            upcoming_by_date[task_date].append(backend_task_to_frontend(t))
+            
     for i in range(1, 8):
         date_str = (now + timedelta(days=i)).strftime("%Y-%m-%d")
-        tasks_raw = await db_repo.get_tasks_by_date_and_user(date_str, user_id)
-        tasks = [backend_task_to_frontend(t) for t in tasks_raw[:3]]  # Limit per day
+        tasks = upcoming_by_date[date_str][:3]  # Limit per day
         upcoming_tasks.extend(tasks)
     
     conflicts = await find_conflicts(user_id=user_id)
@@ -787,7 +799,8 @@ async def _get_historical_context(user_id: str, days_back: int = 30) -> Dict[str
 async def generate_intelligent_response(
     user_message: str,
     user_id: str,
-    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    background_tasks: Any = None
 ) -> Dict[str, Any]:
     """
     Generate an intelligent, context-aware response using LLM.
@@ -796,6 +809,7 @@ async def generate_intelligent_response(
         user_message: The user's message
         user_id: User ID for context
         conversation_history: List of previous messages [{"role": "user|assistant", "content": "..."}]
+        background_tasks: Optional FastAPI BackgroundTasks for offloading heavy work
     
     Returns:
         Dict with "assistant_response" and "ui" keys
@@ -889,17 +903,30 @@ async def generate_intelligent_response(
                 # "suggest" is just conversational - no UI action needed
                 ui = None
         
-        # Memory extraction (fails silently)
+        # Memory extraction (fails silently, now backgrounded if possible)
         try:
-            await _extract_and_store_memory(
-                user_message=user_message,
-                assistant_response=assistant_response,
-                user_id=user_id,
-                user_context=user_context
-            )
+            if background_tasks:
+                background_tasks.add_task(
+                    _extract_and_store_memory,
+                    user_message=user_message,
+                    assistant_response=assistant_response,
+                    user_id=user_id,
+                    user_context=user_context
+                )
+                logger.info(f"[Memory Extraction] Background task added for user {user_id}")
+            else:
+                # Fallback to non-blocking async call (won't wait for it)
+                import asyncio
+                asyncio.create_task(_extract_and_store_memory(
+                    user_message=user_message,
+                    assistant_response=assistant_response,
+                    user_id=user_id,
+                    user_context=user_context
+                ))
+                logger.info(f"[Memory Extraction] Async task created for user {user_id}")
         except Exception as e:
             # Fail silently - never block assistant responses
-            logger.debug(f"Memory extraction failed (silent): {e}")
+            logger.debug(f"Memory extraction scheduling failed (silent): {e}")
         
         return {
             "assistant_response": assistant_response,

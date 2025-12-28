@@ -3,9 +3,9 @@ import os
 import sys
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Depends, status, Request, Response, Form
+from fastapi import FastAPI, Query, UploadFile, File, HTTPException, Depends, status, Request, Response, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr
@@ -34,7 +34,6 @@ from app.auth.audit_log import log_auth_event, get_client_info
 from app.auth.middleware import SecurityHeadersMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 load_dotenv()
@@ -2411,7 +2410,11 @@ async def tasks_conflicts(
 # Assistant Endpoints (SolAI)
 
 @app.post("/assistant/chat", response_model=AssistantReply)
-async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)):
+async def assistant_chat(
+    payload: ChatRequest, 
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
+):
     """Main SolAI chat endpoint (user-scoped)."""
     try:
         # Day 21: Use intelligent assistant with conversation history
@@ -2422,7 +2425,8 @@ async def assistant_chat(payload: ChatRequest, current_user: dict = Depends(get_
         intelligent_reply = await generate_intelligent_response(
             payload.message,
             current_user["id"],
-            payload.conversation_history
+            payload.conversation_history,
+            background_tasks=background_tasks
         )
         
         # Intelligent assistant now creates pending actions for task creation
@@ -2529,10 +2533,14 @@ async def assistant_bootstrap(current_user: dict = Depends(get_current_user)):
         "energy": energy
     }
     
+    # Return bootstrap data
+    week_stats = await get_week_stats(current_user["id"])
+    suggestions_res = await get_suggestions(current_user["id"], week_stats=week_stats)
+    
     return {
         "today": today_view,
-        "week": await get_week_stats(current_user["id"]),
-        "suggestions": (await get_suggestions(current_user["id"])).get("suggestions", []),
+        "week": week_stats,
+        "suggestions": suggestions_res.get("suggestions", []),
         "conflicts": await find_conflicts(user_id=current_user["id"]),
         "categories": await get_category_colors(current_user["id"]),
     }
