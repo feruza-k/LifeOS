@@ -2698,7 +2698,7 @@ async def align_summary(request: Request, current_user: dict = Depends(get_curre
     all_tasks = historical.get("all_tasks", [])
     
     # Calculate goal-task alignment and update progress automatically
-    from app.ai.goal_engine import match_tasks_to_goals
+    from app.ai.goal_engine import match_tasks_to_goals, generate_goal_aware_suggestion
     completed_tasks = [t for t in all_tasks if t.get("completed", False)]
     
     # Debug logging
