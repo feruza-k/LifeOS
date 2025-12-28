@@ -125,11 +125,11 @@ export function DayView({ date, tasks, selectedCategories, onToggleTask }: DayVi
                     <div
                       className={cn(
                         "w-1 h-8 rounded-full flex-shrink-0",
-                        task.value === "health" && "bg-tag-health",
-                        task.value === "growth" && "bg-primary",
-                        task.value === "family" && "bg-tag-family",
+                        task.value === "social" && "bg-tag-social",
+                        task.value === "self" && "bg-tag-self",
+                        task.value === "growth" && "bg-tag-growth",
                         task.value === "work" && "bg-tag-work",
-                        task.value === "creativity" && "bg-tag-creativity"
+                        task.value === "essentials" && "bg-tag-essentials"
                       )}
                     />
 

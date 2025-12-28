@@ -161,6 +161,9 @@ Last week summary (for "how did my last week go" queries):
 Context awareness (for behavior adaptation - use subtly, never mention):
 {_format_context_signals_for_prompt(user_context.get("context_signals", {}))}
 
+Monthly goals (user's focus areas for this month - reference naturally when relevant, but don't be pushy):
+{_format_goals_for_prompt(user_context.get("monthly_goals", []))}
+
 User context (shape your behavior based on these - preferences bias suggestions, constraints limit proposals, values influence tone):
 {_format_memories_for_prompt(user_context.get("relevant_memories", []))}
 
@@ -175,6 +178,7 @@ When responding:
 - Mobile-friendly: scannable and short.
 - CATEGORIES: Every task MUST have a category. If the user doesn't specify one, GUESS based on the title and categories list, but then ASK the user if that category is correct or if they'd like to change it.
 - PROMPTING: If a task request is vague (no time, no category), ask the user for the missing details in a helpful way.
+- GOAL AWARENESS: When the user creates a task that relates to one of their monthly goals, ALWAYS acknowledge it concisely in your response. For example: "Scheduled! This aligns with your goal to [goal title]." or "Done! This relates to your goal: [goal title]." Keep it brief (1 sentence max) and natural. Only mention goals when there's a clear match - don't force it.
 - For task creation/scheduling: Resolve relative dates (e.g., "next Wednesday") accurately based on the Guidance above.
 - Resolve "next week" relative to {today_str}.
 - Match the calm, intentional tone of LifeOS.
@@ -345,6 +349,35 @@ def _format_memories_for_prompt(memories: List[Dict[str, Any]]) -> str:
         parts.append(f"Patterns (inform defaults, but user intent always overrides): {', '.join(patterns)}")
     
     return "\n".join(parts) if parts else "None"
+
+
+def _format_goals_for_prompt(goals: List[Dict[str, Any]]) -> str:
+    """
+    Format monthly goals for system prompt.
+    Only includes active goals with meaningful titles.
+    """
+    if not goals:
+        return "None"
+    
+    active_goals = [g for g in goals if g.get('title')]
+    if not active_goals:
+        return "None"
+    
+    goal_lines = []
+    for goal in active_goals[:5]:  # Max 5 goals
+        title = goal.get('title', '')
+        description = goal.get('description', '') or ''
+        progress = goal.get('progress', 0) or 0
+        
+        goal_line = f"- {title}"
+        if description:
+            goal_line += f" ({description})"
+        if progress > 0:
+            goal_line += f" [Progress: {progress}%]"
+        
+        goal_lines.append(goal_line)
+    
+    return "\n".join(goal_lines) if goal_lines else "None"
 
 
 def _build_weekly_summary(historical: Dict[str, Any], today: datetime, today_tasks: Optional[List[Dict]] = None) -> str:
@@ -641,7 +674,8 @@ async def get_user_context(user_id: str, conversation_context: Optional[str] = N
             "summary": pattern_summary
         },
         "context_signals": context_signals,
-        "relevant_memories": relevant_memories
+        "relevant_memories": relevant_memories,
+        "monthly_goals": monthly_goals
     }
 
 

@@ -20,6 +20,7 @@ interface CoreAIFABProps {
   currentView?: string;
   selectedTaskId?: string;
   selectedDate?: string;
+  goalNotification?: string; // Temporary goal-related notification
 }
 
 export function CoreAIFAB({ 
@@ -32,14 +33,43 @@ export function CoreAIFAB({
   onClearHistory,
   currentView = "today",
   selectedTaskId,
-  selectedDate
+  selectedDate,
+  goalNotification
 }: CoreAIFABProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [contextActions, setContextActions] = useState<any[]>([]);
   const [isListening, setIsListening] = useState(false);
+  const [showGoalNotification, setShowGoalNotification] = useState(false);
+  const [goalNotificationText, setGoalNotificationText] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const goalNotificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Show goal notification when prop changes
+  useEffect(() => {
+    if (goalNotification) {
+      setGoalNotificationText(goalNotification);
+      setShowGoalNotification(true);
+      
+      // Clear existing timeout
+      if (goalNotificationTimeoutRef.current) {
+        clearTimeout(goalNotificationTimeoutRef.current);
+      }
+      
+      // Hide after 2 minutes (120000ms)
+      goalNotificationTimeoutRef.current = setTimeout(() => {
+        setShowGoalNotification(false);
+        setGoalNotificationText("");
+      }, 120000);
+      
+      return () => {
+        if (goalNotificationTimeoutRef.current) {
+          clearTimeout(goalNotificationTimeoutRef.current);
+        }
+      };
+    }
+  }, [goalNotification]);
   
   // Check if speech recognition is available
   const hasSpeechRecognition = typeof window !== 'undefined' && 

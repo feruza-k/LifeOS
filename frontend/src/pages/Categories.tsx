@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,11 @@ export default function Categories() {
   const [editValue, setEditValue] = useState("");
   const [openColorPicker, setOpenColorPicker] = useState<string | null>(null);
 
+  // Load categories on mount
+  useEffect(() => {
+    store.loadCategories();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleEditStart = (id: string, label: string) => {
     setEditingId(id);
     setEditValue(label);
@@ -63,9 +68,13 @@ export default function Categories() {
         toast.success("Category updated");
         setEditingId(null);
         setEditValue("");
+        // Force reload to get updated category with potentially new ID (if global was converted)
+        await store.loadCategories();
       } catch (error: any) {
         console.error("Failed to update category:", error);
         toast.error(error?.message || "Failed to update category");
+        setEditingId(null);
+        setEditValue("");
       }
     } else {
       setEditingId(null);
@@ -78,6 +87,8 @@ export default function Categories() {
       await store.updateCategory(id, { color });
       setOpenColorPicker(null);
       toast.success("Color updated");
+      // Force reload to get updated category with potentially new ID
+      await store.loadCategories();
     } catch (error: any) {
       console.error("Failed to update color:", error);
       toast.error(error?.message || "Failed to update color");
@@ -91,7 +102,12 @@ export default function Categories() {
       toast.success("Category deleted");
     } catch (error: any) {
       console.error("Failed to delete category:", error);
-      toast.error(error?.message || "Failed to delete category");
+      const errorMessage = error?.message || "Failed to delete category";
+      if (errorMessage.includes("global") || errorMessage.includes("Cannot delete")) {
+        toast.error("Default categories cannot be deleted. You can create a custom category instead.");
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -127,96 +143,106 @@ export default function Categories() {
 
         {/* Categories List */}
         <div className="bg-card rounded-2xl border border-border/50 divide-y divide-border/50">
-          {store.categories.map((category) => (
-            <div key={category.id} className="p-4 flex items-center gap-3">
-              <GripVertical className="w-4 h-4 text-muted-foreground/50" />
-              
-              {/* Color Picker Popover */}
-              <Popover 
-                open={openColorPicker === category.id} 
-                onOpenChange={(open) => setOpenColorPicker(open ? category.id : null)}
-              >
-                <PopoverTrigger asChild>
-                  <button
-                    className="w-8 h-8 rounded-full border-2 border-border/50 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    style={{ backgroundColor: category.color }}
-                  />
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-3" align="start">
-                  <p className="text-xs font-medium text-muted-foreground mb-3">Choose a color</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {colorPalette.map((color) => (
+          {store.categories.map((category) => {
+            // Check if this is a global category (no user_id means it's global)
+            const isGlobal = !category.user_id || category.user_id === null;
+            
+            return (
+              <div key={category.id} className="p-4 flex items-center gap-3">
+                <GripVertical className="w-4 h-4 text-muted-foreground/50" />
+                
+                {/* Color Picker Popover */}
+                <Popover 
+                  open={openColorPicker === category.id} 
+                  onOpenChange={(open) => setOpenColorPicker(open ? category.id : null)}
+                >
+                  <PopoverTrigger asChild>
+                    <button
+                      className="w-8 h-8 rounded-full border-2 border-border/50 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      style={{ backgroundColor: category.color }}
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-3" align="start">
+                    <p className="text-xs font-medium text-muted-foreground mb-3">Choose a color</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {colorPalette.map((color) => (
+                        <button
+                          key={color.name}
+                          onClick={() => handleColorChange(category.id, color.value)}
+                          className={cn(
+                            "w-10 h-10 rounded-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring",
+                            category.color === color.value && "ring-2 ring-foreground ring-offset-2"
+                          )}
+                          style={{ backgroundColor: color.value }}
+                          title={color.name}
+                        />
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                
+                {/* Name */}
+                <div className="flex-1">
+                  {editingId === category.id ? (
+                    <Input
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => handleEditSave(category.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleEditSave(category.id);
+                        if (e.key === "Escape") {
+                          setEditingId(null);
+                          setEditValue("");
+                        }
+                      }}
+                      autoFocus
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
                       <button
-                        key={color.name}
-                        onClick={() => handleColorChange(category.id, color.value)}
-                        className={cn(
-                          "w-10 h-10 rounded-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring",
-                          category.color === color.value && "ring-2 ring-foreground ring-offset-2"
-                        )}
-                        style={{ backgroundColor: color.value }}
-                        title={color.name}
-                      />
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-              
-              {/* Name */}
-              <div className="flex-1">
-                {editingId === category.id ? (
-                  <Input
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={() => handleEditSave(category.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleEditSave(category.id);
-                      if (e.key === "Escape") {
-                        setEditingId(null);
-                        setEditValue("");
-                      }
-                    }}
-                    autoFocus
-                    className="h-8 text-sm"
-                  />
-                ) : (
-                  <button
-                    onClick={() => handleEditStart(category.id, category.label)}
-                    className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
-                  >
-                    {category.label}
-                  </button>
+                        onClick={() => handleEditStart(category.id, category.label)}
+                        className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
+                      >
+                        {category.label}
+                      </button>
+                      {isGlobal && (
+                        <span className="text-xs text-muted-foreground">(Default - editing creates your own copy)</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Delete - Only show for user-specific categories */}
+                {!isGlobal && store.categories.length > 1 && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete category?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove "{category.label}" from your categories. Tasks with this category will remain but may need to be recategorized.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => handleDelete(category.id)} 
+                          className="bg-destructive text-destructive-foreground"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </div>
-
-              {/* Delete */}
-              {store.categories.length > 1 && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete category?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove "{category.label}" from your categories. Tasks with this category will remain but may need to be recategorized.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={() => handleDelete(category.id)} 
-                        className="bg-destructive text-destructive-foreground"
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Add Category Button */}

@@ -14,10 +14,11 @@ export default function Confetti() {
   useEffect(() => {
     const colors = [
       "hsl(330, 26%, 45%)", // primary
-      "hsl(160, 45%, 45%)", // health
-      "hsl(220, 50%, 55%)", // family
-      "hsl(40, 70%, 50%)",  // work
-      "hsl(280, 40%, 55%)", // creativity
+      "hsl(358, 60%, 78%)", // social
+      "hsl(135, 25%, 68%)", // self
+      "hsl(270, 25%, 72%)", // growth
+      "hsl(200, 30%, 70%)", // work
+      "hsl(40, 50%, 72%)", // essentials
     ];
 
     const newPieces: ConfettiPiece[] = Array.from({ length: 50 }, (_, i) => ({

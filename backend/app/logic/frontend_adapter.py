@@ -253,13 +253,13 @@ def frontend_task_to_backend(frontend_task: Dict[str, Any], task_type: str = "ev
     else:
         # Legacy label mapping
         value_to_category = {
-            "health": "health",
+            "social": "social",
+            "self": "self",
             "work": "work",
-            "family": "family",
-            "growth": "personal",
-            "creativity": "creativity",
+            "growth": "growth",
+            "essentials": "essentials",
         }
-        category = value_to_category.get(frontend_value, "personal")
+        category = value_to_category.get(frontend_value, "growth")
     
     datetime_str = None
     if frontend_task.get("date") and frontend_task.get("time"):

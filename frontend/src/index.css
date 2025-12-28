@@ -41,11 +41,11 @@
     --radius: 1rem;
 
     /* Value Tags */
-    --tag-health: 160 45% 45%;
-    --tag-growth: 330 26% 45%;
-    --tag-family: 220 50% 55%;
-    --tag-work: 40 70% 50%;
-    --tag-creativity: 280 40% 55%;
+    --tag-social: 358 60% 78%;
+    --tag-self: 135 25% 68%;
+    --tag-growth: 270 25% 72%;
+    --tag-work: 200 30% 70%;
+    --tag-essentials: 40 50% 72%;
 
     /* Balance Score Colors - Soft Aesthetic */
     --balance-low: 170 30% 85%;

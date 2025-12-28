@@ -22,7 +22,7 @@ const suggestions = [
   "Learn a new skill",
   "Improve sleep habits",
   "Practice daily meditation",
-  "Connect with family weekly",
+  "Connect with friends weekly",
 ];
 
 export function SetFocusModal({ isOpen, onClose, onSave, existingGoals = [] }: SetFocusModalProps) {

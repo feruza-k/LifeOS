@@ -718,6 +718,45 @@ class DatabaseRepo:
                 for focus in focuses
             ]
     
+    async def update_monthly_focus(self, focus_id: str, updates: dict, user_id: str) -> Optional[Dict]:
+        """Update an existing monthly focus/goal"""
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(MonthlyFocus).where(
+                    and_(
+                        MonthlyFocus.id == UUID(focus_id),
+                        MonthlyFocus.user_id == UUID(user_id)
+                    )
+                )
+            )
+            focus = result.scalar_one_or_none()
+            if not focus:
+                return None
+            
+            # Update fields
+            if "title" in updates:
+                focus.title = updates["title"]
+            if "description" in updates:
+                focus.description = updates.get("description")
+            if "progress" in updates:
+                focus.progress = updates["progress"]
+            if "order_index" in updates:
+                focus.order_index = updates["order_index"]
+            
+            await session.commit()
+            await session.refresh(focus)
+            
+            return {
+                "id": str(focus.id),
+                "user_id": str(focus.user_id),
+                "month": focus.month,
+                "title": focus.title,
+                "description": focus.description,
+                "progress": focus.progress,
+                "order_index": focus.order_index,
+                "createdAt": focus.created_at.isoformat() if focus.created_at else None,
+            }
+    
     async def save_monthly_focus(self, focus_dict: dict, user_id: str) -> Dict:
         """Save a single monthly focus (creates new or updates existing by id)"""
         async with AsyncSessionLocal() as session:
@@ -734,13 +773,13 @@ class DatabaseRepo:
                     )
                 )
                 focus = result.scalar_one_or_none()
-                if focus:
+            if focus:
                     focus.title = focus_dict.get("title", focus.title)
                     focus.description = focus_dict.get("description", focus.description)
                     focus.progress = focus_dict.get("progress", focus.progress)
                     if "order_index" in focus_dict:
                         focus.order_index = focus_dict.get("order_index", focus.order_index)
-                else:
+            else:
                     return None
             else:
                 # Create new - check limit of 5 goals per month
@@ -916,13 +955,13 @@ class DatabaseRepo:
                         ).order_by(Category.user_id.desc())
                     )
                     category = result.scalar_one_or_none()
-                    if category:
-                        return {
-                            "id": str(category.id),
-                            "label": category.label,
-                            "color": category.color,
-                            "user_id": str(category.user_id) if category.user_id else None,
-                        }
+            if category:
+                return {
+                    "id": str(category.id),
+                    "label": category.label,
+                    "color": category.color,
+                    "user_id": str(category.user_id) if category.user_id else None,
+                }
             return None
     
     async def add_category(self, category_dict: dict) -> Dict:

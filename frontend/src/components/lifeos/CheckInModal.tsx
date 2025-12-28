@@ -132,10 +132,10 @@ export function CheckInModal({
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-10 h-10 rounded-full flex items-center justify-center",
-              step === "celebration" ? "bg-tag-health/20" : "bg-primary/10"
+              step === "celebration" ? "bg-tag-social/20" : "bg-primary/10"
             )}>
               {step === "celebration" ? (
-                <PartyPopper className="w-5 h-5 text-tag-health" />
+                <PartyPopper className="w-5 h-5 text-tag-social" />
               ) : (
                 <CheckCircle2 className="w-5 h-5 text-primary" />
               )}
@@ -218,17 +218,17 @@ export function CheckInModal({
                     key={task.id}
                     className={cn(
                       "p-3 rounded-xl transition-all",
-                      isMoved ? "bg-tag-health/10 opacity-60" : "bg-muted/50"
+                      isMoved ? "bg-tag-social/10 opacity-60" : "bg-muted/50"
                     )}
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <div className={cn(
                         "w-1 h-8 rounded-full",
-                        task.value === "health" && "bg-tag-health",
-                        task.value === "growth" && "bg-primary",
-                        task.value === "family" && "bg-tag-family",
+                        task.value === "social" && "bg-tag-social",
+                        task.value === "self" && "bg-tag-self",
+                        task.value === "growth" && "bg-tag-growth",
                         task.value === "work" && "bg-tag-work",
-                        task.value === "creativity" && "bg-tag-creativity"
+                        task.value === "essentials" && "bg-tag-essentials"
                       )} />
                       <div className="flex-1">
                         <p className="font-sans font-medium text-sm text-foreground">
@@ -257,7 +257,7 @@ export function CheckInModal({
                       </div>
                     )}
                     {isMoved && (
-                      <p className="text-xs text-tag-health font-sans pl-4">
+                      <p className="text-xs text-tag-social font-sans pl-4">
                         ✓ Moved to {format(new Date(isMoved.newDate), "MMM d")}
                       </p>
                     )}

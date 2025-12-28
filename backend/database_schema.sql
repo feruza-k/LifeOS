@@ -376,10 +376,10 @@ COMMENT ON TABLE pending_actions IS 'Pending user confirmations for assistant ac
 -- Insert default categories (system-wide, user_id = NULL)
 -- These can be used as templates or defaults for new users
 INSERT INTO categories (id, label, color, user_id) VALUES
-    (uuid_generate_v4(), 'Health', '#C7DED5', NULL),
-    (uuid_generate_v4(), 'Growth', '#C9DCEB', NULL),
-    (uuid_generate_v4(), 'Family', '#F4D6E4', NULL),
-    (uuid_generate_v4(), 'Work', '#DCD0E6', NULL),
-    (uuid_generate_v4(), 'Creativity', '#FFF5E0', NULL)
+    (uuid_generate_v4(), 'Social', '#EAA4A6', NULL),
+    (uuid_generate_v4(), 'Self', '#A2C1A8', NULL),
+    (uuid_generate_v4(), 'Work', '#A5BBC6', NULL),
+    (uuid_generate_v4(), 'Growth', '#B6A8C7', NULL),
+    (uuid_generate_v4(), 'Essentials', '#DBC599', NULL)
 ON CONFLICT DO NOTHING;
 

@@ -24,6 +24,7 @@ import { api } from "@/lib/api";
 
 const Index = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [goalNotification, setGoalNotification] = useState<string>("");
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showSetFocus, setShowSetFocus] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -156,7 +157,6 @@ const Index = () => {
 
   const energyStatus = mapEnergyStatus(store.today?.energy?.status);
 
-
   const handleAddTask = async (task: { title: string; time?: string; endTime?: string; value: any; date: string; repeat?: any }) => {
     try {
       const result = await store.addTask({
@@ -172,11 +172,23 @@ const Index = () => {
       if (result && typeof result === 'object' && 'conflict' in result && result.conflict === true) {
         return result; // Return conflict so modal stays open
       }
+      // Show goal notification if task matches a goal
+      if (result && typeof result === 'object' && 'goalMatch' in result && result.goalMatch) {
+        setGoalNotification(result.goalMatch);
+      }
       // Task created successfully - modal will close automatically
       return result;
     } catch (error: any) {
       toast.error(error?.message || "Failed to add task. Please try again.");
       throw error; // Re-throw so AddTaskModal can handle it
+    }
+  };
+  
+  const handleToggleTask = async (id: string) => {
+    const result = await store.toggleTask(id);
+    // Show goal notification if task matches a goal
+    if (result && result.goalMatch) {
+      setGoalNotification(result.goalMatch);
     }
   };
 
@@ -253,7 +265,7 @@ const Index = () => {
        {/* Scheduled */}
       <TaskList
         groups={[{ title: "Scheduled", tasks: scheduledTasks }]}
-        onToggleTask={store.toggleTask}
+        onToggleTask={handleToggleTask}
         onDeleteTask={store.deleteTask}
         onAddTask={() => setShowAddTask(true)}
       />
@@ -266,7 +278,7 @@ const Index = () => {
       {/* Anytime */}
       <TaskList
         groups={[{ title: "Anytime", tasks: anytimeTasks }]}
-        onToggleTask={store.toggleTask}
+        onToggleTask={handleToggleTask}
         onDeleteTask={store.deleteTask}
       />
 
@@ -284,6 +296,7 @@ const Index = () => {
         onClearHistory={coreAI.clearHistory}
         currentView="today"
         selectedDate={format(selectedDate, "yyyy-MM-dd")}
+        goalNotification={goalNotification}
       />
       
       <CheckInModal
@@ -294,7 +307,7 @@ const Index = () => {
         }}
         date={selectedDate}
         tasks={todayTasks}
-        onToggleTask={store.toggleTask}
+        onToggleTask={handleToggleTask}
         onMoveTask={store.moveTask}
         onComplete={async (completedIds, incompleteIds, movedTasks, note, mood, photo) => {
           await store.saveCheckIn(selectedDate, completedIds, incompleteIds, movedTasks, note, mood);

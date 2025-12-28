@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 
-export type ValueType = "health" | "growth" | "family" | "work" | "creativity" | string;
+export type ValueType = "social" | "self" | "growth" | "work" | "essentials" | string;
 
 interface ValueTagProps {
   value: ValueType;

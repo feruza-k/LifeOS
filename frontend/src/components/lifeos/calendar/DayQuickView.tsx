@@ -50,11 +50,11 @@ export function DayQuickView({ date, tasks, onClose, onViewFullDay }: DayQuickVi
               >
                 <div className={cn(
                   "w-2 h-2 rounded-full flex-shrink-0",
-                  task.value === "health" && "bg-tag-health",
-                  task.value === "growth" && "bg-primary",
-                  task.value === "family" && "bg-tag-family",
+                  task.value === "social" && "bg-tag-social",
+                  task.value === "self" && "bg-tag-self",
+                  task.value === "growth" && "bg-tag-growth",
                   task.value === "work" && "bg-tag-work",
-                  task.value === "creativity" && "bg-tag-creativity"
+                  task.value === "essentials" && "bg-tag-essentials"
                 )} />
                 <div className="flex-1 min-w-0">
                   <p className={cn(

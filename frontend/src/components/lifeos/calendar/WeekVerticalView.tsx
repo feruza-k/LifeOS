@@ -45,12 +45,12 @@ export function WeekVerticalView({
     const dateNum = date.getDate();
     
     const allTasks: Task[] = [
-      { id: `${dateNum}-1`, title: "Morning meditation", time: "07:00", completed: false, value: "health" as ValueType },
+      { id: `${dateNum}-1`, title: "Morning meditation", time: "07:00", completed: false, value: "self" as ValueType },
       { id: `${dateNum}-2`, title: "Team standup", time: "09:30", completed: true, value: "work" as ValueType },
-      { id: `${dateNum}-3`, title: "Lunch with family", time: "12:30", completed: false, value: "family" as ValueType },
+      { id: `${dateNum}-3`, title: "Lunch with friends", time: "12:30", completed: false, value: "social" as ValueType },
       { id: `${dateNum}-4`, title: "Deep work session", time: "14:00", completed: false, value: "growth" as ValueType },
-      { id: `${dateNum}-5`, title: "Evening run", time: "18:00", completed: false, value: "health" as ValueType },
-      { id: `${dateNum}-6`, title: "Creative writing", time: "20:00", completed: false, value: "creativity" as ValueType },
+      { id: `${dateNum}-5`, title: "Evening run", time: "18:00", completed: false, value: "self" as ValueType },
+      { id: `${dateNum}-6`, title: "Learning session", time: "20:00", completed: false, value: "growth" as ValueType },
     ];
 
     // Return different subset based on day

@@ -21,9 +21,9 @@ interface LifeOSStore {
   // Methods
   loadBootstrap: () => Promise<void>;
   loadToday: (date: Date | string) => Promise<void>;
-  addTask: (task: any) => Promise<void>;
+  addTask: (task: any) => Promise<{ task: any; goalMatch?: string }>;
   updateTask: (id: string, updates: any) => Promise<void>;
-  toggleTask: (id: string) => Promise<void>;
+  toggleTask: (id: string) => Promise<{ goalMatch?: string }>;
   deleteTask: (id: string) => Promise<void>;
   moveTask: (id: string, newDate: Date | string) => Promise<void>;
   getTasksForDate: (date: string | Date) => Promise<any[]>;
@@ -70,11 +70,11 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
     coreAIName: "SolAI",
   },
   categories: [
-    { id: "health", label: "Health", color: "#C7DED5" }, // Muted Sage
-    { id: "growth", label: "Growth", color: "#C9DCEB" }, // Pale Sky
-    { id: "family", label: "Family", color: "#F4D6E4" }, // Dusty Rose
-    { id: "work", label: "Work", color: "#DCD0E6" }, // Lavender Mist
-    { id: "creativity", label: "Creativity", color: "#FFF5E0" }, // Creamy Yellow
+    { id: "social", label: "Social", color: "#EAA4A6" }, // Dusty Rose
+    { id: "self", label: "Self", color: "#A2C1A8" }, // Muted Sage
+    { id: "work", label: "Work", color: "#A5BBC6" }, // Pale Sky
+    { id: "growth", label: "Growth", color: "#B6A8C7" }, // Lavender Mist
+    { id: "essentials", label: "Essentials", color: "#DBC599" }, // Goldenrod
   ],
 
   // -------- LOADERS -------- //
@@ -189,8 +189,30 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         tasks: state.tasks.map(t => t.id === id ? response.task : t)
       }));
     }
+    
+    // Check for goal match
+    let goalMatch: string | undefined;
+    try {
+      const task = get().tasks.find(t => t.id === id);
+      if (task && response?.task?.completed) {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const goals = await api.getMonthlyGoals(currentMonth);
+        if (goals && goals.length > 0) {
+          const { findMatchingGoal } = await import("@/utils/goalMatching");
+          const matchedGoal = findMatchingGoal(task.title, goals);
+          if (matchedGoal) {
+            goalMatch = `Great progress on "${matchedGoal.title}"!`;
+          }
+        }
+      }
+    } catch (error) {
+      // Silently fail goal matching - not critical
+      console.warn("Failed to check goal match:", error);
+    }
+    
     const currentDate = get().today?.date || new Date().toISOString().slice(0, 10);
     await get().loadToday(currentDate);
+    return { goalMatch };
   },
 
   deleteTask: async (id: string) => {

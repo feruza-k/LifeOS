@@ -21,7 +21,7 @@ const statusConfig = {
   light: {
     label: "Light Day",
     description: "Room for deep work or rest.",
-    className: "bg-tag-health",
+    className: "bg-tag-social",
   },
   recovery: {
     label: "Recovery Mode",

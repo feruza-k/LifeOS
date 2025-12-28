@@ -4,6 +4,7 @@ export interface Category {
   id: string;
   label: string;
   color: string;
+  user_id?: string | null; // null means it's a global category
 }
 
 export interface Task {

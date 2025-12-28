@@ -1299,7 +1299,7 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     success = await db_repo.delete_user_account(user_id)
     
     if success:
-        return {"message": "Account deleted successfully"}
+    return {"message": "Account deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -1405,11 +1405,11 @@ async def create_task(
                 backend_task["category_id"] = category_label_to_id[frontend_value.lower()]
             else:
                 value_to_label = {
-                    "health": "health",
+                    "social": "social",
+                    "self": "self",
                     "work": "work",
-                    "family": "family",
                     "growth": "growth",
-                    "creativity": "creativity",
+                    "essentials": "essentials",
                 }
                 mapped_label = value_to_label.get(frontend_value.lower(), "growth")
                 if mapped_label in category_label_to_id:
@@ -1877,7 +1877,7 @@ async def delete_photo_endpoint(
     # Delete the file (don't fail if file doesn't exist - might have been manually deleted)
     try:
         if photo_exists(filename):
-            delete_photo(filename)
+    delete_photo(filename)
     except Exception as e:
         logger.warning(f"Photo file {filename} not found or already deleted: {e}")
     
@@ -2300,29 +2300,41 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
         import logging
         logger = logging.getLogger(__name__)
         
-        # Check if user already has a user-specific category with this label
+        # Check if user already has a user-specific category with the same label (before or after update)
+        # Use the new label if provided, otherwise use the original label
+        target_label = updates_dict.get("label") if "label" in updates_dict else category.get("label", "")
         user_categories = await db_repo.get_categories(current_user["id"])
         existing_user_category = next(
-            (c for c in user_categories if c.get("user_id") == current_user["id"] and c.get("label", "").lower() == category.get("label", "").lower()),
+            (c for c in user_categories 
+             if c.get("user_id") == current_user["id"] 
+             and c.get("label", "").lower() == target_label.lower()),
             None
         )
         
         if existing_user_category:
-            # User already has a custom version, update it instead
-            result = await db_repo.update_category(existing_user_category["id"], updates_dict)
+            # User already has a custom version with this label, update it instead
+            # Merge updates: if only color is being updated, keep existing label; if label is updated, use new label
+            merged_updates = {**updates_dict}
+            if "label" not in merged_updates:
+                # If label wasn't in updates, keep the existing user category's label
+                merged_updates["label"] = existing_user_category.get("label")
+            result = await db_repo.update_category(existing_user_category["id"], merged_updates)
             # Also update tasks that reference the old global category
             updated_count = await db_repo.update_tasks_category(real_category_id, existing_user_category["id"], current_user["id"])
-            logger.info(f"Updated existing user category and {updated_count} tasks")
+            logger.info(f"Updated existing user category '{result.get('label')}' and updated {updated_count} tasks")
         else:
+            # Create new user-specific category with updated values
+            # If only color is being updated, keep the original label
+            # If label is being updated, use the new label
             new_category = {
-                "label": category["label"],
-                "color": updates_dict.get("color", category["color"]),
+                "label": updates_dict.get("label") if "label" in updates_dict else category["label"],
+                "color": updates_dict.get("color") if "color" in updates_dict else category["color"],
                 "user_id": current_user["id"]
             }
             result = await db_repo.add_category(new_category)
             
             updated_count = await db_repo.update_tasks_category(real_category_id, result["id"], current_user["id"])
-            logger.info(f"Created new user category and updated {updated_count} tasks")
+            logger.info(f"Created new user category '{result['label']}' and updated {updated_count} tasks")
         
         return result
     
@@ -2442,7 +2454,7 @@ async def assistant_chat(
         
         # Return intelligent assistant's response
         if intelligent_reply.get("assistant_response"):
-            return {
+    return {
                 "assistant_response": intelligent_reply.get("assistant_response", "Something went wrong."),
                 "ui": intelligent_reply.get("ui")
             }
@@ -2479,7 +2491,7 @@ async def assistant_confirm(current_user: dict = Depends(get_current_user)):
     
     if pending:
         # Use rule-based assistant to handle pending action confirmation
-        return await generate_assistant_response("yes", current_user["id"])
+    return await generate_assistant_response("yes", current_user["id"])
     else:
         # No pending action - return helpful message
         return {
@@ -2682,6 +2694,46 @@ async def align_summary(request: Request, current_user: dict = Depends(get_curre
     monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
     monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
     
+    # Get all tasks for goal matching (from historical context)
+    all_tasks = historical.get("all_tasks", [])
+    
+    # Calculate goal-task alignment and update progress automatically
+    from app.ai.goal_engine import match_tasks_to_goals
+    completed_tasks = [t for t in all_tasks if t.get("completed", False)]
+    
+    # Debug logging
+    logger.info(f"[Goal Matching] Found {len(completed_tasks)} completed tasks out of {len(all_tasks)} total tasks")
+    logger.info(f"[Goal Matching] Goals to match: {[g.get('title') for g in monthly_goals]}")
+    
+    goal_matches = match_tasks_to_goals(monthly_goals, completed_tasks, days_back=30)
+    
+    # Debug logging
+    for goal_id, match_data in goal_matches.items():
+        goal_title = next((g.get('title') for g in monthly_goals if g.get('id') == goal_id), 'Unknown')
+        logger.info(f"[Goal Matching] Goal '{goal_title}': {match_data.get('total_matches', 0)} matches, progress: {match_data.get('progress_score', 0):.1f}%")
+    
+    # Update goal progress in database
+    for goal in monthly_goals:
+        goal_id = goal.get("id")
+        if goal_id and goal_id in goal_matches:
+            matches = goal_matches[goal_id]
+            new_progress = int(matches.get("progress_score", 0))
+            current_progress = goal.get("progress", 0) or 0
+            
+            # Update if progress changed (removed threshold for initial updates, or if going from 0)
+            should_update = (current_progress == 0 and new_progress > 0) or abs(new_progress - current_progress) >= 3
+            
+            if should_update:
+                try:
+                    logger.info(f"[Goal Progress] Updating goal '{goal.get('title')}' from {current_progress}% to {new_progress}%")
+                    await db_repo.update_monthly_focus(goal_id, {"progress": new_progress}, current_user["id"])
+                    goal["progress"] = new_progress
+                except Exception as e:
+                    logger.error(f"Error updating goal progress: {e}", exc_info=True)
+        elif goal_id:
+            # Goal has no matches - log for debugging
+            logger.info(f"[Goal Matching] Goal '{goal.get('title')}' has no matches")
+    
     # Get tasks for pattern analysis (last 30 days)
     all_tasks = historical.get("all_tasks", [])
     task_patterns = analyze_task_patterns(all_tasks, days_back=30)
@@ -2782,6 +2834,14 @@ async def align_summary(request: Request, current_user: dict = Depends(get_curre
     # Smart nudge generation - more contextual and actionable
     nudge = None
     
+    # Try goal-aware suggestion first (only if contextually relevant)
+    goal_suggestion = generate_goal_aware_suggestion(
+        monthly_goals,
+        goal_matches,
+        user_context.get("tasks_today", []),
+        user_context.get("upcoming_tasks", [])
+    )
+    
     # Calculate completion rate for this week
     week_completion_rate = completed_tasks / total_week_tasks if total_week_tasks > 0 else 0
     
@@ -2798,8 +2858,14 @@ async def align_summary(request: Request, current_user: dict = Depends(get_curre
             if cat_completion_rate < 0.5 and len(cat_tasks) >= 2:
                 drifted_categories.append((cat, cat_completion_rate))
     
+    # Priority 0: Goal-aware suggestion (only if goal is neglected and contextually relevant)
+    if goal_suggestion and not nudge:
+        nudge = {
+            "message": goal_suggestion.get("message", ""),
+            "action": goal_suggestion.get("action", "review")
+        }
     # Priority 1: Low completion rate + specific category drift
-    if week_completion_rate < 0.6 and drifted_categories:
+    elif week_completion_rate < 0.6 and drifted_categories:
         top_drifted = max(drifted_categories, key=lambda x: x[1])
         cat_name = top_drifted[0].capitalize()
         nudge = {

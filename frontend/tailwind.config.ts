@@ -62,11 +62,11 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
         tag: {
-          health: "hsl(var(--tag-health))",
+          social: "hsl(var(--tag-social))",
+          self: "hsl(var(--tag-self))",
           growth: "hsl(var(--tag-growth))",
-          family: "hsl(var(--tag-family))",
           work: "hsl(var(--tag-work))",
-          creativity: "hsl(var(--tag-creativity))",
+          essentials: "hsl(var(--tag-essentials))",
         },
         balance: {
           low: "hsl(var(--balance-low))",
