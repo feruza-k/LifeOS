@@ -2623,6 +2623,28 @@ async def assistant_suggestions(current_user: dict = Depends(get_current_user)):
     """Get suggestions for the user (user-scoped)."""
     return await get_suggestions(current_user["id"])
 
+@app.get("/assistant/morning-briefing")
+async def morning_briefing(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get proactive morning briefing from SolAI (user-scoped)."""
+    from app.ai.morning_briefing import generate_morning_briefing
+    
+    # Get user's language preference (default to English)
+    user_language = request.headers.get("Accept-Language", "en")
+    # Extract language code (e.g., "en-US" -> "en")
+    if "-" in user_language:
+        user_language = user_language.split("-")[0]
+    if "," in user_language:
+        user_language = user_language.split(",")[0]
+    
+    # Get from user settings if available (future enhancement)
+    # For now, use header or default to English
+    
+    briefing = await generate_morning_briefing(current_user["id"], user_language)
+    return briefing
+
 @app.get("/assistant/reschedule-options")
 async def assistant_reschedule_options(task_id: str, current_user: dict = Depends(get_current_user)):
     """Get rescheduling suggestions for a specific task (user-scoped)."""

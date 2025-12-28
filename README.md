@@ -1807,6 +1807,7 @@ Today was about moving from "it works on my machine" to "it works everywhere." D
 - **Backend Resilience**: Performed a full syntax audit and resolved several `IndentationError` bugs in `main.py` that were blocking production startup. Standardized `MonthlyFocusRequest` to allow flexible bulk saving of goals.
 - **Vite Configuration**: Locked the `base` path to `/` to prevent domain-relative URL rewriting in production.
 
+
 #### **Explore: Strategic Reflection Layer**
 
 The **Explore** page (formerly Align) is now the strategic brain of LifeOS.

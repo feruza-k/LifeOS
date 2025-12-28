@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Sparkles, Loader2, Trash2, MessageSquare, Plus, Copy, Check, ThumbsUp, ThumbsDown, Download, Search, HelpCircle, Wifi, WifiOff } from "lucide-react";
+import { X, Send, Sparkles, Loader2, Trash2, MessageSquare, Plus, Copy, Check, ThumbsUp, ThumbsDown, Download, Search, HelpCircle, Wifi, WifiOff, Mic, MicOff, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConversationMessage } from "@/types/lifeos";
 import { formatMessageTime } from "@/utils/timeUtils";
@@ -48,9 +48,13 @@ export function CoreAIChat({
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "error">("connected");
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Load chat history from store
   const chatHistory = store.chatHistory || [];
@@ -176,6 +180,117 @@ export function CoreAIChat({
       setAutoScroll(true);
     }
   };
+
+  // Voice Input (Speech-to-Text)
+  const startVoiceInput = () => {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+      toast.error("Speech recognition not supported in this browser");
+      return;
+    }
+
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = navigator.language || "en-US";
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      setIsListening(false);
+      recognition.stop();
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+      if (event.error === "no-speech") {
+        toast.error("No speech detected. Please try again.");
+      } else {
+        toast.error("Speech recognition failed. Please try again.");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
+  // Voice Output (Text-to-Speech)
+  const speakText = (text: string) => {
+    if (!("speechSynthesis" in window)) {
+      toast.error("Text-to-speech not supported in this browser");
+      return;
+    }
+
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = navigator.language || "en-US";
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.8;
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      toast.error("Failed to speak text");
+    };
+
+    synthesisRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
+
+  // Auto-speak assistant responses (optional, can be toggled)
+  // DISABLED by default - user can enable via settings if desired
+  // useEffect(() => {
+  //   if (messages.length > 0) {
+  //     const lastMessage = messages[messages.length - 1];
+  //     // Only speak if it's an assistant message and user has explicitly enabled it
+  //     const autoSpeakEnabled = localStorage.getItem("solai_auto_speak") === "true";
+  //     if (lastMessage.role === "assistant" && autoSpeakEnabled && !isLoading) {
+  //       // Small delay to let UI update
+  //       setTimeout(() => {
+  //         speakText(lastMessage.content);
+  //       }, 500);
+  //     }
+  //   }
+  // }, [messages.length]); // Only trigger on new messages
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopVoiceInput();
+      stopSpeaking();
+    };
+  }, []);
 
   const handleCopyMessage = async (messageId: string, content: string) => {
     try {
@@ -669,16 +784,56 @@ export function CoreAIChat({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask me anything..."
-                disabled={isLoading}
+                disabled={isLoading || isListening}
                 className="w-full py-3 px-4 pr-12 bg-muted/50 rounded-xl text-foreground font-sans text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-border/30"
               />
+              {/* Voice input button */}
+              <button
+                type="button"
+                onClick={isListening ? stopVoiceInput : startVoiceInput}
+                disabled={isLoading}
+                className={cn(
+                  "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                  isListening
+                    ? "bg-destructive text-destructive-foreground animate-pulse"
+                    : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                )}
+                title={isListening ? "Stop listening" : "Voice input"}
+              >
+                {isListening ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
             </div>
+            {/* Speak button for last assistant message */}
+            {messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+              <button
+                type="button"
+                onClick={isSpeaking ? stopSpeaking : () => speakText(messages[messages.length - 1].content)}
+                disabled={isLoading}
+                className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
+                  isSpeaking
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                )}
+                title={isSpeaking ? "Stop speaking" : "Read last response"}
+              >
+                {isSpeaking ? (
+                  <MicOff className="w-5 h-5" />
+                ) : (
+                  <Volume2 className="w-5 h-5" />
+                )}
+              </button>
+            )}
             <button
               type="submit"
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || isListening}
               className={cn(
                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
-                input.trim() && !isLoading
+                input.trim() && !isLoading && !isListening
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "bg-muted text-muted-foreground"
               )}
@@ -686,6 +841,12 @@ export function CoreAIChat({
               <Send className="w-5 h-5" />
             </button>
           </div>
+          {isListening && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              <span className="font-sans">Listening...</span>
+            </div>
+          )}
         </form>
       </div>
     </div>

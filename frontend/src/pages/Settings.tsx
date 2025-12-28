@@ -109,7 +109,11 @@ export default function Settings() {
   const [showSideMenu, setShowSideMenu] = useState(false);
   
   const [name, setName] = useState("User");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(() => {
+    // Load from localStorage or default to English
+    const saved = localStorage.getItem("lifeos_language");
+    return (saved && ["en", "ru", "ko", "es"].includes(saved)) ? saved : "en";
+  });
   const [weekStart, setWeekStart] = useState("monday");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [defaultReminderTime, setDefaultReminderTime] = useState("09:00");
@@ -171,18 +175,42 @@ export default function Settings() {
           </SettingsRow>
 
           <SettingsRow label="Language">
-            <Select value={language} onValueChange={setLanguage}>
+            <Select value={language} onValueChange={(value) => {
+              setLanguage(value);
+              // Update i18n
+              import("@/utils/i18n").then(({ i18n }) => {
+                i18n.setLanguage(value as "en" | "ru" | "ko" | "es");
+                // Reload page to apply language changes
+                window.location.reload();
+              });
+            }}>
               <SelectTrigger className="w-32 h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="en">English</SelectItem>
+                <SelectItem value="ru">Русский</SelectItem>
+                <SelectItem value="ko">한국어</SelectItem>
                 <SelectItem value="es">Español</SelectItem>
-                <SelectItem value="fr">Français</SelectItem>
-                <SelectItem value="de">Deutsch</SelectItem>
-                <SelectItem value="ja">日本語</SelectItem>
               </SelectContent>
             </Select>
+          </SettingsRow>
+
+          <SettingsRow label="Notifications" description="Enable browser notifications for reminders">
+            <button
+              onClick={async () => {
+                const { NotificationManager } = await import("@/utils/notifications");
+                const granted = await NotificationManager.requestPermission();
+                if (granted) {
+                  toast.success("Notifications enabled");
+                } else {
+                  toast.error("Please enable notifications in your browser settings");
+                }
+              }}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
+            >
+              Enable
+            </button>
           </SettingsRow>
         </SettingsGroup>
 

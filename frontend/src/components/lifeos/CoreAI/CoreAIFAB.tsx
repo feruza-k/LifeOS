@@ -37,6 +37,25 @@ export function CoreAIFAB({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(!!notification);
   const [contextActions, setContextActions] = useState<any[]>([]);
+  const [morningBriefing, setMorningBriefing] = useState<any>(null);
+
+  // Load morning briefing on mount
+  useEffect(() => {
+    const briefingData = localStorage.getItem("morning_briefing");
+    if (briefingData) {
+      try {
+        const briefing = JSON.parse(briefingData);
+        setMorningBriefing(briefing);
+        setShowTooltip(true);
+        // Clear after showing once
+        setTimeout(() => {
+          localStorage.removeItem("morning_briefing");
+        }, 10000); // Show for 10 seconds
+      } catch (error) {
+        console.error("Failed to parse morning briefing:", error);
+      }
+    }
+  }, []);
 
   // Load context actions
   useEffect(() => {
@@ -69,22 +88,62 @@ export function CoreAIFAB({
       {!isOpen && (
         <div className="fixed bottom-20 right-4 z-40">
           {/* Notification Tooltip */}
-          {showTooltip && notification && (
+          {(showTooltip && (notification || morningBriefing)) && (
             <div 
-              className="absolute bottom-16 right-0 w-64 p-3 bg-card rounded-2xl shadow-card border border-border/50 animate-scale-in mb-2"
+              className="absolute bottom-16 right-0 w-72 p-4 bg-card rounded-2xl shadow-card border border-border/50 animate-scale-in mb-2 z-50"
             >
               <button
-                onClick={() => setShowTooltip(false)}
+                onClick={() => {
+                  setShowTooltip(false);
+                  setMorningBriefing(null);
+                }}
                 className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
               >
                 <X className="w-3 h-3 text-muted-foreground" />
               </button>
-              <div className="flex items-start gap-2">
-                <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm font-sans text-foreground leading-relaxed">
-                  {notification}
-                </p>
-              </div>
+              {morningBriefing ? (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-sans font-semibold text-foreground mb-1">
+                        {morningBriefing.greeting}
+                      </p>
+                      {morningBriefing.priorities && morningBriefing.priorities.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs font-sans font-medium text-muted-foreground">Priorities:</p>
+                          <ul className="text-xs font-sans text-foreground space-y-0.5">
+                            {morningBriefing.priorities.map((p: string, i: number) => (
+                              <li key={i}>• {p}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {morningBriefing.insights && (
+                        <p className="text-xs font-sans text-muted-foreground mt-2 italic">
+                          {morningBriefing.insights}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsOpen(true);
+                      setShowTooltip(false);
+                    }}
+                    className="w-full mt-2 px-3 py-2 text-xs font-sans bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors"
+                  >
+                    Chat with SolAI
+                  </button>
+                </div>
+              ) : notification ? (
+                <div className="flex items-start gap-2">
+                  <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm font-sans text-foreground leading-relaxed">
+                    {notification}
+                  </p>
+                </div>
+              ) : null}
             </div>
           )}
 

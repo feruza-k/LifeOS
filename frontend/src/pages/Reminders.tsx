@@ -46,6 +46,8 @@ export default function Reminders() {
       setIsLoadingReminders(true);
       try {
         await store.loadReminders();
+        // Schedule notifications for reminders
+        await scheduleReminderNotifications(store.reminders);
       } catch (error) {
       } finally {
         setIsLoadingReminders(false);
@@ -53,6 +55,21 @@ export default function Reminders() {
     };
     loadData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Schedule notifications for reminders
+  const scheduleReminderNotifications = async (reminders: any[]) => {
+    const { NotificationManager } = await import("@/utils/notifications");
+    
+    // Request permission first
+    await NotificationManager.requestPermission();
+    
+    // Schedule notifications for "notify" type reminders with date and time
+    reminders
+      .filter(r => r.type === "notify" && r.dueDate && r.time)
+      .forEach(reminder => {
+        NotificationManager.scheduleReminder(reminder);
+      });
+  };
 
   // Form state
   const [title, setTitle] = useState("");

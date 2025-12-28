@@ -637,6 +637,18 @@ export const api = {
     return request(`/assistant/context-actions?${params.toString()}`);
   },
 
+  getMorningBriefing: () => {
+    // Get user's language preference
+    const userLanguage = typeof window !== 'undefined' 
+      ? (localStorage.getItem("lifeos_language") || "en")
+      : "en";
+    return request("/assistant/morning-briefing", {
+      headers: {
+        "Accept-Language": userLanguage
+      }
+    });
+  },
+
   // --- Categories ---
   getAllCategories: () => request("/categories"),
 
