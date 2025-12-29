@@ -180,6 +180,7 @@ const Explore = () => {
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [displayedNote, setDisplayedNote] = useState<string>("");
+  const [weeklySummary, setWeeklySummary] = useState<string>("");
   const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
@@ -286,6 +287,15 @@ const Explore = () => {
       
       // Load weekly photos and reflections
       await loadWeeklyPhotosAndReflections();
+      // Load weekly summary
+      try {
+        const summary = await api.getWeeklyReflectionSummary();
+        if (summary?.summary) {
+          setWeeklySummary(summary.summary);
+        }
+      } catch (error) {
+        console.error("Failed to load weekly summary:", error);
+      }
     } catch (error) {
       console.error("Failed to load align data:", error);
       toast.error("Failed to load alignment data");
@@ -846,27 +856,6 @@ const Explore = () => {
         </div>
       )}
 
-      {/* Patterns from analysis - only show if we have real insights */}
-      {alignData.patterns.length > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Patterns
-              </h3>
-            </div>
-            <div className="space-y-2">
-              {alignData.patterns.map((pattern, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                  <p className="text-sm text-foreground font-sans flex-1">{pattern}</p>
-                </div>
-          ))}
-        </div>
-          </div>
-        </div>
-      )}
 
       {/* Category distribution as proxy for value alignment */}
       {Object.keys(alignData.value_alignment).length > 0 && (
@@ -963,6 +952,13 @@ const Explore = () => {
                 This Week
               </h3>
             </div>
+            {weeklySummary && (
+              <div className="mb-4 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                <p className="text-sm text-foreground font-sans leading-relaxed text-center">
+                  {weeklySummary}
+                </p>
+              </div>
+            )}
             <div className="grid gap-4 grid-cols-2">
               {/* Photo Album */}
               <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
@@ -987,16 +983,16 @@ const Explore = () => {
                 )}
               </div>
               {/* Reflection Note - rotates with photo with typing animation */}
-              <div className="flex flex-col justify-center">
+              <div className="flex flex-col justify-center items-center text-center">
                 {weeklyPhotos[currentPhotoIndex]?.note ? (
-                  <p className="text-sm text-foreground font-serif italic leading-relaxed min-h-[60px]">
+                  <p className="text-sm text-foreground font-sans italic leading-relaxed min-h-[60px] flex items-center justify-center">
                     {displayedNote}
                     {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
                       <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
                     )}
                   </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground font-serif italic leading-relaxed">
+                  <p className="text-sm text-muted-foreground font-sans italic leading-relaxed">
                     No reflection for this moment
                   </p>
                 )}
@@ -1220,7 +1216,7 @@ const Explore = () => {
                   analyticsData.energy_patterns.trend === "increasing" 
                     ? "bg-amber-500/20 text-amber-600"
                     : analyticsData.energy_patterns.trend === "decreasing"
-                    ? "bg-purple-500/20 text-purple-600"
+                    ? "bg-emerald-500/20 text-emerald-600"
                     : "bg-muted text-muted-foreground"
                 }`}>
                   {analyticsData.energy_patterns.trend === "increasing" ? "↑ Increasing" :
@@ -1229,19 +1225,43 @@ const Explore = () => {
               )}
             </div>
             
+            {/* Weekly Summary - Moved Above Trend Chart */}
+            {analyticsData.energy_patterns.weekly_patterns.length > 0 && (() => {
+              const currentWeek = analyticsData.energy_patterns.weekly_patterns[analyticsData.energy_patterns.weekly_patterns.length - 1];
+              return (
+                <div className="mb-6">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-sans font-bold text-foreground">{currentWeek.average_daily_load.toFixed(1)}</div>
+                      <div className="text-xs text-muted-foreground font-sans uppercase mt-1">Avg Load</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-sans font-bold text-foreground">{Math.round((currentWeek.average_completion_rate || 0) * 100)}%</div>
+                      <div className="text-xs text-muted-foreground font-sans uppercase mt-1">Completion</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-sans font-bold text-foreground">{Math.round(currentWeek.average_energy_score || 0)}</div>
+                      <div className="text-xs text-muted-foreground font-sans uppercase mt-1">Energy</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            
             {/* Weekly Trend Chart */}
             <div className="mb-6">
               <div className="flex items-end justify-between h-32 gap-1 mb-2">
                 {analyticsData.energy_patterns.weekly_patterns.slice(-4).map((week, index) => {
                   const maxLoad = Math.max(...analyticsData.energy_patterns.weekly_patterns.map(w => w.average_daily_load || 0), 1);
                   const heightPercent = (week.average_daily_load / maxLoad) * 100;
+                  // Aesthetic green colors for weekly bars
                   const energyColors = {
                     "empty": "bg-muted",
-                    "very_light": "bg-purple-300",
-                    "light": "bg-purple-400",
-                    "balanced": "bg-primary",
-                    "moderate": "bg-amber-500",
-                    "heavy": "bg-red-500"
+                    "very_light": "bg-emerald-300",
+                    "light": "bg-emerald-400",
+                    "balanced": "bg-emerald-500",
+                    "moderate": "bg-emerald-600",
+                    "heavy": "bg-emerald-700"
                   };
                   return (
                     <div key={index} className="flex-1 flex flex-col items-center gap-1">
@@ -1266,7 +1286,7 @@ const Explore = () => {
               </div>
             </div>
 
-            {/* Daily Breakdown for Current Week */}
+            {/* Daily Breakdown for Current Week - Using Today Screen Colors */}
             {analyticsData.energy_patterns.daily_patterns && analyticsData.energy_patterns.daily_patterns.length > 0 && (
               <div className="mb-4">
                 <h4 className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-3">
@@ -1274,18 +1294,20 @@ const Explore = () => {
                 </h4>
                 <div className="grid grid-cols-7 gap-1">
                   {analyticsData.energy_patterns.daily_patterns.map((day, index) => {
-                    const energyColors = {
-                      "empty": "bg-muted/30",
-                      "very_light": "bg-purple-300/30",
-                      "light": "bg-purple-400/40",
-                      "balanced": "bg-primary/50",
-                      "moderate": "bg-amber-500/50",
-                      "heavy": "bg-red-500/50",
-                      "unknown": "bg-muted/20"
+                    // Map energy levels to Today screen balance colors
+                    const getBalanceColor = (energyLevel: string) => {
+                      if (energyLevel === "empty" || energyLevel === "very_light" || energyLevel === "light") {
+                        return "bg-balance-low";
+                      } else if (energyLevel === "balanced" || energyLevel === "moderate") {
+                        return "bg-balance-optimal";
+                      } else if (energyLevel === "heavy") {
+                        return "bg-balance-heavy";
+                      }
+                      return "bg-muted/20";
                     };
                     return (
                       <div key={index} className="flex flex-col items-center gap-1">
-                        <div className={`w-full aspect-square rounded ${energyColors[day.energy_level as keyof typeof energyColors] || "bg-muted/30"} flex flex-col items-center justify-center`}>
+                        <div className={`w-full aspect-square rounded ${getBalanceColor(day.energy_level)} flex flex-col items-center justify-center`}>
                           <span className="text-[10px] font-sans font-medium text-foreground">{day.total_tasks}</span>
                           {day.completion_rate > 0 && (
                             <span className="text-[8px] font-sans text-muted-foreground">{Math.round(day.completion_rate * 100)}%</span>
@@ -1307,82 +1329,15 @@ const Explore = () => {
                     <div key={index} className="flex items-start gap-2">
                       <Sparkles className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-foreground font-sans leading-relaxed">{insight}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-            )}
-
-            {/* Weekly Summary */}
-            <div className="mt-4 pt-4 border-t border-border/50">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                {analyticsData.energy_patterns.weekly_patterns.length > 0 && (() => {
-                  const currentWeek = analyticsData.energy_patterns.weekly_patterns[analyticsData.energy_patterns.weekly_patterns.length - 1];
-                  return (
-                    <>
-                      <div>
-                        <div className="text-lg font-sans font-semibold text-foreground">{currentWeek.average_daily_load.toFixed(1)}</div>
-                        <div className="text-[10px] text-muted-foreground font-sans uppercase">Avg Load</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-sans font-semibold text-foreground">{Math.round((currentWeek.average_completion_rate || 0) * 100)}%</div>
-                        <div className="text-[10px] text-muted-foreground font-sans uppercase">Completion</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-sans font-semibold text-foreground">{Math.round(currentWeek.average_energy_score || 0)}</div>
-                        <div className="text-[10px] text-muted-foreground font-sans uppercase">Energy</div>
-                      </div>
-                    </>
-                  );
-                })()}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Goal-Task Connections */}
-      {analyticsData && analyticsData.goal_task_connections && analyticsData.goal_task_connections.length > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.4s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Goal Progress
-          </h3>
-        </div>
-            <div className="space-y-4">
-              {analyticsData.goal_task_connections.map((connection) => (
-                <div key={connection.goal_id} className="border-b border-border/50 last:border-0 pb-3 last:pb-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-sans font-medium text-foreground">
-                      {connection.goal_title}
-                    </h4>
-                    <span className="text-xs text-muted-foreground font-sans">
-                      {connection.total_matches} task{connection.total_matches !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  {connection.recent_tasks.length > 0 && (
-                    <div className="space-y-1 mt-2">
-                      {connection.recent_tasks.slice(0, 3).map((task, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-xs">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          <span className="text-muted-foreground font-sans flex-1 truncate">
-                            {task.title}
-                          </span>
-                          <span className="text-muted-foreground font-sans">
-                            {format(parseISO(task.date), "MMM d")}
-                          </span>
-                        </div>
-          ))}
-        </div>
-                  )}
-      </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Productivity Insights */}
       {analyticsData && analyticsData.productivity_insights && (
@@ -1417,6 +1372,14 @@ const Explore = () => {
                   {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
                 </span>
               </div>
+              {analyticsData.consistency && (
+                <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                  <span className="text-sm text-foreground font-sans">Check-in frequency</span>
+                  <span className="text-sm font-sans font-medium text-foreground">
+                    {analyticsData.consistency.days_with_checkins} of {analyticsData.consistency.total_days} days ({Math.round(analyticsData.consistency.consistency_rate * 100)}%)
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

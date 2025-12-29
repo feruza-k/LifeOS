@@ -401,6 +401,9 @@ export const api = {
 
   getTasksByDateRange: (start: string, end: string) =>
     request(`/tasks/calendar?start=${start}&end=${end}`),
+  
+  getTaskSuggestions: (limit: number = 6) =>
+    request(`/tasks/suggestions?limit=${limit}`),
 
   createTask: (task: any) =>
     request("/tasks", {

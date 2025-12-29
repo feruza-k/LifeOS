@@ -500,6 +500,16 @@ def calculate_energy_patterns(tasks: List[Dict[str, Any]], checkins: List[Dict[s
                     daily_loads.append(total)
                     completion_rate = completed / total if total > 0 else 0
                     daily_completions.append(completion_rate)
+                    # Calculate energy score for tasks too
+                    if total == 0:
+                        energy_score = 0
+                    elif total <= 3:
+                        energy_score = 30 + (completion_rate * 20)
+                    elif total <= 6:
+                        energy_score = 50 + (completion_rate * 30)
+                    else:
+                        energy_score = 70 + (completion_rate * 20)
+                    daily_energy_scores.append(min(100, energy_score))
         
         avg_daily_load = sum(daily_loads) / len(daily_loads) if daily_loads else 0
         avg_completion_rate = sum(daily_completions) / len(daily_completions) if daily_completions else 0

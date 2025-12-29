@@ -3069,8 +3069,10 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
     category_balance = None
     if current_week_metrics:
         week_categories = current_week_metrics.get("categories", {})
+        # Filter out empty categories and ensure we have valid data
+        week_categories = {k: v for k, v in week_categories.items() if v > 0 and k}
         total_cat_tasks = sum(week_categories.values())
-        if total_cat_tasks > 0 and week_categories:
+        if total_cat_tasks > 0 and len(week_categories) > 0:
             # Calculate balance score (0-1, where 1 is perfectly balanced)
             # Use coefficient of variation (lower = more balanced)
             category_counts = list(week_categories.values())
@@ -3286,18 +3288,17 @@ async def get_weekly_reflection_summary(request: Request, current_user: dict = D
     # Collect reflection texts
     reflection_texts = [n.get("content", "").strip() for n in week_notes if n.get("content", "").strip()]
     
-    if not reflection_texts:
-        return {"summary": ""}
+    # Build context for AI - even if no reflections, we can still analyze tasks and goals
+    reflections_combined = "\n\n".join([f"Day {i+1}: {text}" for i, text in enumerate(reflection_texts)]) if reflection_texts else ""
     
-    # Build context for AI
-    reflections_combined = "\n\n".join([f"Day {i+1}: {text}" for i, text in enumerate(reflection_texts)])
-    
-    goals_text = ""
+    goals_text = "No goals set"
     if monthly_goals:
         goals_list = [g.get('title', '') for g in monthly_goals[:3]]
-        goals_text = f"\nMonthly goals: {', '.join(goals_list)}"
+        goals_text = f"{', '.join(goals_list)}"
     
-    completion_text = f"Completed {len(completed_tasks)} of {len(week_tasks)} tasks ({int(completion_rate * 100)}%)" if week_tasks else "No tasks this week"
+    # If no reflections and no tasks, return empty
+    if not reflection_texts and not week_tasks:
+        return {"summary": ""}
     
     # Generate AI summary
     try:
@@ -3306,20 +3307,26 @@ async def get_weekly_reflection_summary(request: Request, current_user: dict = D
         
         client = get_client()
         
-        system_prompt = """You are a supportive life coach. Generate exactly 2 sentences that highlight the week:
-1. First sentence: The key highlight or meaningful moment from the week (what stood out, what they accomplished, or what they learned).
-2. Second sentence: A warm, encouraging acknowledgment of their progress or effort.
-
-Be warm, personal, and genuine. Keep each sentence under 15 words. Focus on the standout moments, not general summaries."""
+        system_prompt = """You are a supportive life coach. Generate a single, valuable sentence that analyzes the user's week holistically.
+        Consider their tasks, completion rate, reflections, and goals. Provide insight that helps them understand their progress and patterns.
+        Be warm, insightful, and actionable. One sentence only, under 25 words."""
         
-        user_prompt = f"""User's reflections from the past 7 days:
-{reflections_combined}
+        # Get task completion stats for context
+        week_tasks = [
+            t for t in all_tasks
+            if t.get("date") and date.fromisoformat(t["date"][:10]) >= week_start
+        ]
+        completed_week_tasks = [t for t in week_tasks if t.get("completed", False)]
+        week_completion_rate = len(completed_week_tasks) / len(week_tasks) if week_tasks else 0
+        
+        user_prompt = f"""Analyze this week holistically and provide ONE valuable sentence:
 
-Context:
-- {completion_text}
-{goals_text}
+Tasks: {len(completed_week_tasks)} of {len(week_tasks)} completed ({int(week_completion_rate * 100)}%)
+Reflections: {len(reflection_texts)} day{'s' if len(reflection_texts) != 1 else ''} with notes
+Goals: {goals_text}
+Reflection content: {reflections_combined[:500] if reflections_combined else 'None'}
 
-Generate exactly 2 sentences highlighting the week: (1) The key highlight or meaningful moment, (2) A warm acknowledgment. Focus on what stood out, not general summaries."""
+Generate ONE sentence that synthesizes these insights - what patterns do you see? What's working? What could improve? Be specific and actionable."""
         
         # Run synchronous OpenAI call in executor
         loop = asyncio.get_event_loop()
@@ -3331,8 +3338,8 @@ Generate exactly 2 sentences highlighting the week: (1) The key highlight or mea
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=60,
-                temperature=0.8
+                max_tokens=40,
+                temperature=0.7
             )
         )
         
@@ -3340,10 +3347,165 @@ Generate exactly 2 sentences highlighting the week: (1) The key highlight or mea
         return {"summary": summary}
     except Exception as e:
         logger.error(f"Error generating reflection summary: {e}", exc_info=True)
-        # Fallback to simple summary
-        if reflection_texts:
-            return {"summary": f"You've been reflecting on {len(reflection_texts)} day{'s' if len(reflection_texts) > 1 else ''} this week. Keep up the thoughtful engagement with your daily experiences."}
+        # Fallback to simple summary based on what data we have
+        if week_tasks:
+            completion_pct = int((len(completed_week_tasks) / len(week_tasks)) * 100) if week_tasks else 0
+            if reflection_texts:
+                return {"summary": f"Completed {len(completed_week_tasks)} of {len(week_tasks)} tasks ({completion_pct}%) and reflected on {len(reflection_texts)} day{'s' if len(reflection_texts) > 1 else ''} this week."}
+            else:
+                return {"summary": f"Completed {len(completed_week_tasks)} of {len(week_tasks)} tasks ({completion_pct}%) this week."}
         return {"summary": ""}
+
+# Task Suggestions Endpoint
+@app.get("/tasks/suggestions")
+async def get_task_suggestions(
+    limit: int = Query(6, ge=1, le=10),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get intelligent task suggestions based on:
+    - Frequently scheduled tasks (last 30 days)
+    - Goal-related tasks
+    - Returns: List of suggestions with title, default time, and category
+    """
+    from collections import defaultdict, Counter
+    from app.ai.intelligent_assistant import get_user_context
+    from app.ai.goal_engine import match_tasks_to_goals
+    
+    # Get user's historical data
+    user_context = await get_user_context(current_user["id"])
+    historical = user_context.get("historical", {})
+    all_tasks = historical.get("all_tasks", [])
+    
+    # Get current month's goals
+    current_month = datetime.now().strftime("%Y-%m")
+    monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
+    
+    # Analyze frequently scheduled tasks (last 30 days)
+    thirty_days_ago = (datetime.now() - timedelta(days=30)).date()
+    recent_tasks = [
+        t for t in all_tasks
+        if t.get("date") and date.fromisoformat(t["date"][:10]) >= thirty_days_ago
+    ]
+    
+    # Group by task title (normalized)
+    task_patterns = defaultdict(lambda: {
+        "count": 0,
+        "times": [],
+        "categories": [],
+        "title": ""
+    })
+    
+    # Get categories mapping for ID conversion
+    categories = await db_repo.get_categories(current_user["id"])
+    category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+    
+    for task in recent_tasks:
+        title = task.get("title", "").strip().lower()
+        if not title:
+            continue
+        
+        # Normalize title (remove common variations)
+        normalized = title
+        if task_patterns[normalized]["title"] == "":
+            task_patterns[normalized]["title"] = task.get("title", "").strip()
+        
+        task_patterns[normalized]["count"] += 1
+        if task.get("time"):
+            task_patterns[normalized]["times"].append(task.get("time"))
+        
+        # Get category ID (prefer category_id, fallback to category label lookup)
+        category_id = task.get("category_id")
+        if not category_id and task.get("category"):
+            category_label = task.get("category").lower()
+            category_id = category_label_to_id.get(category_label)
+        
+        if category_id:
+            task_patterns[normalized]["categories"].append(category_id)
+    
+    # Get most frequent tasks
+    frequent_tasks = sorted(
+        task_patterns.items(),
+        key=lambda x: x[1]["count"],
+        reverse=True
+    )[:limit]
+    
+    # Get goal-related suggestions
+    goal_suggestions = []
+    if monthly_goals:
+        completed_tasks = [t for t in all_tasks if t.get("completed", False)]
+        goal_matches = match_tasks_to_goals(monthly_goals, completed_tasks, days_back=60)
+        
+        for goal in monthly_goals:
+            goal_id = goal.get("id")
+            if goal_id and goal_id in goal_matches:
+                matches = goal_matches[goal_id]
+                matched_tasks = matches.get("matched_tasks", [])
+                if matched_tasks:
+                    # Get most common task pattern for this goal
+                    goal_task_titles = [t.get("title", "").strip().lower() for t in matched_tasks if t.get("title")]
+                    if goal_task_titles:
+                        most_common = Counter(goal_task_titles).most_common(1)[0]
+                        goal_suggestions.append({
+                            "title": most_common[0].title(),  # Capitalize
+                            "goal_id": goal_id,
+                            "goal_title": goal.get("title", ""),
+                            "priority": "goal"
+                        })
+    
+    # Build suggestions list
+    suggestions = []
+    
+    # Add frequent tasks
+    for normalized_title, pattern in frequent_tasks:
+        # Get most common time
+        most_common_time = None
+        if pattern["times"]:
+            time_counter = Counter(pattern["times"])
+            most_common_time = time_counter.most_common(1)[0][0]
+        
+        # Get most common category
+        most_common_category = None
+        if pattern["categories"]:
+            cat_counter = Counter(pattern["categories"])
+            most_common_category = cat_counter.most_common(1)[0][0]
+        
+        suggestions.append({
+            "title": pattern["title"],
+            "time": most_common_time,
+            "category": most_common_category,
+            "frequency": pattern["count"],
+            "priority": "frequent"
+        })
+    
+    # Add goal-related suggestions (if not already in frequent)
+    existing_titles = {s["title"].lower() for s in suggestions}
+    for goal_suggestion in goal_suggestions:
+        if goal_suggestion["title"].lower() not in existing_titles and len(suggestions) < limit:
+            # Find a similar task to get time/category pattern
+            similar_task = next(
+                (t for t in recent_tasks if t.get("title", "").strip().lower() == goal_suggestion["title"].lower()),
+                None
+            )
+            # Get category ID from similar task
+            category_id = None
+            if similar_task:
+                category_id = similar_task.get("category_id")
+                if not category_id and similar_task.get("category"):
+                    category_label = similar_task.get("category").lower()
+                    category_id = category_label_to_id.get(category_label)
+            
+            suggestions.append({
+                "title": goal_suggestion["title"],
+                "time": similar_task.get("time") if similar_task else None,
+                "category": category_id,
+                "goal_id": goal_suggestion["goal_id"],
+                "goal_title": goal_suggestion["goal_title"],
+                "priority": "goal"
+            })
+    
+    # Limit to requested number
+    return {"suggestions": suggestions[:limit]}
 
 # Meta Endpoints
 

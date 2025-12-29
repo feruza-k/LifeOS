@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ValueType } from "./ValueTag";
 import { Task } from "./TaskItem";
 import { cn } from "@/lib/utils";
-import { X, Calendar, Clock, Tag, Repeat, CalendarDays, Calendar as CalendarIcon, AlertTriangle } from "lucide-react";
+import { X, Calendar, Clock, Tag, Repeat, CalendarDays, Calendar as CalendarIcon, AlertTriangle, Sparkles } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, parseISO, isToday, isTomorrow } from "date-fns";
@@ -12,6 +12,7 @@ import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { TimePicker } from "./TimePicker";
 import { toast } from "sonner";
 import { i18n } from "@/utils/i18n";
+import { api } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +82,61 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
     suggestedAlternative: { time: string; datetime?: string } | null;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{
+    title: string;
+    time?: string;
+    category?: string;
+    priority?: string;
+  }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  
+  // Load task suggestions when modal opens
+  useEffect(() => {
+    if (isOpen && !task) {
+      loadSuggestions();
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [isOpen, task]);
+  
+  const loadSuggestions = async () => {
+    try {
+      setIsLoadingSuggestions(true);
+      const response = await api.getTaskSuggestions(6);
+      if (response?.suggestions) {
+        setSuggestions(response.suggestions);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error("Failed to load task suggestions:", error);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+  
+  const handleSelectSuggestion = (suggestion: typeof suggestions[0]) => {
+    setTitle(suggestion.title);
+    if (suggestion.time) {
+      setStartTime(suggestion.time);
+      setIsScheduled(true);
+      // Calculate end time (default 1 hour)
+      const [hours, minutes] = suggestion.time.split(":").map(Number);
+      const totalMinutes = hours * 60 + minutes + 60;
+      const endHours = Math.floor(totalMinutes / 60) % 24;
+      const endMins = totalMinutes % 60;
+      setEndTime(`${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`);
+    }
+    if (suggestion.category) {
+      // Find category by ID
+      const categoryMatch = categories.find(c => c.value === suggestion.category);
+      if (categoryMatch) {
+        setCategory(categoryMatch.value);
+      }
+    }
+    setShowSuggestions(false);
+  };
   
   // Load task data when editing or when modal opens
   useEffect(() => {
@@ -335,19 +391,83 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
         <div className="min-h-[280px] max-h-[320px] overflow-y-auto">
           <form onSubmit={(e) => { e.preventDefault(); handleSubmit(e); }} className="p-4 space-y-4">
           {/* Title Input - Dominant */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What do you want to accomplish?"
-            className="text-lg font-sans font-medium py-4 w-full rounded-md border border-input bg-background px-3 text-base text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (title.trim()) handleSubmit(e);
-              }
-            }}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setShowSuggestions(e.target.value.length === 0 && suggestions.length > 0);
+              }}
+              onFocus={() => {
+                if (suggestions.length > 0 && !title.trim()) {
+                  setShowSuggestions(true);
+                }
+              }}
+              placeholder="What do you want to accomplish?"
+              className="text-lg font-sans font-medium py-4 w-full rounded-md border border-input bg-background px-3 text-base text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (title.trim()) handleSubmit(e);
+                } else if (e.key === "Escape") {
+                  setShowSuggestions(false);
+                }
+              }}
+            />
+            
+            {/* Task Suggestions */}
+            {showSuggestions && suggestions.length > 0 && !title.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                <div className="p-2">
+                  <div className="flex items-center gap-2 px-2 py-1.5 mb-1">
+                    <Sparkles className="w-3 h-3 text-primary" />
+                    <span className="text-xs font-sans font-medium text-muted-foreground">Suggestions</span>
+                  </div>
+                  <div className="space-y-1">
+                    {suggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-muted transition-colors flex items-center justify-between group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-sans font-medium text-foreground truncate">
+                            {suggestion.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {suggestion.time && (
+                              <span className="text-xs text-muted-foreground font-sans">
+                                {suggestion.time}
+                              </span>
+                            )}
+                            {suggestion.category && (() => {
+                              const cat = categories.find(c => c.value === suggestion.category);
+                              return cat ? (
+                                <span 
+                                  className="text-xs font-sans px-1.5 py-0.5 rounded"
+                                  style={{ 
+                                    backgroundColor: `${cat.color}20`,
+                                    color: cat.color
+                                  }}
+                                >
+                                  {cat.label}
+                                </span>
+                              ) : null;
+                            })()}
+                            {suggestion.priority === "goal" && (
+                              <span className="text-xs text-primary font-sans">Goal</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Quick Action Row - Icon Buttons */}
           <div className="flex items-center gap-2">
@@ -488,20 +608,14 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
                     const selectedCategory = categories.find(c => c.value === category);
                     const categoryColor = selectedCategory?.color;
                     return (
-                      <>
-                        <Tag 
-                          className="w-4 h-4" 
-                          style={{ 
-                            color: categoryColor || "currentColor"
-                          }} 
-                        />
-                        {categoryColor && (
-                          <div 
-                            className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card"
-                            style={{ backgroundColor: categoryColor }}
-                          />
-                        )}
-                      </>
+                      <Tag 
+                        className="w-5 h-5" 
+                        style={{ 
+                          color: categoryColor || "currentColor",
+                          fill: categoryColor || "currentColor",
+                          opacity: 1
+                        }} 
+                      />
                     );
                   })()}
                 </button>
