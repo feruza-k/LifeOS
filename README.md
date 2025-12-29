@@ -35,6 +35,7 @@
   - [Day 26: Deployment & Production Setup](#day-26-deployment--production-setup-dec-26-2025)
   - [Day 27: Cross-Browser Stability & Explore Page](#day-27-cross-browser-stability--explore-page-dec-27-2025)
   - [Day 28: Goal-Aware Intelligence & Voice Input](#day-28-goal-aware-intelligence--voice-input-dec-28-2025)
+  - [Day 29: Smart Task Suggestions & Explore Page Refinements](#day-29-smart-task-suggestions--explore-page-refinements-dec-29-2025)
 - [Next Steps](#next-steps)
 
 
@@ -1852,9 +1853,28 @@ The goal system is subtle and helpful - it recognizes your work, celebrates prog
 
 ---
 
+### **Day 29**: Smart Task Suggestions & Explore Page Refinements (Dec 29, 2025)
+
+Added intelligent task suggestions to the New Task modal and refined the Explore page visualizations.
+
+#### **Smart Task Suggestions**
+
+SolAI now suggests up to 6 tasks when you open the New Task modal. The system analyzes frequently scheduled tasks from the last 30 days and goal-related tasks, then auto-fills title, time, and category when you select one. The `/tasks/suggestions` endpoint uses pattern analysis to identify your most common task patterns and their typical scheduling times.
+
+#### **Explore Page Enhancements**
+
+- **Category Balance**: Redesigned pie chart with gap segments and better visual hierarchy. Balance score displayed in center.
+- **Productivity Insights**: Merged Consistency metrics into this section. Check-in frequency now appears with a progress bar between "Most productive day" and "Overall completion".
+- **Weekly Reflection**: Reflection text centered next to photos, rotates every 5 seconds with highlights from the week.
+
+#### **Technical Details**
+
+- Created `/tasks/suggestions` endpoint for task frequency and goal relationship analysis
+- Enhanced category balance calculation to handle multiple category field formats
+- Improved pie chart SVG rendering with gap segments
+
+---
+
 ## **Next Steps:**
 
-- **Habit Reinforcement**: Build a dedicated module for tracking recurring tasks and their impact on weekly energy.
-- **Goal-Task Alignment**: Create a tighter feedback loop where monthly goals directly influence the priority of daily task suggestions.
-- **Deep Reflection**: Complete the full "Review this week" flow with detailed, long-form AI narrative summaries.
-- **Performance Polish**: Optimize the loading states for the SVG charts and carousel transitions for a "native-app" feel.
+Continue refining Explore page features and comprehensive testing. Then build habit reinforcement tracking and complete the "Review this week" flow with detailed AI narrative summaries.

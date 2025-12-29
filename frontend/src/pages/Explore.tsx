@@ -940,41 +940,20 @@ const Explore = () => {
                   </div>
                 )}
               </div>
-              {/* Reflection Note - top right, rotates with photo */}
-              <div className="flex flex-col">
-                <div className="flex-1 flex flex-col items-center justify-center text-center">
-                  {weeklyPhotos[currentPhotoIndex]?.note ? (
-                    <div className="w-full">
-                      <p className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        Your highlight reflection:
-                      </p>
-                      <p className="text-sm text-foreground font-sans italic leading-relaxed">
-                        {displayedNote}
-                        {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
-                          <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
-                        )}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="w-full">
-                      <p className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        Your highlight reflection:
-                      </p>
-                      <p className="text-sm text-muted-foreground font-sans italic leading-relaxed">
-                        No reflection for this moment
-                      </p>
-                    </div>
-                  )}
-                  {/* Weekly Summary - Right after reflection, still on the right */}
-                  {weeklySummary && (
-                    <div className="mt-3">
-                      <p className="text-xs text-foreground font-sans leading-relaxed">
-                        {weeklySummary.split(' ').slice(0, 20).join(' ')}
-                        {weeklySummary.split(' ').length > 20 && '...'}
-                      </p>
-                    </div>
-                  )}
-                </div>
+              {/* Reflection Note - centered, rotates with photo */}
+              <div className="relative aspect-square flex items-center justify-center">
+                {weeklyPhotos[currentPhotoIndex]?.note ? (
+                  <p className="text-sm text-foreground font-sans italic leading-relaxed text-center px-2">
+                    {displayedNote}
+                    {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
+                      <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground font-sans italic leading-relaxed text-center px-2">
+                    No reflection for this moment
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1048,101 +1027,70 @@ const Explore = () => {
                 </div>
             
             {/* Pie Chart Visualization */}
-            <div className="mb-4 flex items-center justify-center">
-              <svg width="160" height="160" viewBox="0 0 160 160" className="transform -rotate-90">
-                {(() => {
-                  const entries = Object.entries(analyticsData.category_balance.distribution)
-                    .sort((a, b) => b[1] - a[1]);
-                  const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
-                  let currentAngle = 0;
-                  const radius = 70;
-                  const centerX = 80;
-                  const centerY = 80;
-                  
-                  return entries.map(([categoryId, count], index) => {
-                    const categoryInfo = store.categories.find(c => c.id === categoryId);
-                    const percentage = (count / total) * 100;
-                    const angle = (percentage / 100) * 360;
-                    const startAngle = currentAngle;
-                    const endAngle = currentAngle + angle;
-                    currentAngle = endAngle;
+            <div className="mb-6 flex items-center justify-center">
+              <div className="relative">
+                <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+                  {(() => {
+                    const entries = Object.entries(analyticsData.category_balance.distribution)
+                      .sort((a, b) => b[1] - a[1]);
+                    const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
+                    let currentAngle = 0;
+                    const radius = 85;
+                    const centerX = 100;
+                    const centerY = 100;
+                    const gap = 2; // Gap between segments in degrees
                     
-                    // Calculate arc path
-                    const startRad = (startAngle * Math.PI) / 180;
-                    const endRad = (endAngle * Math.PI) / 180;
-                    const x1 = centerX + radius * Math.cos(startRad);
-                    const y1 = centerY + radius * Math.sin(startRad);
-                    const x2 = centerX + radius * Math.cos(endRad);
-                    const y2 = centerY + radius * Math.sin(endRad);
-                    const largeArcFlag = angle > 180 ? 1 : 0;
-                    
-                    const pathData = [
-                      `M ${centerX} ${centerY}`,
-                      `L ${x1} ${y1}`,
-                      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-                      'Z'
-                    ].join(' ');
-                    
-                    return (
-                      <path
-                        key={categoryId}
-                        d={pathData}
-                        fill={categoryInfo?.color || "hsl(var(--primary))"}
-                        stroke="hsl(var(--background))"
-                        strokeWidth="2"
-                        opacity={0.9}
-                      />
-                    );
-                  });
-                })()}
-                {/* Center circle for balance score */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="45"
-                  fill="hsl(var(--background))"
-                />
-                <text
-                  x="80"
-                  y="75"
-                  textAnchor="middle"
-                  className="text-lg font-sans font-bold fill-foreground"
-                >
-                  {Math.round(analyticsData.category_balance.score * 100)}%
-                </text>
-                <text
-                  x="80"
-                  y="90"
-                  textAnchor="middle"
-                  className="text-[10px] font-sans fill-muted-foreground"
-                >
-                  Balance
-                </text>
-              </svg>
-              </div>
-              
-            {/* Balance Score Bar */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between text-xs text-muted-foreground font-sans mb-1">
-                <span>Balance Score</span>
-                <span>{Math.round(analyticsData.category_balance.score * 100)}%</span>
-                </div>
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    analyticsData.category_balance.status === "balanced" 
-                      ? "bg-primary" 
-                      : analyticsData.category_balance.status === "imbalanced"
-                      ? "bg-amber-500"
-                      : "bg-primary"
-                  }`}
-                  style={{ width: `${analyticsData.category_balance.score * 100}%` }}
-                  />
+                    return entries.map(([categoryId, count], index) => {
+                      const categoryInfo = store.categories.find(c => c.id === categoryId);
+                      const percentage = (count / total) * 100;
+                      const angle = (percentage / 100) * 360;
+                      const startAngle = currentAngle + (gap / 2);
+                      const endAngle = currentAngle + angle - (gap / 2);
+                      currentAngle += angle;
+                      
+                      // Calculate arc path
+                      const startRad = (startAngle * Math.PI) / 180;
+                      const endRad = (endAngle * Math.PI) / 180;
+                      const x1 = centerX + radius * Math.cos(startRad);
+                      const y1 = centerY + radius * Math.sin(startRad);
+                      const x2 = centerX + radius * Math.cos(endRad);
+                      const y2 = centerY + radius * Math.sin(endRad);
+                      const largeArcFlag = angle > 180 ? 1 : 0;
+                      
+                      const pathData = [
+                        `M ${centerX} ${centerY}`,
+                        `L ${x1} ${y1}`,
+                        `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+                        'Z'
+                      ].join(' ');
+                      
+                      return (
+                        <path
+                          key={categoryId}
+                          d={pathData}
+                          fill={categoryInfo?.color || "hsl(var(--primary))"}
+                          stroke="hsl(var(--background))"
+                          strokeWidth="3"
+                          className="transition-all duration-300 hover:opacity-80"
+                        />
+                      );
+                    });
+                  })()}
+                </svg>
+                {/* Center content */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-2xl font-sans font-bold text-foreground">
+                    {Math.round(analyticsData.category_balance.score * 100)}%
+                  </span>
+                  <span className="text-xs font-sans text-muted-foreground mt-0.5">
+                    Balance
+                  </span>
                 </div>
               </div>
+            </div>
             
             {/* Category Distribution List */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               {Object.entries(analyticsData.category_balance.distribution)
                 .sort((a, b) => b[1] - a[1])
                 .map(([categoryId, count]) => {
@@ -1151,25 +1099,25 @@ const Explore = () => {
                   const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
                   const percentage = (count / total) * 100;
                   return (
-                    <div key={categoryId} className="flex items-center gap-3">
-                      <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: categoryInfo?.color || "hsl(var(--primary))" }}
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-foreground font-sans">{label}</span>
-                          <span className="text-xs text-muted-foreground font-sans">{count} ({Math.round(percentage)}%)</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ 
-                              width: `${percentage}%`,
-                              backgroundColor: categoryInfo?.color || "hsl(var(--primary))"
-                            }}
+                    <div key={categoryId} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
+                            style={{ backgroundColor: categoryInfo?.color || "hsl(var(--primary))" }}
                           />
+                          <span className="text-sm text-foreground font-sans font-medium">{label}</span>
                         </div>
+                        <span className="text-xs text-muted-foreground font-sans">{Math.round(percentage)}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500 shadow-sm"
+                          style={{ 
+                            width: `${percentage}%`,
+                            backgroundColor: categoryInfo?.color || "hsl(var(--primary))"
+                          }}
+                        />
                       </div>
                     </div>
                   );
