@@ -2803,7 +2803,7 @@ async def align_summary(request: Request, current_user: dict = Depends(get_curre
     
     # Get categories for proper label mapping
     categories = await db_repo.get_categories(current_user["id"])
-    category_id_to_label = {str(cat.id): cat.label for cat in categories if cat.id}
+    category_id_to_label = {cat["id"]: cat["label"] for cat in categories if cat.get("id")}
     
     # Generate patterns & insights (max 3, real only)
     patterns = []
