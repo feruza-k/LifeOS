@@ -2801,23 +2801,42 @@ async def align_summary(request: Request, current_user: dict = Depends(get_curre
     else:
         direction_narrative = "Building patterns as you use LifeOS more. Set a monthly focus to begin aligning your actions."
     
+    # Get categories for proper label mapping
+    categories = await db_repo.get_categories(current_user["id"])
+    category_id_to_label = {str(cat.id): cat.label for cat in categories if cat.id}
+    
     # Generate patterns & insights (max 3, real only)
     patterns = []
     if task_patterns.get("preferred_times"):
         times = task_patterns["preferred_times"][:2]
-        if times:
-            time_str = " and ".join(times)
-            patterns.append(f"Peak focus window: {time_str}")
+        if times and len(times) > 0:
+            # Filter out invalid times and format properly
+            valid_times = [t for t in times if t and ":" in t]
+            if valid_times:
+                time_str = " and ".join(valid_times)
+                patterns.append(f"Peak focus window: {time_str}")
     
     if task_patterns.get("category_usage"):
-        top_category = max(task_patterns["category_usage"].items(), key=lambda x: x[1], default=None)
-        if top_category:
-            category_label = top_category[0].capitalize()
-            patterns.append(f"Most active area: {category_label}")
+        # Filter out "uncategorized" and map category IDs to labels
+        category_usage = task_patterns["category_usage"]
+        # Remove uncategorized and None values
+        filtered_usage = {k: v for k, v in category_usage.items() if k and k.lower() != "uncategorized" and k.lower() != "none"}
+        
+        if filtered_usage:
+            top_category = max(filtered_usage.items(), key=lambda x: x[1], default=None)
+            if top_category and top_category[1] > 0:
+                category_key = top_category[0]
+                # Try to map category ID to label, or use the key if it's already a label
+                category_label = category_id_to_label.get(category_key, category_key)
+                # Capitalize properly (handle multi-word labels)
+                if category_label:
+                    category_label = category_label.title()
+                    patterns.append(f"Most active area: {category_label}")
     
     if checkin_patterns.get("average_completion", 0) > 0:
         completion = checkin_patterns["average_completion"]
-        if completion >= 0.7:
+        # Only show if completion is meaningful (at least 0.5 or higher)
+        if completion >= 0.5:
             patterns.append(f"Strong daily completion: {completion:.0%}")
     
     # Progress snapshot (minimal) - use check-in data if available

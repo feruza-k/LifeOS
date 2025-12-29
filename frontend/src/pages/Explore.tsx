@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, ChevronLeft, ChevronRight } from "lucide-react";
+import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, Edit2, Image as ImageIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
@@ -119,8 +119,13 @@ const Explore = () => {
   const [loading, setLoading] = useState(true);
   const [showSetFocus, setShowSetFocus] = useState(false);
   const [currentGoalIndex, setCurrentGoalIndex] = useState(0);
+  const [trendView, setTrendView] = useState<"weekly" | "monthly">("weekly");
+  const [weeklyPhotos, setWeeklyPhotos] = useState<Array<{ date: string; filename: string; url: string }>>([]);
+  const [weeklyReflection, setWeeklyReflection] = useState<string>("");
   const carouselRef = useRef<HTMLDivElement>(null);
   const autoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const photoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
@@ -224,6 +229,9 @@ const Explore = () => {
       ]);
       setAlignData(summary);
       setAnalyticsData(analytics);
+      
+      // Load weekly photos and reflections
+      await loadWeeklyPhotosAndReflections();
     } catch (error) {
       console.error("Failed to load align data:", error);
       toast.error("Failed to load alignment data");
@@ -231,6 +239,76 @@ const Explore = () => {
       setLoading(false);
     }
   };
+
+  const loadWeeklyPhotosAndReflections = async () => {
+    try {
+      // Get dates for this week
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const photos: Array<{ date: string; filename: string; url: string }> = [];
+      const reflections: string[] = [];
+      
+      // Load notes for each day of the week
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
+        const dateStr = format(date, "yyyy-MM-dd");
+        
+        try {
+          const note = await api.getNote(dateStr);
+          if (note) {
+            // Check for photo
+            if (note.photo && note.photo.filename) {
+              photos.push({
+                date: dateStr,
+                filename: note.photo.filename,
+                url: `${import.meta.env.VITE_API_URL || 'https://api.mylifeos.dev'}/photos/${note.photo.filename}`
+              });
+            }
+            // Collect reflection text
+            if (note.content && note.content.trim()) {
+              reflections.push(note.content.trim());
+            }
+          }
+        } catch (error) {
+          // Note doesn't exist for this day, skip
+        }
+      }
+      
+      setWeeklyPhotos(photos);
+      
+      // Generate AI summary of reflections if we have any
+      if (reflections.length > 0) {
+        // For now, just show a simple summary
+        // TODO: Could use AI to generate a more sophisticated summary
+        const totalReflections = reflections.length;
+        const totalWords = reflections.join(" ").split(/\s+/).length;
+        setWeeklyReflection(`You reflected ${totalReflections} day${totalReflections !== 1 ? "s" : ""} this week. ${totalWords > 50 ? "Your reflections show thoughtful engagement with your daily experiences." : ""}`);
+      } else {
+        setWeeklyReflection("");
+      }
+    } catch (error) {
+      console.error("Failed to load weekly photos and reflections:", error);
+    }
+  };
+
+  // Auto-rotate photos if there are multiple
+  useEffect(() => {
+    if (weeklyPhotos.length > 1) {
+      photoRotateTimerRef.current = setInterval(() => {
+        setCurrentPhotoIndex((prev) => (prev + 1) % weeklyPhotos.length);
+      }, 5000);
+      
+      return () => {
+        if (photoRotateTimerRef.current) {
+          clearInterval(photoRotateTimerRef.current);
+        }
+      };
+    }
+  }, [weeklyPhotos.length]);
 
   const handleSetFocus = async (goals: Array<{ title: string; description?: string }>) => {
     try {
@@ -347,141 +425,183 @@ const Explore = () => {
         </p>
       </header>
 
-      {/* Main direction narrative from SolAI */}
-      <div className="px-4 py-3 animate-slide-up">
-        <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-primary" />
+      {/* Suggestions from SolAI - MOVED TO TOP */}
+      {alignData.nudge && (
+        <div className="px-4 py-3 animate-slide-up">
+          <div className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-sans font-semibold text-foreground mb-1">Suggestion</h4>
+                <p className="text-sm text-foreground font-sans leading-relaxed mb-3">
+                  {alignData.nudge.message}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/week")}
+                    className="flex-1 text-sm font-sans"
+                  >
+                    Review Week
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 text-sm font-sans"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="flex-1">
-              <h3 className="font-sans font-semibold text-foreground mb-2">Direction</h3>
-              <p className="text-sm text-foreground font-sans leading-relaxed">
-                {alignData.direction.narrative}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/week")}
-              className="w-full text-sm font-sans"
-            >
-              Review this week
-            </Button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Analytics: Completion Rate Trends - MOVED TO TOP */}
-      {analyticsData && analyticsData.weekly_trends.length > 0 && (
+      {/* Analytics: Completion Rate Trends */}
+      {analyticsData && ((trendView === "weekly" && analyticsData.weekly_trends.length > 0) || (trendView === "monthly" && analyticsData.monthly_trends.length > 0)) && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.05s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Completion Trends
-              </h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                  Completion Trends
+                </h3>
+              </div>
+              {/* Toggle between weekly and monthly */}
+              {analyticsData.monthly_trends.length > 0 && (
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                  <button
+                    onClick={() => setTrendView("weekly")}
+                    className={`px-2 py-1 text-xs font-sans rounded transition-colors ${
+                      trendView === "weekly"
+                        ? "bg-background text-foreground font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setTrendView("monthly")}
+                    className={`px-2 py-1 text-xs font-sans rounded transition-colors ${
+                      trendView === "monthly"
+                        ? "bg-background text-foreground font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              )}
             </div>
             {/* Line Chart Visualization */}
-            <div className="relative h-32 mb-4">
-              <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
-                {/* Grid lines */}
-                <defs>
-                  <linearGradient id="completionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="rgb(var(--primary))" stopOpacity="0.3" />
-                    <stop offset="100%" stopColor="rgb(var(--primary))" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {[0, 25, 50, 75, 100].map((y) => (
-                  <line
-                    key={y}
-                    x1="0"
-                    y1={100 - y}
-                    x2="300"
-                    y2={100 - y}
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeWidth="0.5"
-                    strokeOpacity="0.2"
-                  />
-                ))}
-                {/* Area under curve */}
-                <path
-                  d={(() => {
-                    const points = analyticsData.weekly_trends.slice(-4);
-                    const maxValue = Math.max(...points.map(w => w.completion_rate), 1);
-                    const width = 300;
-                    const height = 100;
-                    const step = width / (points.length - 1 || 1);
-                    
-                    let path = `M 0 ${height}`;
-                    points.forEach((week, index) => {
-                      const x = index * step;
-                      const y = height - (week.completion_rate / maxValue) * height;
-                      path += index === 0 ? ` L ${x} ${y}` : ` L ${x} ${y}`;
-                    });
-                    path += ` L ${width} ${height} Z`;
-                    return path;
-                  })()}
-                  fill="url(#completionGradient)"
-                />
-                {/* Line */}
-                <polyline
-                  points={analyticsData.weekly_trends.slice(-4).map((week, index) => {
-                    const maxValue = Math.max(...analyticsData.weekly_trends.slice(-4).map(w => w.completion_rate), 1);
-                    const width = 300;
-                    const height = 100;
-                    const step = width / (analyticsData.weekly_trends.slice(-4).length - 1 || 1);
-                    const x = index * step;
-                    const y = height - (week.completion_rate / maxValue) * height;
-                    return `${x},${y}`;
-                  }).join(' ')}
-                  fill="none"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                {/* Data points */}
-                {analyticsData.weekly_trends.slice(-4).map((week, index) => {
-                  const maxValue = Math.max(...analyticsData.weekly_trends.slice(-4).map(w => w.completion_rate), 1);
-                  const width = 300;
-                  const height = 100;
-                  const step = width / (analyticsData.weekly_trends.slice(-4).length - 1 || 1);
-                  const x = index * step;
-                  const y = height - (week.completion_rate / maxValue) * height;
-                  return (
-                    <circle
-                      key={index}
-                      cx={x}
-                      cy={y}
-                      r="3.5"
-                      fill="hsl(var(--primary))"
-                      stroke="hsl(var(--background))"
-                      strokeWidth="2"
-                    />
-                  );
-                })}
-              </svg>
-            </div>
-            {/* Week labels and values */}
-            <div className="flex justify-between items-end text-xs">
-              {analyticsData.weekly_trends.slice(-4).map((week, index) => {
-                const weekStart = parseISO(week.week_start);
-                const completionRate = Math.round(week.completion_rate * 100);
-                return (
-                  <div key={index} className="flex flex-col items-center gap-1">
-                    <span className="text-muted-foreground font-sans">
-                      {format(weekStart, "MMM d")}
-                    </span>
-                    <span className="font-sans font-medium text-foreground">
-                      {completionRate}%
-                    </span>
+            {(() => {
+              const trends = trendView === "weekly" 
+                ? analyticsData.weekly_trends.slice(-4)
+                : analyticsData.monthly_trends.slice(-6);
+              const maxValue = Math.max(...trends.map(t => t.completion_rate), 1);
+              const width = 300;
+              const height = 100;
+              const step = trends.length > 1 ? width / (trends.length - 1) : width;
+              
+              return (
+                <>
+                  <div className="relative h-32 mb-4">
+                    <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
+                      {/* Grid lines */}
+                      <defs>
+                        <linearGradient id="completionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="rgb(var(--primary))" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="rgb(var(--primary))" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      {[0, 25, 50, 75, 100].map((y) => (
+                        <line
+                          key={y}
+                          x1="0"
+                          y1={100 - y}
+                          x2="300"
+                          y2={100 - y}
+                          stroke="hsl(var(--muted-foreground))"
+                          strokeWidth="0.5"
+                          strokeOpacity="0.2"
+                        />
+                      ))}
+                      {/* Area under curve */}
+                      <path
+                        d={(() => {
+                          let path = `M 0 ${height}`;
+                          trends.forEach((point, index) => {
+                            const x = index * step;
+                            const y = height - (point.completion_rate / maxValue) * height;
+                            path += index === 0 ? ` L ${x} ${y}` : ` L ${x} ${y}`;
+                          });
+                          path += ` L ${width} ${height} Z`;
+                          return path;
+                        })()}
+                        fill="url(#completionGradient)"
+                      />
+                      {/* Line */}
+                      <polyline
+                        points={trends.map((point, index) => {
+                          const x = index * step;
+                          const y = height - (point.completion_rate / maxValue) * height;
+                          return `${x},${y}`;
+                        }).join(' ')}
+                        fill="none"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {/* Data points */}
+                      {trends.map((point, index) => {
+                        const x = index * step;
+                        const y = height - (point.completion_rate / maxValue) * height;
+                        return (
+                          <circle
+                            key={index}
+                            cx={x}
+                            cy={y}
+                            r="3.5"
+                            fill="hsl(var(--primary))"
+                            stroke="hsl(var(--background))"
+                            strokeWidth="2"
+                          />
+                        );
+                      })}
+                    </svg>
                   </div>
-                );
-              })}
-            </div>
+                  {/* Labels and values */}
+                  <div className="flex justify-between items-end text-xs">
+                    {trends.map((point, index) => {
+                      const dateStr = trendView === "weekly" ? point.week_start : point.month;
+                      const date = trendView === "weekly" 
+                        ? parseISO(dateStr)
+                        : parseISO(`${dateStr}-01`);
+                      const completionRate = Math.round(point.completion_rate * 100);
+                      const label = trendView === "weekly"
+                        ? format(date, "MMM d")
+                        : format(date, "MMM");
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-1">
+                          <span className="text-muted-foreground font-sans">
+                            {label}
+                          </span>
+                          <span className="font-sans font-medium text-foreground">
+                            {completionRate}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -490,11 +610,20 @@ const Explore = () => {
       {goals.length > 0 ? (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
           <div className="relative p-5 bg-card rounded-2xl shadow-soft border border-border/50 overflow-hidden">
-            <div className="flex items-center gap-2 mb-3">
-              <Layers className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Focus {goals.length > 1 && `(${currentGoalIndex + 1}/${goals.length})`}
-              </h3>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                  Focus {goals.length > 1 && `(${currentGoalIndex + 1}/${goals.length})`}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowSetFocus(true)}
+                className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                aria-label="Edit focus"
+              >
+                <Edit2 className="w-4 h-4 text-muted-foreground" />
+              </button>
             </div>
             
             {/* Carousel Container */}
@@ -544,14 +673,14 @@ const Explore = () => {
               </div>
             </div>
 
-            {/* Navigation Controls */}
+            {/* Navigation Controls - Only dots, no arrows */}
             {goals.length > 1 && (
-              <>
-                {/* Previous/Next Buttons */}
-                <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center justify-center gap-1.5 mt-4">
+                {goals.map((_, index) => (
                   <button
+                    key={index}
                     onClick={() => {
-                      setCurrentGoalIndex((prev) => (prev - 1 + goals.length) % goals.length);
+                      setCurrentGoalIndex(index);
                       if (autoRotateTimerRef.current) {
                         clearInterval(autoRotateTimerRef.current);
                       }
@@ -559,63 +688,16 @@ const Explore = () => {
                         setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
                       }, 5000);
                     }}
-                    className="p-2 rounded-full hover:bg-muted transition-colors"
-                    aria-label="Previous goal"
-                  >
-                    <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-                  </button>
-
-                  {/* Dots Indicator */}
-                  <div className="flex gap-1.5">
-                    {goals.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          setCurrentGoalIndex(index);
-                          if (autoRotateTimerRef.current) {
-                            clearInterval(autoRotateTimerRef.current);
-                          }
-                          autoRotateTimerRef.current = setInterval(() => {
-                            setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
-                          }, 5000);
-                        }}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          index === currentGoalIndex
-                            ? "w-6 bg-primary"
-                            : "w-1.5 bg-muted-foreground/30"
-                        }`}
-                        aria-label={`Go to goal ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
-                      if (autoRotateTimerRef.current) {
-                        clearInterval(autoRotateTimerRef.current);
-                      }
-                      autoRotateTimerRef.current = setInterval(() => {
-                        setCurrentGoalIndex((prev) => (prev + 1) % goals.length);
-                      }, 5000);
-                    }}
-                    className="p-2 rounded-full hover:bg-muted transition-colors"
-                    aria-label="Next goal"
-                  >
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                </div>
-              </>
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      index === currentGoalIndex
+                        ? "w-6 bg-primary"
+                        : "w-1.5 bg-muted-foreground/30"
+                    }`}
+                    aria-label={`Go to goal ${index + 1}`}
+                  />
+                ))}
+              </div>
             )}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSetFocus(true)}
-              className="mt-3 text-xs font-sans text-muted-foreground w-full"
-            >
-              {goals.length > 0 ? "Update focus" : "Set focus"}
-            </Button>
           </div>
         </div>
       ) : (
@@ -709,78 +791,81 @@ const Explore = () => {
         </div>
       </div>
 
-      {/* Analytics: Week-over-Week Comparison */}
-      {analyticsData && analyticsData.week_comparison.has_comparison && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
+      {/* Analytics: Consistency Metrics */}
+      {analyticsData && analyticsData.consistency.days_with_checkins > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-4 h-4 text-primary" />
+              <Calendar className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                This Week vs Last Week
+                Consistency
               </h3>
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground font-sans">Tasks planned</span>
-                <div className="flex items-center gap-2">
-                  {analyticsData.week_comparison.tasks_delta !== 0 && (
-                    analyticsData.week_comparison.tasks_delta > 0 ? (
-                      <ArrowUp className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <ArrowDown className="w-4 h-4 text-muted-foreground" />
-                    )
-                  )}
-                  <span className="text-sm font-sans font-medium text-foreground">
-                    {analyticsData.week_comparison.tasks_delta > 0 ? "+" : ""}
-                    {analyticsData.week_comparison.tasks_delta}
-                  </span>
-                </div>
+                <span className="text-sm text-foreground font-sans">Check-in frequency</span>
+                <span className="text-sm font-sans font-medium text-foreground">
+                  {Math.round(analyticsData.consistency.consistency_rate * 100)}%
+                </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground font-sans">Completion rate</span>
-                <div className="flex items-center gap-2">
-                  {analyticsData.week_comparison.completion_delta !== 0 && (
-                    analyticsData.week_comparison.completion_delta > 0 ? (
-                      <ArrowUp className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <ArrowDown className="w-4 h-4 text-muted-foreground" />
-                    )
-                  )}
-                  <span className="text-sm font-sans font-medium text-foreground">
-                    {analyticsData.week_comparison.completion_delta > 0 ? "+" : ""}
-                    {analyticsData.week_comparison.completion_delta_percentage.toFixed(1)}%
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{ width: `${analyticsData.consistency.consistency_rate * 100}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground font-sans">
+                <span>{analyticsData.consistency.days_with_checkins} of {analyticsData.consistency.total_days} days</span>
+                {analyticsData.consistency.current_streak > 0 && (
+                  <span className="font-medium text-foreground">
+                    🔥 {analyticsData.consistency.current_streak} day streak
                   </span>
-                </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-
-      {/* Analytics: Consistency Metrics */}
-      {analyticsData && analyticsData.consistency.days_with_checkins > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.4s" }}>
+      {/* Weekly Photos & Reflections Widget */}
+      {weeklyPhotos.length > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-4 h-4 text-primary" />
+            <div className="flex items-center gap-2 mb-4">
+              <ImageIcon className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Consistency
+                This Week
               </h3>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground font-sans">Days with check-ins</span>
-                <span className="text-sm font-sans font-medium text-foreground">
-                  {analyticsData.consistency.days_with_checkins} of {analyticsData.consistency.total_days}
-                </span>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Photo Album */}
+              <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                {weeklyPhotos[currentPhotoIndex] && (
+                  <img
+                    src={weeklyPhotos[currentPhotoIndex].url}
+                    alt={`Photo from ${format(parseISO(weeklyPhotos[currentPhotoIndex].date), "MMM d")}`}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {weeklyPhotos.length > 1 && (
+                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                    {weeklyPhotos.map((_, index) => (
+                      <div
+                        key={index}
+                        className={`h-1 rounded-full transition-all ${
+                          index === currentPhotoIndex ? "w-4 bg-white" : "w-1 bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-              {analyticsData.consistency.current_streak > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground font-sans">Current streak</span>
-                  <span className="text-sm font-sans font-medium text-foreground">
-                    {analyticsData.consistency.current_streak} days
-                  </span>
+              {/* Reflection Summary */}
+              {weeklyReflection && (
+                <div className="flex flex-col justify-center">
+                  <p className="text-sm text-foreground font-sans leading-relaxed italic">
+                    {weeklyReflection}
+                  </p>
                 </div>
               )}
             </div>
@@ -857,42 +942,6 @@ const Explore = () => {
                     {analyticsData.month_comparison.completion_delta > 0 ? "+" : ""}
                     {analyticsData.month_comparison.completion_delta_percentage.toFixed(1)}%
                   </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Single suggestion from SolAI */}
-      {alignData.nudge && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
-          <div className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-sans font-semibold text-foreground mb-1">Suggestion</h4>
-                <p className="text-sm text-foreground font-sans leading-relaxed mb-3">
-                  {alignData.nudge.message}
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate("/week")}
-                    className="flex-1 text-sm font-sans"
-                  >
-                    Review Week
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex-1 text-sm font-sans"
-                  >
-                    Dismiss
-                  </Button>
                 </div>
               </div>
             </div>
