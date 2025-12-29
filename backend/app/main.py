@@ -3065,6 +3065,159 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
     monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
     monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
     
+    # Calculate category balance (current week)
+    category_balance = {}
+    balance_score = 0.0
+    if current_week_metrics:
+        week_categories = current_week_metrics.get("categories", {})
+        total_cat_tasks = sum(week_categories.values())
+        if total_cat_tasks > 0:
+            # Calculate balance score (0-1, where 1 is perfectly balanced)
+            # Use coefficient of variation (lower = more balanced)
+            category_counts = list(week_categories.values())
+            if len(category_counts) > 1:
+                mean_count = sum(category_counts) / len(category_counts)
+                variance = sum((x - mean_count) ** 2 for x in category_counts) / len(category_counts)
+                std_dev = variance ** 0.5
+                cv = std_dev / mean_count if mean_count > 0 else 1.0
+                balance_score = max(0, 1 - min(cv, 1.0))  # Invert CV, cap at 1
+            else:
+                balance_score = 0.5  # Only one category, not balanced
+            
+            category_balance = {
+                "distribution": week_categories,
+                "score": round(balance_score, 2),
+                "status": "balanced" if balance_score > 0.7 else "imbalanced" if balance_score < 0.4 else "moderate"
+            }
+    
+    # Get goal-task connections (from align_summary logic)
+    from app.ai.goal_engine import match_tasks_to_goals
+    completed_tasks = [t for t in all_tasks if t.get("completed", False)]
+    goal_matches = match_tasks_to_goals(monthly_goals, completed_tasks, days_back=30)
+    
+    # Build goal-task connections for display
+    goal_task_connections = []
+    for goal in monthly_goals:
+        goal_id = goal.get("id")
+        if goal_id and goal_id in goal_matches:
+            matches = goal_matches[goal_id]
+            recent_tasks = matches.get("matched_tasks", [])[:5]  # Top 5 recent tasks
+            goal_task_connections.append({
+                "goal_id": goal_id,
+                "goal_title": goal.get("title", ""),
+                "recent_tasks": [
+                    {
+                        "title": t.get("title", ""),
+                        "date": t.get("date", ""),
+                        "similarity": round(t.get("similarity", 0) * 100, 0)
+                    }
+                    for t in recent_tasks
+                ],
+                "total_matches": matches.get("total_matches", 0)
+            })
+    
+    # Calculate productivity insights (best day/time)
+    from app.ai.pattern_analyzer import analyze_task_patterns
+    task_patterns = analyze_task_patterns(all_tasks, days_back=30)
+    productivity_insights = {
+        "best_times": task_patterns.get("preferred_times", [])[:3],
+        "best_day": None,  # Will calculate from check-ins
+        "completion_rate": task_patterns.get("completion_rate", 0)
+    }
+    
+    # Calculate best day of week from check-ins
+    if checkins:
+        day_completion = defaultdict(lambda: {"completed": 0, "total": 0})
+        for checkin in checkins:
+            checkin_date_str = checkin.get("date")
+            if checkin_date_str:
+                try:
+                    checkin_date = date.fromisoformat(checkin_date_str[:10])
+                    day_name = checkin_date.strftime("%A")
+                    completed = len(checkin.get("completedTaskIds", []))
+                    incomplete = len(checkin.get("incompleteTaskIds", []))
+                    day_completion[day_name]["completed"] += completed
+                    day_completion[day_name]["total"] += (completed + incomplete)
+                except:
+                    pass
+        
+        if day_completion:
+            best_day = max(day_completion.items(), key=lambda x: x[1]["completed"] / x[1]["total"] if x[1]["total"] > 0 else 0)
+            productivity_insights["best_day"] = {
+                "day": best_day[0],
+                "completion_rate": round(best_day[1]["completed"] / best_day[1]["total"], 2) if best_day[1]["total"] > 0 else 0
+            }
+    
+    # Get upcoming week preview (next Monday to Sunday)
+    # Calculate days until next Monday (0 = Monday, 6 = Sunday)
+    days_until_monday = (7 - today.weekday()) % 7
+    if days_until_monday == 0:
+        days_until_monday = 7  # If today is Monday, show next week
+    next_week_start = today.date() + timedelta(days=days_until_monday)
+    next_week_end = next_week_start + timedelta(days=6)
+    upcoming_tasks = [
+        t for t in all_tasks
+        if t.get("date") and date.fromisoformat(t["date"][:10]) >= next_week_start
+        and date.fromisoformat(t["date"][:10]) <= next_week_end
+    ]
+    
+    # Calculate upcoming week load
+    upcoming_load_by_day = defaultdict(int)
+    for task in upcoming_tasks:
+        task_date_str = task.get("date", "")
+        if task_date_str:
+            try:
+                task_date = date.fromisoformat(task_date_str[:10])
+                day_name = task_date.strftime("%A")
+                upcoming_load_by_day[day_name] += 1
+            except:
+                pass
+    
+    upcoming_week_preview = {
+        "week_start": next_week_start.isoformat(),
+        "week_end": next_week_end.isoformat(),
+        "total_tasks": len(upcoming_tasks),
+        "load_by_day": dict(upcoming_load_by_day),
+        "heaviest_day": max(upcoming_load_by_day.items(), key=lambda x: x[1])[0] if upcoming_load_by_day else None
+    }
+    
+    # Generate quick actions based on insights
+    quick_actions = []
+    
+    # Action 1: Category balance
+    if category_balance and category_balance.get("status") == "imbalanced":
+        top_category = max(category_balance["distribution"].items(), key=lambda x: x[1])[0] if category_balance["distribution"] else None
+        if top_category:
+            quick_actions.append({
+                "type": "balance_category",
+                "label": f"Add more {top_category} tasks",
+                "message": f"Your week is heavy on {top_category}. Consider adding tasks from other categories.",
+                "action": "schedule_category"
+            })
+    
+    # Action 2: Neglected goals
+    for goal_conn in goal_task_connections:
+        if goal_conn["total_matches"] == 0:
+            quick_actions.append({
+                "type": "neglected_goal",
+                "label": f"Work on {goal_conn['goal_title']}",
+                "message": f"Your goal '{goal_conn['goal_title']}' needs attention.",
+                "action": "schedule_goal_task",
+                "goal_id": goal_conn["goal_id"]
+            })
+            break  # Only suggest one at a time
+    
+    # Action 3: Energy/load
+    if energy_patterns and energy_patterns.get("weekly_patterns"):
+        recent_energy = energy_patterns["weekly_patterns"][-1] if energy_patterns["weekly_patterns"] else None
+        if recent_energy and recent_energy.get("energy_level") == "heavy":
+            quick_actions.append({
+                "type": "reduce_load",
+                "label": "Plan lighter days",
+                "message": "Your recent load has been heavy. Consider scheduling fewer tasks.",
+                "action": "review_schedule"
+            })
+    
     return {
         "weekly_trends": weekly_trends,
         "monthly_trends": monthly_trends,
@@ -3074,6 +3227,11 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
         "drift_analysis": drift_analysis,
         "consistency": consistency,
         "energy_patterns": energy_patterns,
+        "category_balance": category_balance,
+        "goal_task_connections": goal_task_connections,
+        "productivity_insights": productivity_insights,
+        "upcoming_week_preview": upcoming_week_preview,
+        "quick_actions": quick_actions[:3],  # Max 3 actions
         "current_week": {
             "total_tasks": week_stats.get("total_tasks", 0),
             "week_start": week_stats.get("week_start"),
@@ -3085,6 +3243,97 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
             "month": current_month
         }
     }
+
+@app.get("/align/weekly-reflection")
+async def get_weekly_reflection_summary(request: Request, current_user: dict = Depends(get_current_user)):
+    """
+    Generate an intelligent 1-2 sentence summary of weekly reflections, considering tasks, completion, and goals.
+    Returns: A concise, contextual summary that either cheers up or suggests improvements.
+    """
+    from datetime import datetime, timedelta, date
+    from app.utils.timezone import get_timezone_from_request
+    from app.ai.intelligent_assistant import get_user_context
+    import openai
+    
+    tz = get_timezone_from_request(request)
+    today = datetime.now(tz)
+    
+    # Get week start (last 7 days, including today)
+    week_start = today.date() - timedelta(days=6)
+    
+    # Get user context
+    user_context = await get_user_context(current_user["id"])
+    historical = user_context.get("historical", {})
+    
+    # Get notes from this week
+    notes = historical.get("notes", [])
+    week_notes = [
+        n for n in notes
+        if n.get("date") and date.fromisoformat(n["date"][:10]) >= week_start
+    ]
+    
+    # Get tasks from this week
+    all_tasks = historical.get("all_tasks", [])
+    week_tasks = [
+        t for t in all_tasks
+        if t.get("date") and date.fromisoformat(t["date"][:10]) >= week_start
+    ]
+    completed_tasks = [t for t in week_tasks if t.get("completed", False)]
+    completion_rate = len(completed_tasks) / len(week_tasks) if week_tasks else 0
+    
+    # Get goals
+    current_month = today.strftime("%Y-%m")
+    monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
+    
+    # Collect reflection texts
+    reflection_texts = [n.get("content", "").strip() for n in week_notes if n.get("content", "").strip()]
+    
+    if not reflection_texts:
+        return {"summary": ""}
+    
+    # Build context for AI
+    reflections_combined = "\n\n".join([f"Day {i+1}: {text}" for i, text in enumerate(reflection_texts)])
+    
+    goals_text = ""
+    if monthly_goals:
+        goals_list = [g.get('title', '') for g in monthly_goals[:3]]
+        goals_text = f"\nMonthly goals: {', '.join(goals_list)}"
+    
+    completion_text = f"Completed {len(completed_tasks)} of {len(week_tasks)} tasks ({int(completion_rate * 100)}%)" if week_tasks else "No tasks this week"
+    
+    # Generate AI summary
+    try:
+        system_prompt = """You are a supportive life coach. Generate a concise 1-2 sentence summary of the user's weekly reflections. 
+Consider their tasks, completion rate, and goals. Be encouraging if they're doing well, or gently suggest improvements if needed.
+Be warm, personal, and actionable. Maximum 2 sentences."""
+        
+        user_prompt = f"""User's reflections from the past 7 days:
+{reflections_combined}
+
+Context:
+- {completion_text}
+{goals_text}
+
+Generate a 1-2 sentence summary that either celebrates their progress or gently suggests improvements based on their reflections, tasks, and goals."""
+        
+        response = await openai.ChatCompletion.acreate(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=100,
+            temperature=0.7
+        )
+        
+        summary = response.choices[0].message.content.strip()
+        return {"summary": summary}
+    except Exception as e:
+        logger.error(f"Error generating reflection summary: {e}", exc_info=True)
+        # Fallback to simple summary
+        if reflection_texts:
+            return {"summary": f"You've been reflecting on {len(reflection_texts)} day{'s' if len(reflection_texts) > 1 else ''} this week. Keep up the thoughtful engagement with your daily experiences."}
+        return {"summary": ""}
 
 # Meta Endpoints
 

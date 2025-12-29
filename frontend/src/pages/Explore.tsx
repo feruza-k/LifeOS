@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, Edit2, Image as ImageIcon } from "lucide-react";
+import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, Edit2, Image as ImageIcon, Zap, Target, Clock, ChevronRight, PieChart } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
@@ -101,6 +101,43 @@ interface AnalyticsData {
       average_daily_load: number;
     }>;
   };
+  category_balance?: {
+    distribution: Record<string, number>;
+    score: number;
+    status: "balanced" | "moderate" | "imbalanced";
+  };
+  goal_task_connections?: Array<{
+    goal_id: string;
+    goal_title: string;
+    recent_tasks: Array<{
+      title: string;
+      date: string;
+      similarity: number;
+    }>;
+    total_matches: number;
+  }>;
+  productivity_insights?: {
+    best_times: string[];
+    best_day: {
+      day: string;
+      completion_rate: number;
+    } | null;
+    completion_rate: number;
+  };
+  upcoming_week_preview?: {
+    week_start: string;
+    week_end: string;
+    total_tasks: number;
+    load_by_day: Record<string, number>;
+    heaviest_day: string | null;
+  };
+  quick_actions?: Array<{
+    type: string;
+    label: string;
+    message: string;
+    action: string;
+    goal_id?: string;
+  }>;
   current_week: {
     total_tasks: number;
     week_start: string;
@@ -282,11 +319,14 @@ const Explore = () => {
       
       // Generate AI summary of reflections if we have any
       if (reflections.length > 0) {
-        // For now, just show a simple summary
-        // TODO: Could use AI to generate a more sophisticated summary
-        const totalReflections = reflections.length;
-        const totalWords = reflections.join(" ").split(/\s+/).length;
-        setWeeklyReflection(`You reflected ${totalReflections} day${totalReflections !== 1 ? "s" : ""} this week. ${totalWords > 50 ? "Your reflections show thoughtful engagement with your daily experiences." : ""}`);
+        try {
+          const summaryResponse = await api.getWeeklyReflectionSummary();
+          setWeeklyReflection(summaryResponse.summary || "");
+        } catch (error) {
+          console.error("Failed to generate reflection summary:", error);
+          // Fallback to simple message
+          setWeeklyReflection("");
+        }
       } else {
         setWeeklyReflection("");
       }
@@ -828,7 +868,7 @@ const Explore = () => {
       )}
 
       {/* Weekly Photos & Reflections Widget */}
-      {weeklyPhotos.length > 0 && (
+      {(weeklyPhotos.length > 0 || weeklyReflection) && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-4">
@@ -837,35 +877,335 @@ const Explore = () => {
                 This Week
               </h3>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${weeklyPhotos.length > 0 && weeklyReflection ? 'grid-cols-2' : 'grid-cols-1'}`}>
               {/* Photo Album */}
-              <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-                {weeklyPhotos[currentPhotoIndex] && (
-                  <img
-                    src={weeklyPhotos[currentPhotoIndex].url}
-                    alt={`Photo from ${format(parseISO(weeklyPhotos[currentPhotoIndex].date), "MMM d")}`}
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {weeklyPhotos.length > 1 && (
-                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
-                    {weeklyPhotos.map((_, index) => (
-                      <div
-                        key={index}
-                        className={`h-1 rounded-full transition-all ${
-                          index === currentPhotoIndex ? "w-4 bg-white" : "w-1 bg-white/50"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
+              {weeklyPhotos.length > 0 && (
+                <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                  {weeklyPhotos[currentPhotoIndex] && (
+                    <img
+                      src={weeklyPhotos[currentPhotoIndex].url}
+                      alt={`Photo from ${format(parseISO(weeklyPhotos[currentPhotoIndex].date), "MMM d")}`}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  {weeklyPhotos.length > 1 && (
+                    <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                      {weeklyPhotos.map((_, index) => (
+                        <div
+                          key={index}
+                          className={`h-1 rounded-full transition-all ${
+                            index === currentPhotoIndex ? "w-4 bg-white" : "w-1 bg-white/50"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {/* Reflection Summary */}
               {weeklyReflection && (
-                <div className="flex flex-col justify-center">
-                  <p className="text-sm text-foreground font-sans leading-relaxed italic">
+                <div className={`flex flex-col justify-center ${weeklyPhotos.length > 0 ? '' : 'min-h-[100px]'}`}>
+                  <p className="text-sm text-foreground font-sans leading-relaxed">
                     {weeklyReflection}
                   </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      {analyticsData && analyticsData.quick_actions && analyticsData.quick_actions.length > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.25s" }}>
+          <div className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                Quick Actions
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {analyticsData.quick_actions.map((action, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    if (action.action === "schedule_category" || action.action === "schedule_goal_task") {
+                      navigate("/calendar");
+                    } else if (action.action === "review_schedule") {
+                      navigate("/week");
+                    }
+                  }}
+                  className="w-full p-3 bg-background/50 rounded-xl border border-primary/20 hover:bg-primary/10 transition-colors text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-sans font-medium text-foreground mb-1">
+                        {action.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-sans">
+                        {action.message}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-2" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Balance Visualization */}
+      {analyticsData && analyticsData.category_balance && Object.keys(analyticsData.category_balance.distribution).length > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
+          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <PieChart className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                  Category Balance
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                  analyticsData.category_balance.status === "balanced" 
+                    ? "bg-green-500/20 text-green-600" 
+                    : analyticsData.category_balance.status === "imbalanced"
+                    ? "bg-amber-500/20 text-amber-600"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {analyticsData.category_balance.status === "balanced" ? "Balanced" : 
+                   analyticsData.category_balance.status === "imbalanced" ? "Imbalanced" : "Moderate"}
+                </span>
+              </div>
+            </div>
+            {/* Balance Score Bar */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-xs text-muted-foreground font-sans mb-1">
+                <span>Balance Score</span>
+                <span>{Math.round(analyticsData.category_balance.score * 100)}%</span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    analyticsData.category_balance.status === "balanced" 
+                      ? "bg-green-500" 
+                      : analyticsData.category_balance.status === "imbalanced"
+                      ? "bg-amber-500"
+                      : "bg-primary"
+                  }`}
+                  style={{ width: `${analyticsData.category_balance.score * 100}%` }}
+                />
+              </div>
+            </div>
+            {/* Category Distribution */}
+            <div className="space-y-2">
+              {Object.entries(analyticsData.category_balance.distribution)
+                .sort((a, b) => b[1] - a[1])
+                .map(([categoryId, count]) => {
+                  const categoryInfo = store.categories.find(c => c.id === categoryId);
+                  const label = categoryInfo?.label || categoryId;
+                  const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
+                  const percentage = (count / total) * 100;
+                  return (
+                    <div key={categoryId} className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-foreground font-sans">{label}</span>
+                          <span className="text-xs text-muted-foreground font-sans">{count} tasks</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ 
+                              width: `${percentage}%`,
+                              backgroundColor: categoryInfo?.color || "hsl(var(--primary))"
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Energy/Load Patterns */}
+      {analyticsData && analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.35s" }}>
+          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                Energy Patterns
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {analyticsData.energy_patterns.weekly_patterns.slice(-4).map((week, index) => {
+                const energyColors = {
+                  "empty": "bg-muted",
+                  "light": "bg-green-500",
+                  "balanced": "bg-primary",
+                  "heavy": "bg-amber-500"
+                };
+                const energyLabels = {
+                  "empty": "Empty",
+                  "light": "Light",
+                  "balanced": "Balanced",
+                  "heavy": "Heavy"
+                };
+                return (
+                  <div key={index} className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-sans">
+                      {format(parseISO(week.week_start), "MMM d")}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-16 h-2 rounded-full ${energyColors[week.energy_level as keyof typeof energyColors] || "bg-muted"}`} />
+                      <span className="text-xs font-sans text-foreground min-w-[60px]">
+                        {energyLabels[week.energy_level as keyof typeof energyLabels] || week.energy_level}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-sans">
+                        {week.average_daily_load.toFixed(1)} tasks/day
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Goal-Task Connections */}
+      {analyticsData && analyticsData.goal_task_connections && analyticsData.goal_task_connections.length > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.4s" }}>
+          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                Goal Progress
+              </h3>
+            </div>
+            <div className="space-y-4">
+              {analyticsData.goal_task_connections.map((connection) => (
+                <div key={connection.goal_id} className="border-b border-border/50 last:border-0 pb-3 last:pb-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-sans font-medium text-foreground">
+                      {connection.goal_title}
+                    </h4>
+                    <span className="text-xs text-muted-foreground font-sans">
+                      {connection.total_matches} task{connection.total_matches !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  {connection.recent_tasks.length > 0 && (
+                    <div className="space-y-1 mt-2">
+                      {connection.recent_tasks.slice(0, 3).map((task, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                          <span className="text-muted-foreground font-sans flex-1 truncate">
+                            {task.title}
+                          </span>
+                          <span className="text-muted-foreground font-sans">
+                            {format(parseISO(task.date), "MMM d")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Productivity Insights */}
+      {analyticsData && analyticsData.productivity_insights && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.45s" }}>
+          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                Productivity Insights
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {analyticsData.productivity_insights.best_times.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground font-sans">Peak focus times</span>
+                  <span className="text-sm font-sans font-medium text-foreground">
+                    {analyticsData.productivity_insights.best_times.join(", ")}
+                  </span>
+                </div>
+              )}
+              {analyticsData.productivity_insights.best_day && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground font-sans">Most productive day</span>
+                  <span className="text-sm font-sans font-medium text-foreground">
+                    {analyticsData.productivity_insights.best_day.day} ({Math.round(analyticsData.productivity_insights.best_day.completion_rate * 100)}%)
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground font-sans">Overall completion</span>
+                <span className="text-sm font-sans font-medium text-foreground">
+                  {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming Week Preview */}
+      {analyticsData && analyticsData.upcoming_week_preview && analyticsData.upcoming_week_preview.total_tasks > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.5s" }}>
+          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                  Next Week
+                </h3>
+              </div>
+              <button
+                onClick={() => navigate("/calendar")}
+                className="text-xs text-primary font-sans hover:underline"
+              >
+                View
+              </button>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground font-sans">Total tasks</span>
+                <span className="text-sm font-sans font-medium text-foreground">
+                  {analyticsData.upcoming_week_preview.total_tasks}
+                </span>
+              </div>
+              {analyticsData.upcoming_week_preview.heaviest_day && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground font-sans">Heaviest day</span>
+                  <span className="text-sm font-sans font-medium text-foreground">
+                    {analyticsData.upcoming_week_preview.heaviest_day} ({analyticsData.upcoming_week_preview.load_by_day[analyticsData.upcoming_week_preview.heaviest_day]} tasks)
+                  </span>
+                </div>
+              )}
+              {Object.keys(analyticsData.upcoming_week_preview.load_by_day).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground font-sans mb-2">Daily breakdown:</p>
+                  <div className="space-y-1">
+                    {Object.entries(analyticsData.upcoming_week_preview.load_by_day)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([day, count]) => (
+                        <div key={day} className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground font-sans">{day}</span>
+                          <span className="text-foreground font-sans font-medium">{count} tasks</span>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               )}
             </div>
