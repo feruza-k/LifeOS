@@ -437,11 +437,6 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
                             {suggestion.title}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            {suggestion.time && (
-                              <span className="text-xs text-muted-foreground font-sans">
-                                {suggestion.time}
-                              </span>
-                            )}
                             {suggestion.category && (() => {
                               const cat = categories.find(c => c.value === suggestion.category);
                               return cat ? (

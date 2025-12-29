@@ -3069,9 +3069,34 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
     category_balance = None
     if current_week_metrics:
         week_categories = current_week_metrics.get("categories", {})
+        logger.info(f"[Category Balance] Raw week_categories: {week_categories}, current_week_metrics keys: {list(current_week_metrics.keys())}")
+        
+        # Get categories mapping to convert labels to IDs
+        categories_list = await db_repo.get_categories(current_user["id"])
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
+        category_id_to_label = {cat["id"]: cat["label"] for cat in categories_list}
+        
+        # Convert category labels to IDs if needed
+        week_categories_by_id = {}
+        for cat_key, count in week_categories.items():
+            if count > 0 and cat_key:
+                # Check if it's already an ID (UUID format) or a label
+                if len(cat_key) == 36 and cat_key.count("-") == 4:
+                    # It's already an ID
+                    week_categories_by_id[cat_key] = week_categories_by_id.get(cat_key, 0) + count
+                else:
+                    # It's a label, convert to ID
+                    cat_id = category_label_to_id.get(cat_key.lower())
+                    if cat_id:
+                        week_categories_by_id[cat_id] = week_categories_by_id.get(cat_id, 0) + count
+        
+        week_categories = week_categories_by_id
+        logger.info(f"[Category Balance] Converted to IDs: {week_categories}, total={sum(week_categories.values())}")
+        
         # Filter out empty categories and ensure we have valid data
         week_categories = {k: v for k, v in week_categories.items() if v > 0 and k}
         total_cat_tasks = sum(week_categories.values())
+        logger.info(f"[Category Balance] Filtered: {week_categories}, total={total_cat_tasks}")
         if total_cat_tasks > 0 and len(week_categories) > 0:
             # Calculate balance score (0-1, where 1 is perfectly balanced)
             # Use coefficient of variation (lower = more balanced)

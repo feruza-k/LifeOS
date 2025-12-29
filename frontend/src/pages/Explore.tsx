@@ -906,41 +906,6 @@ const Explore = () => {
         </div>
       </div>
 
-      {/* Analytics: Consistency Metrics */}
-      {analyticsData && analyticsData.consistency.days_with_checkins > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Consistency
-              </h3>
-            </div>
-        <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground font-sans">Check-in frequency</span>
-                <span className="text-sm font-sans font-medium text-foreground">
-                  {Math.round(analyticsData.consistency.consistency_rate * 100)}%
-                </span>
-              </div>
-              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{ width: `${analyticsData.consistency.consistency_rate * 100}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground font-sans">
-                <span>{analyticsData.consistency.days_with_checkins} of {analyticsData.consistency.total_days} days</span>
-                {analyticsData.consistency.current_streak > 0 && (
-                  <span className="font-medium text-foreground">
-                    🔥 {analyticsData.consistency.current_streak} day streak
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Weekly Photos & Reflections Widget */}
       {weeklyPhotos.length > 0 && (
@@ -952,13 +917,6 @@ const Explore = () => {
                 This Week
               </h3>
             </div>
-            {weeklySummary && (
-              <div className="mb-4 p-3 bg-primary/5 rounded-xl border border-primary/10">
-                <p className="text-sm text-foreground font-sans leading-relaxed text-center">
-                  {weeklySummary}
-                </p>
-              </div>
-            )}
             <div className="grid gap-4 grid-cols-2">
               {/* Photo Album */}
               <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
@@ -982,22 +940,36 @@ const Explore = () => {
                   </div>
                 )}
               </div>
-              {/* Reflection Note - rotates with photo with typing animation */}
-              <div className="flex flex-col justify-center items-center text-center">
-                {weeklyPhotos[currentPhotoIndex]?.note ? (
-                  <p className="text-sm text-foreground font-sans italic leading-relaxed min-h-[60px] flex items-center justify-center">
-                    {displayedNote}
-                    {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
-                      <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
-                    )}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground font-sans italic leading-relaxed">
-                    No reflection for this moment
-                  </p>
-                )}
+              {/* Reflection Note - top right, rotates with photo */}
+              <div className="flex flex-col">
+                <h4 className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Your highlight reflection:
+                </h4>
+                <div className="flex-1 flex items-start">
+                  {weeklyPhotos[currentPhotoIndex]?.note ? (
+                    <p className="text-sm text-foreground font-sans italic leading-relaxed">
+                      {displayedNote}
+                      {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
+                        <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground font-sans italic leading-relaxed">
+                      No reflection for this moment
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
+            {/* Weekly Summary - Below reflection, concise */}
+            {weeklySummary && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-xs text-foreground font-sans leading-relaxed text-center">
+                  {weeklySummary.split(' ').slice(0, 20).join(' ')}
+                  {weeklySummary.split(' ').length > 20 && '...'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1366,20 +1338,36 @@ const Explore = () => {
                   </span>
                 </div>
               )}
+              {analyticsData.consistency && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-foreground font-sans">Check-in frequency</span>
+                    <span className="text-sm font-sans font-medium text-foreground">
+                      {Math.round(analyticsData.consistency.consistency_rate * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${analyticsData.consistency.consistency_rate * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground font-sans">
+                    <span>{analyticsData.consistency.days_with_checkins} of {analyticsData.consistency.total_days} days</span>
+                    {analyticsData.consistency.current_streak > 0 && (
+                      <span className="font-medium text-foreground">
+                        🔥 {analyticsData.consistency.current_streak} day streak
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-foreground font-sans">Overall completion</span>
                 <span className="text-sm font-sans font-medium text-foreground">
                   {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
                 </span>
               </div>
-              {analyticsData.consistency && (
-                <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                  <span className="text-sm text-foreground font-sans">Check-in frequency</span>
-                  <span className="text-sm font-sans font-medium text-foreground">
-                    {analyticsData.consistency.days_with_checkins} of {analyticsData.consistency.total_days} days ({Math.round(analyticsData.consistency.consistency_rate * 100)}%)
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
