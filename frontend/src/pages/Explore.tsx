@@ -22,7 +22,7 @@ interface AlignData {
       title: string;
       description: string | null;
       progress: number | null;
-      id: string;
+  id: string;
       order_index: number;
     }>;
     month_focus: {
@@ -126,7 +126,7 @@ interface AnalyticsData {
     goal_id: string;
     goal_title: string;
     recent_tasks: Array<{
-      title: string;
+  title: string;
       date: string;
       similarity: number;
     }>;
@@ -427,11 +427,11 @@ const Explore = () => {
 
   // Show invitation for new users instead of empty state
   if (alignData.is_new_user) {
-    return (
-      <div className="min-h-screen bg-background pb-24">
-        <p className="text-xs font-sans font-medium text-muted-foreground tracking-widest uppercase text-center pt-4 pb-2">
-          LifeOS, powered by SolAI
-        </p>
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      <p className="text-xs font-sans font-medium text-muted-foreground tracking-widest uppercase text-center pt-4 pb-2">
+        LifeOS, powered by SolAI
+      </p>
 
         <header className="px-6 pb-6 animate-fade-in">
           <div className="flex items-center justify-between">
@@ -509,25 +509,25 @@ const Explore = () => {
 
       {/* Weekly Summary Card - Executive Overview */}
       {alignData && alignData.week_stats && (
-        <div className="px-4 py-3 animate-slide-up">
+      <div className="px-4 py-3 animate-slide-up">
           <div className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
             <div className="flex items-center gap-2 mb-4">
               <Activity className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                 This Week
               </h3>
-            </div>
+              </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-sans font-bold text-foreground mb-1">
                   {alignData.week_stats.completed || 0}
-                </div>
+            </div>
                 <div className="text-xs text-muted-foreground font-sans uppercase">Completed</div>
-              </div>
+        </div>
               <div className="text-center">
                 <div className="text-2xl font-sans font-bold text-foreground mb-1">
                   {alignData.week_stats.total || 0}
-                </div>
+      </div>
                 <div className="text-xs text-muted-foreground font-sans uppercase">Total Tasks</div>
               </div>
               <div className="text-center">
@@ -555,11 +555,11 @@ const Explore = () => {
       {alignData.nudge && (
         <div className="px-4 py-3 animate-slide-up">
           <div className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
                 <h4 className="font-sans font-semibold text-foreground mb-1">Suggestion</h4>
                 <p className="text-sm text-foreground font-sans leading-relaxed mb-3">
                   {alignData.nudge.message}
@@ -580,10 +580,10 @@ const Explore = () => {
                   >
                     Dismiss
                   </Button>
-                </div>
-              </div>
             </div>
           </div>
+        </div>
+      </div>
         </div>
       )}
 
@@ -601,7 +601,7 @@ const Explore = () => {
               {/* Toggle between weekly and monthly */}
               {analyticsData.monthly_trends.length > 0 && (
                 <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-                  <button
+            <button
                     onClick={() => setTrendView("weekly")}
                     className={`px-2 py-1 text-xs font-sans rounded transition-colors ${
                       trendView === "weekly"
@@ -621,9 +621,9 @@ const Explore = () => {
                   >
                     Monthly
                   </button>
-                </div>
+              </div>
               )}
-            </div>
+              </div>
             {/* Line Chart Visualization */}
             {(() => {
               const trends = trendView === "weekly" 
@@ -701,7 +701,7 @@ const Explore = () => {
                         );
                       })}
                     </svg>
-                  </div>
+        </div>
                   {/* Labels and values */}
                   <div className="flex justify-between items-end text-xs">
                     {trends.map((point, index) => {
@@ -721,7 +721,7 @@ const Explore = () => {
                           <span className="font-sans font-medium text-foreground">
                             {completionRate}%
                           </span>
-                        </div>
+      </div>
                       );
                     })}
                   </div>
@@ -737,21 +737,21 @@ const Explore = () => {
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
           <div className="relative p-5 bg-card rounded-2xl shadow-soft border border-border/50 overflow-hidden">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                   Focus {goals.length > 1 && `(${currentGoalIndex + 1}/${goals.length})`}
-                </h3>
-              </div>
+            </h3>
+          </div>
               <button
                 onClick={() => setShowSetFocus(true)}
                 className="p-1.5 rounded-full hover:bg-muted transition-colors"
                 aria-label="Edit focus"
               >
                 <Edit2 className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-            
+          </button>
+        </div>
+
             {/* Carousel Container */}
             <div 
               ref={carouselRef}
@@ -803,7 +803,7 @@ const Explore = () => {
             {goals.length > 1 && (
               <div className="flex items-center justify-center gap-1.5 mt-4">
                 {goals.map((_, index) => (
-                  <button
+            <button
                     key={index}
                     onClick={() => {
                       setCurrentGoalIndex(index);
@@ -862,8 +862,8 @@ const Explore = () => {
                   <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
                   <p className="text-sm text-foreground font-sans flex-1">{pattern}</p>
                 </div>
-              ))}
-            </div>
+          ))}
+        </div>
           </div>
         </div>
       )}
@@ -927,7 +927,7 @@ const Explore = () => {
                 Consistency
               </h3>
             </div>
-            <div className="space-y-3">
+        <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-foreground font-sans">Check-in frequency</span>
                 <span className="text-sm font-sans font-medium text-foreground">
@@ -1030,7 +1030,7 @@ const Explore = () => {
                   className="w-full p-3 bg-background/50 rounded-xl border border-primary/20 hover:bg-primary/10 transition-colors text-left"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex-1">
+                <div className="flex-1">
                       <p className="text-sm font-sans font-medium text-foreground mb-1">
                         {action.label}
                       </p>
@@ -1052,7 +1052,7 @@ const Explore = () => {
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                 <PieChart className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                   Category Balance
@@ -1061,16 +1061,16 @@ const Explore = () => {
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
                   analyticsData.category_balance.status === "balanced" 
-                    ? "bg-green-500/20 text-green-600" 
+                    ? "bg-primary/20 text-primary" 
                     : analyticsData.category_balance.status === "imbalanced"
                     ? "bg-amber-500/20 text-amber-600"
                     : "bg-muted text-muted-foreground"
                 }`}>
                   {analyticsData.category_balance.status === "balanced" ? "Balanced" : 
                    analyticsData.category_balance.status === "imbalanced" ? "Imbalanced" : "Moderate"}
-                </span>
-              </div>
-            </div>
+                      </span>
+                  </div>
+                </div>
             
             {/* Pie Chart Visualization */}
             <div className="mb-4 flex items-center justify-center">
@@ -1144,27 +1144,27 @@ const Explore = () => {
                   Balance
                 </text>
               </svg>
-            </div>
-            
+              </div>
+              
             {/* Balance Score Bar */}
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs text-muted-foreground font-sans mb-1">
                 <span>Balance Score</span>
                 <span>{Math.round(analyticsData.category_balance.score * 100)}%</span>
-              </div>
-              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
                   className={`h-full rounded-full transition-all duration-500 ${
                     analyticsData.category_balance.status === "balanced" 
-                      ? "bg-green-500" 
+                      ? "bg-primary" 
                       : analyticsData.category_balance.status === "imbalanced"
                       ? "bg-amber-500"
                       : "bg-primary"
                   }`}
                   style={{ width: `${analyticsData.category_balance.score * 100}%` }}
-                />
+                  />
+                </div>
               </div>
-            </div>
             
             {/* Category Distribution List */}
             <div className="space-y-2">
@@ -1220,7 +1220,7 @@ const Explore = () => {
                   analyticsData.energy_patterns.trend === "increasing" 
                     ? "bg-amber-500/20 text-amber-600"
                     : analyticsData.energy_patterns.trend === "decreasing"
-                    ? "bg-green-500/20 text-green-600"
+                    ? "bg-purple-500/20 text-purple-600"
                     : "bg-muted text-muted-foreground"
                 }`}>
                   {analyticsData.energy_patterns.trend === "increasing" ? "↑ Increasing" :
@@ -1237,8 +1237,8 @@ const Explore = () => {
                   const heightPercent = (week.average_daily_load / maxLoad) * 100;
                   const energyColors = {
                     "empty": "bg-muted",
-                    "very_light": "bg-green-400",
-                    "light": "bg-green-500",
+                    "very_light": "bg-purple-300",
+                    "light": "bg-purple-400",
                     "balanced": "bg-primary",
                     "moderate": "bg-amber-500",
                     "heavy": "bg-red-500"
@@ -1276,8 +1276,8 @@ const Explore = () => {
                   {analyticsData.energy_patterns.daily_patterns.map((day, index) => {
                     const energyColors = {
                       "empty": "bg-muted/30",
-                      "very_light": "bg-green-400/30",
-                      "light": "bg-green-500/40",
+                      "very_light": "bg-purple-300/30",
+                      "light": "bg-purple-400/40",
                       "balanced": "bg-primary/50",
                       "moderate": "bg-amber-500/50",
                       "heavy": "bg-red-500/50",
@@ -1307,10 +1307,10 @@ const Explore = () => {
                     <div key={index} className="flex items-start gap-2">
                       <Sparkles className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-foreground font-sans leading-relaxed">{insight}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            </div>
+          ))}
+        </div>
+      </div>
             )}
 
             {/* Weekly Summary */}
@@ -1347,10 +1347,10 @@ const Explore = () => {
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-4">
               <Target className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+          <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                 Goal Progress
-              </h3>
-            </div>
+          </h3>
+        </div>
             <div className="space-y-4">
               {analyticsData.goal_task_connections.map((connection) => (
                 <div key={connection.goal_id} className="border-b border-border/50 last:border-0 pb-3 last:pb-0">
@@ -1374,10 +1374,10 @@ const Explore = () => {
                             {format(parseISO(task.date), "MMM d")}
                           </span>
                         </div>
-                      ))}
-                    </div>
+          ))}
+        </div>
                   )}
-                </div>
+      </div>
               ))}
             </div>
           </div>
@@ -1390,11 +1390,11 @@ const Explore = () => {
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-4">
               <Clock className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+          <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                 Productivity Insights
-              </h3>
-            </div>
-            <div className="space-y-3">
+          </h3>
+        </div>
+          <div className="space-y-3">
               {analyticsData.productivity_insights.best_times.length > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-foreground font-sans">Peak focus times</span>
@@ -1465,12 +1465,12 @@ const Explore = () => {
                         <div key={day} className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground font-sans">{day}</span>
                           <span className="text-foreground font-sans font-medium">{count} tasks</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
+              </div>
+            ))}
+          </div>
+        </div>
               )}
-            </div>
+      </div>
           </div>
         </div>
       )}
@@ -1566,7 +1566,7 @@ const Explore = () => {
           onClose={() => setShowSetFocus(false)}
           onSave={handleSetFocus}
           existingGoals={goals}
-        />
+      />
     </div>
   );
 }
