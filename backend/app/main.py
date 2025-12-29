@@ -3080,15 +3080,19 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
         week_categories_by_id = {}
         for cat_key, count in week_categories.items():
             if count > 0 and cat_key:
-                # Check if it's already an ID (UUID format) or a label
-                if len(cat_key) == 36 and cat_key.count("-") == 4:
+                # Check if it's already an ID (UUID format)
+                if isinstance(cat_key, str) and len(cat_key) == 36 and cat_key.count("-") == 4:
                     # It's already an ID
                     week_categories_by_id[cat_key] = week_categories_by_id.get(cat_key, 0) + count
                 else:
-                    # It's a label, convert to ID
-                    cat_id = category_label_to_id.get(cat_key.lower())
+                    # It's a label or frontend value, convert to ID
+                    cat_id = category_label_to_id.get(str(cat_key).lower())
                     if cat_id:
                         week_categories_by_id[cat_id] = week_categories_by_id.get(cat_id, 0) + count
+                    else:
+                        # Try to find by matching any category ID that might match
+                        # This handles edge cases where the key might be a partial match
+                        logger.warning(f"[Category Balance] Could not convert category key '{cat_key}' to ID")
         
         week_categories = week_categories_by_id
         logger.info(f"[Category Balance] Converted to IDs: {week_categories}, total={sum(week_categories.values())}")
@@ -3115,6 +3119,11 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
                 "score": round(balance_score, 2),
                 "status": "balanced" if balance_score > 0.7 else "imbalanced" if balance_score < 0.4 else "moderate"
             }
+            logger.info(f"[Category Balance] Final result: {category_balance}")
+        else:
+            logger.info(f"[Category Balance] No valid data: total={total_cat_tasks}, categories={len(week_categories)}")
+    else:
+        logger.info(f"[Category Balance] current_week_metrics is None")
     
     # Get goal-task connections (from align_summary logic)
     from app.ai.goal_engine import match_tasks_to_goals

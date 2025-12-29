@@ -84,10 +84,11 @@ def calculate_week_metrics(tasks: List[Dict[str, Any]], checkins: List[Dict[str,
     
     completion_rate = tasks_completed / tasks_planned if tasks_planned > 0 else 0.0
     
-    # Category distribution - prefer category_id, fallback to category label
+    # Category distribution - check multiple possible field names
+    # Tasks from get_user_context may have: category_id, category, or value (frontend format)
     category_dist = defaultdict(int)
     for task in week_tasks:
-        cat = task.get("category_id") or task.get("category")
+        cat = task.get("category_id") or task.get("category") or task.get("value")
         if cat:
             category_dist[cat] += 1
     

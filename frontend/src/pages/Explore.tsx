@@ -942,34 +942,41 @@ const Explore = () => {
               </div>
               {/* Reflection Note - top right, rotates with photo */}
               <div className="flex flex-col">
-                <h4 className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Your highlight reflection:
-                </h4>
-                <div className="flex-1 flex items-start">
+                <div className="flex-1 flex flex-col items-center justify-center text-center">
                   {weeklyPhotos[currentPhotoIndex]?.note ? (
-                    <p className="text-sm text-foreground font-sans italic leading-relaxed">
-                      {displayedNote}
-                      {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
-                        <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
-                      )}
-                    </p>
+                    <div className="w-full">
+                      <p className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Your highlight reflection:
+                      </p>
+                      <p className="text-sm text-foreground font-sans italic leading-relaxed">
+                        {displayedNote}
+                        {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
+                          <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
+                        )}
+                      </p>
+                    </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground font-sans italic leading-relaxed">
-                      No reflection for this moment
-                    </p>
+                    <div className="w-full">
+                      <p className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Your highlight reflection:
+                      </p>
+                      <p className="text-sm text-muted-foreground font-sans italic leading-relaxed">
+                        No reflection for this moment
+                      </p>
+                    </div>
+                  )}
+                  {/* Weekly Summary - Right after reflection, still on the right */}
+                  {weeklySummary && (
+                    <div className="mt-3">
+                      <p className="text-xs text-foreground font-sans leading-relaxed">
+                        {weeklySummary.split(' ').slice(0, 20).join(' ')}
+                        {weeklySummary.split(' ').length > 20 && '...'}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
-            {/* Weekly Summary - Below reflection, concise */}
-            {weeklySummary && (
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <p className="text-xs text-foreground font-sans leading-relaxed text-center">
-                  {weeklySummary.split(' ').slice(0, 20).join(' ')}
-                  {weeklySummary.split(' ').length > 20 && '...'}
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1362,11 +1369,19 @@ const Explore = () => {
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground font-sans">Overall completion</span>
-                <span className="text-sm font-sans font-medium text-foreground">
-                  {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
-                </span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground font-sans">Overall completion</span>
+                  <span className="text-sm font-sans font-medium text-foreground">
+                    {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-500"
+                    style={{ width: `${analyticsData.productivity_insights.completion_rate * 100}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
