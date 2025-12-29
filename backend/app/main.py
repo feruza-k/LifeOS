@@ -3066,12 +3066,11 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
     monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
     
     # Calculate category balance (current week)
-    category_balance = {}
-    balance_score = 0.0
+    category_balance = None
     if current_week_metrics:
         week_categories = current_week_metrics.get("categories", {})
         total_cat_tasks = sum(week_categories.values())
-        if total_cat_tasks > 0:
+        if total_cat_tasks > 0 and week_categories:
             # Calculate balance score (0-1, where 1 is perfectly balanced)
             # Use coefficient of variation (lower = more balanced)
             category_counts = list(week_categories.values())
@@ -3253,7 +3252,6 @@ async def get_weekly_reflection_summary(request: Request, current_user: dict = D
     from datetime import datetime, timedelta, date
     from app.utils.timezone import get_timezone_from_request
     from app.ai.intelligent_assistant import get_user_context
-    import openai
     
     tz = get_timezone_from_request(request)
     today = datetime.now(tz)
@@ -3303,6 +3301,11 @@ async def get_weekly_reflection_summary(request: Request, current_user: dict = D
     
     # Generate AI summary
     try:
+        from app.ai.intelligent_assistant import get_client
+        import asyncio
+        
+        client = get_client()
+        
         system_prompt = """You are a supportive life coach. Generate a concise 1-2 sentence summary of the user's weekly reflections. 
 Consider their tasks, completion rate, and goals. Be encouraging if they're doing well, or gently suggest improvements if needed.
 Be warm, personal, and actionable. Maximum 2 sentences."""
@@ -3316,14 +3319,19 @@ Context:
 
 Generate a 1-2 sentence summary that either celebrates their progress or gently suggests improvements based on their reflections, tasks, and goals."""
         
-        response = await openai.ChatCompletion.acreate(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            max_tokens=100,
-            temperature=0.7
+        # Run synchronous OpenAI call in executor
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=100,
+                temperature=0.7
+            )
         )
         
         summary = response.choices[0].message.content.strip()

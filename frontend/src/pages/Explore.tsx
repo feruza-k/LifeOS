@@ -957,7 +957,7 @@ const Explore = () => {
       )}
 
       {/* Category Balance Visualization */}
-      {analyticsData && analyticsData.category_balance && Object.keys(analyticsData.category_balance.distribution).length > 0 && (
+      {analyticsData && analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center justify-between mb-4">
