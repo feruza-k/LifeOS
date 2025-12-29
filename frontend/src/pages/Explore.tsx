@@ -97,9 +97,25 @@ interface AnalyticsData {
   energy_patterns: {
     weekly_patterns: Array<{
       week_start: string;
+      week_end: string;
       energy_level: string;
       average_daily_load: number;
+      average_completion_rate: number;
+      average_energy_score: number;
+      days_tracked: number;
+      total_tasks: number;
+      completed_tasks: number;
     }>;
+    daily_patterns?: Array<{
+      date: string;
+      day_name: string;
+      total_tasks: number;
+      completed_tasks: number;
+      completion_rate: number;
+      energy_level: string;
+    }>;
+    trend: string;
+    insights?: string[];
   };
   category_balance?: {
     distribution: Record<string, number>;
@@ -157,12 +173,13 @@ const Explore = () => {
   const [showSetFocus, setShowSetFocus] = useState(false);
   const [currentGoalIndex, setCurrentGoalIndex] = useState(0);
   const [trendView, setTrendView] = useState<"weekly" | "monthly">("weekly");
-  const [weeklyPhotos, setWeeklyPhotos] = useState<Array<{ date: string; filename: string; url: string }>>([]);
-  const [weeklyReflection, setWeeklyReflection] = useState<string>("");
+  const [weeklyPhotos, setWeeklyPhotos] = useState<Array<{ date: string; filename: string; url: string; note?: string }>>([]);
   const carouselRef = useRef<HTMLDivElement>(null);
   const autoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const photoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [displayedNote, setDisplayedNote] = useState<string>("");
   const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
@@ -285,8 +302,7 @@ const Explore = () => {
       weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
       weekStart.setHours(0, 0, 0, 0);
       
-      const photos: Array<{ date: string; filename: string; url: string }> = [];
-      const reflections: string[] = [];
+      const photosWithNotes: Array<{ date: string; filename: string; url: string; note?: string }> = [];
       
       // Load notes for each day of the week
       for (let i = 0; i < 7; i++) {
@@ -297,17 +313,14 @@ const Explore = () => {
         try {
           const note = await api.getNote(dateStr);
           if (note) {
-            // Check for photo
+            // Only include if there's a photo
             if (note.photo && note.photo.filename) {
-              photos.push({
+              photosWithNotes.push({
                 date: dateStr,
                 filename: note.photo.filename,
-                url: `${import.meta.env.VITE_API_URL || 'https://api.mylifeos.dev'}/photos/${note.photo.filename}`
+                url: `${import.meta.env.VITE_API_URL || 'https://api.mylifeos.dev'}/photos/${note.photo.filename}`,
+                note: note.content && note.content.trim() ? note.content.trim() : undefined
               });
-            }
-            // Collect reflection text
-            if (note.content && note.content.trim()) {
-              reflections.push(note.content.trim());
             }
           }
         } catch (error) {
@@ -315,25 +328,54 @@ const Explore = () => {
         }
       }
       
-      setWeeklyPhotos(photos);
-      
-      // Generate AI summary of reflections if we have any
-      if (reflections.length > 0) {
-        try {
-          const summaryResponse = await api.getWeeklyReflectionSummary();
-          setWeeklyReflection(summaryResponse.summary || "");
-        } catch (error) {
-          console.error("Failed to generate reflection summary:", error);
-          // Fallback to simple message
-          setWeeklyReflection("");
-        }
-      } else {
-        setWeeklyReflection("");
-      }
+      setWeeklyPhotos(photosWithNotes);
     } catch (error) {
       console.error("Failed to load weekly photos and reflections:", error);
     }
   };
+
+  // Typing animation effect for notes
+  useEffect(() => {
+    const currentNote = weeklyPhotos[currentPhotoIndex]?.note || "";
+    
+    // Clear any existing typing animation
+    if (typingTimerRef.current) {
+      clearInterval(typingTimerRef.current);
+    }
+    
+    // Reset displayed note
+    setDisplayedNote("");
+    
+    if (!currentNote) {
+      return;
+    }
+    
+    // Calculate typing speed (reveal over 4.5 seconds, leaving 0.5s pause)
+    const typingDuration = 4500; // 4.5 seconds
+    const totalChars = currentNote.length;
+    const intervalTime = 30; // Update every 30ms for smooth animation
+    const charsPerInterval = Math.max(1, Math.ceil((totalChars * intervalTime) / typingDuration));
+    
+    let currentCharIndex = 0;
+    
+    typingTimerRef.current = setInterval(() => {
+      if (currentCharIndex < totalChars) {
+        setDisplayedNote(currentNote.substring(0, currentCharIndex + charsPerInterval));
+        currentCharIndex += charsPerInterval;
+      } else {
+        setDisplayedNote(currentNote);
+        if (typingTimerRef.current) {
+          clearInterval(typingTimerRef.current);
+        }
+      }
+    }, intervalTime);
+    
+    return () => {
+      if (typingTimerRef.current) {
+        clearInterval(typingTimerRef.current);
+      }
+    };
+  }, [currentPhotoIndex, weeklyPhotos]);
 
   // Auto-rotate photos if there are multiple
   useEffect(() => {
@@ -464,6 +506,50 @@ const Explore = () => {
           Strategic reflection and alignment
         </p>
       </header>
+
+      {/* Weekly Summary Card - Executive Overview */}
+      {alignData && alignData.week_stats && (
+        <div className="px-4 py-3 animate-slide-up">
+          <div className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                This Week
+              </h3>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-sans font-bold text-foreground mb-1">
+                  {alignData.week_stats.completed || 0}
+                </div>
+                <div className="text-xs text-muted-foreground font-sans uppercase">Completed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-sans font-bold text-foreground mb-1">
+                  {alignData.week_stats.total || 0}
+                </div>
+                <div className="text-xs text-muted-foreground font-sans uppercase">Total Tasks</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-sans font-bold text-foreground mb-1">
+                  {alignData.week_stats.total > 0 
+                    ? Math.round((alignData.week_stats.completed / alignData.week_stats.total) * 100)
+                    : 0}%
+                </div>
+                <div className="text-xs text-muted-foreground font-sans uppercase">Rate</div>
+              </div>
+            </div>
+            {analyticsData && analyticsData.consistency && analyticsData.consistency.current_streak > 0 && (
+              <div className="mt-4 pt-4 border-t border-primary/20 flex items-center justify-center gap-2">
+                <span className="text-sm font-sans text-foreground">🔥</span>
+                <span className="text-sm font-sans font-medium text-foreground">
+                  {analyticsData.consistency.current_streak} day streak
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Suggestions from SolAI - MOVED TO TOP */}
       {alignData.nudge && (
@@ -868,7 +954,7 @@ const Explore = () => {
       )}
 
       {/* Weekly Photos & Reflections Widget */}
-      {(weeklyPhotos.length > 0 || weeklyReflection) && (
+      {weeklyPhotos.length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-4">
@@ -877,39 +963,44 @@ const Explore = () => {
                 This Week
               </h3>
             </div>
-            <div className={`grid gap-4 ${weeklyPhotos.length > 0 && weeklyReflection ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <div className="grid gap-4 grid-cols-2">
               {/* Photo Album */}
-              {weeklyPhotos.length > 0 && (
-                <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-                  {weeklyPhotos[currentPhotoIndex] && (
-                    <img
-                      src={weeklyPhotos[currentPhotoIndex].url}
-                      alt={`Photo from ${format(parseISO(weeklyPhotos[currentPhotoIndex].date), "MMM d")}`}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  {weeklyPhotos.length > 1 && (
-                    <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
-                      {weeklyPhotos.map((_, index) => (
-                        <div
-                          key={index}
-                          className={`h-1 rounded-full transition-all ${
-                            index === currentPhotoIndex ? "w-4 bg-white" : "w-1 bg-white/50"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* Reflection Summary */}
-              {weeklyReflection && (
-                <div className={`flex flex-col justify-center ${weeklyPhotos.length > 0 ? '' : 'min-h-[100px]'}`}>
-                  <p className="text-sm text-foreground font-sans leading-relaxed">
-                    {weeklyReflection}
+              <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                {weeklyPhotos[currentPhotoIndex] && (
+                  <img
+                    src={weeklyPhotos[currentPhotoIndex].url}
+                    alt="Weekly photo"
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {weeklyPhotos.length > 1 && (
+                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                    {weeklyPhotos.map((_, index) => (
+                      <div
+                        key={index}
+                        className={`h-1 rounded-full transition-all ${
+                          index === currentPhotoIndex ? "w-4 bg-white" : "w-1 bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Reflection Note - rotates with photo with typing animation */}
+              <div className="flex flex-col justify-center">
+                {weeklyPhotos[currentPhotoIndex]?.note ? (
+                  <p className="text-sm text-foreground font-serif italic leading-relaxed min-h-[60px]">
+                    {displayedNote}
+                    {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
+                      <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
+                    )}
                   </p>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground font-serif italic leading-relaxed">
+                    No reflection for this moment
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -980,6 +1071,81 @@ const Explore = () => {
                 </span>
               </div>
             </div>
+            
+            {/* Pie Chart Visualization */}
+            <div className="mb-4 flex items-center justify-center">
+              <svg width="160" height="160" viewBox="0 0 160 160" className="transform -rotate-90">
+                {(() => {
+                  const entries = Object.entries(analyticsData.category_balance.distribution)
+                    .sort((a, b) => b[1] - a[1]);
+                  const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
+                  let currentAngle = 0;
+                  const radius = 70;
+                  const centerX = 80;
+                  const centerY = 80;
+                  
+                  return entries.map(([categoryId, count], index) => {
+                    const categoryInfo = store.categories.find(c => c.id === categoryId);
+                    const percentage = (count / total) * 100;
+                    const angle = (percentage / 100) * 360;
+                    const startAngle = currentAngle;
+                    const endAngle = currentAngle + angle;
+                    currentAngle = endAngle;
+                    
+                    // Calculate arc path
+                    const startRad = (startAngle * Math.PI) / 180;
+                    const endRad = (endAngle * Math.PI) / 180;
+                    const x1 = centerX + radius * Math.cos(startRad);
+                    const y1 = centerY + radius * Math.sin(startRad);
+                    const x2 = centerX + radius * Math.cos(endRad);
+                    const y2 = centerY + radius * Math.sin(endRad);
+                    const largeArcFlag = angle > 180 ? 1 : 0;
+                    
+                    const pathData = [
+                      `M ${centerX} ${centerY}`,
+                      `L ${x1} ${y1}`,
+                      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+                      'Z'
+                    ].join(' ');
+                    
+                    return (
+                      <path
+                        key={categoryId}
+                        d={pathData}
+                        fill={categoryInfo?.color || "hsl(var(--primary))"}
+                        stroke="hsl(var(--background))"
+                        strokeWidth="2"
+                        opacity={0.9}
+                      />
+                    );
+                  });
+                })()}
+                {/* Center circle for balance score */}
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="45"
+                  fill="hsl(var(--background))"
+                />
+                <text
+                  x="80"
+                  y="75"
+                  textAnchor="middle"
+                  className="text-lg font-sans font-bold fill-foreground"
+                >
+                  {Math.round(analyticsData.category_balance.score * 100)}%
+                </text>
+                <text
+                  x="80"
+                  y="90"
+                  textAnchor="middle"
+                  className="text-[10px] font-sans fill-muted-foreground"
+                >
+                  Balance
+                </text>
+              </svg>
+            </div>
+            
             {/* Balance Score Bar */}
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs text-muted-foreground font-sans mb-1">
@@ -999,7 +1165,8 @@ const Explore = () => {
                 />
               </div>
             </div>
-            {/* Category Distribution */}
+            
+            {/* Category Distribution List */}
             <div className="space-y-2">
               {Object.entries(analyticsData.category_balance.distribution)
                 .sort((a, b) => b[1] - a[1])
@@ -1009,15 +1176,19 @@ const Explore = () => {
                   const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
                   const percentage = (count / total) * 100;
                   return (
-                    <div key={categoryId} className="flex items-center gap-2">
+                    <div key={categoryId} className="flex items-center gap-3">
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: categoryInfo?.color || "hsl(var(--primary))" }}
+                      />
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-foreground font-sans">{label}</span>
-                          <span className="text-xs text-muted-foreground font-sans">{count} tasks</span>
+                          <span className="text-xs text-muted-foreground font-sans">{count} ({Math.round(percentage)}%)</span>
                         </div>
                         <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
-                            className="h-full rounded-full"
+                            className="h-full rounded-full transition-all duration-500"
                             style={{ 
                               width: `${percentage}%`,
                               backgroundColor: categoryInfo?.color || "hsl(var(--primary))"
@@ -1033,47 +1204,138 @@ const Explore = () => {
         </div>
       )}
 
-      {/* Energy/Load Patterns */}
+      {/* Energy/Load Patterns - Enhanced */}
       {analyticsData && analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.35s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Energy Patterns
-              </h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                  Energy & Load Patterns
+                </h3>
+              </div>
+              {analyticsData.energy_patterns.trend && (
+                <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                  analyticsData.energy_patterns.trend === "increasing" 
+                    ? "bg-amber-500/20 text-amber-600"
+                    : analyticsData.energy_patterns.trend === "decreasing"
+                    ? "bg-green-500/20 text-green-600"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {analyticsData.energy_patterns.trend === "increasing" ? "↑ Increasing" :
+                   analyticsData.energy_patterns.trend === "decreasing" ? "↓ Decreasing" : "→ Stable"}
+                </span>
+              )}
             </div>
-            <div className="space-y-3">
-              {analyticsData.energy_patterns.weekly_patterns.slice(-4).map((week, index) => {
-                const energyColors = {
-                  "empty": "bg-muted",
-                  "light": "bg-green-500",
-                  "balanced": "bg-primary",
-                  "heavy": "bg-amber-500"
-                };
-                const energyLabels = {
-                  "empty": "Empty",
-                  "light": "Light",
-                  "balanced": "Balanced",
-                  "heavy": "Heavy"
-                };
-                return (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground font-sans">
-                      {format(parseISO(week.week_start), "MMM d")}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-16 h-2 rounded-full ${energyColors[week.energy_level as keyof typeof energyColors] || "bg-muted"}`} />
-                      <span className="text-xs font-sans text-foreground min-w-[60px]">
-                        {energyLabels[week.energy_level as keyof typeof energyLabels] || week.energy_level}
-                      </span>
-                      <span className="text-xs text-muted-foreground font-sans">
-                        {week.average_daily_load.toFixed(1)} tasks/day
+            
+            {/* Weekly Trend Chart */}
+            <div className="mb-6">
+              <div className="flex items-end justify-between h-32 gap-1 mb-2">
+                {analyticsData.energy_patterns.weekly_patterns.slice(-4).map((week, index) => {
+                  const maxLoad = Math.max(...analyticsData.energy_patterns.weekly_patterns.map(w => w.average_daily_load || 0), 1);
+                  const heightPercent = (week.average_daily_load / maxLoad) * 100;
+                  const energyColors = {
+                    "empty": "bg-muted",
+                    "very_light": "bg-green-400",
+                    "light": "bg-green-500",
+                    "balanced": "bg-primary",
+                    "moderate": "bg-amber-500",
+                    "heavy": "bg-red-500"
+                  };
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full flex items-end justify-center" style={{ height: "100px" }}>
+                        <div
+                          className={`w-full rounded-t transition-all duration-500 ${energyColors[week.energy_level as keyof typeof energyColors] || "bg-muted"}`}
+                          style={{ height: `${Math.max(heightPercent, 5)}%` }}
+                          title={`${week.average_daily_load.toFixed(1)} tasks/day, ${(week.average_completion_rate * 100).toFixed(0)}% completion`}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-sans text-center">
+                        {format(parseISO(week.week_start), "MMM d")}
                       </span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground font-sans">
+                <span>Load (tasks/day)</span>
+                <span>Completion: {analyticsData.energy_patterns.weekly_patterns[analyticsData.energy_patterns.weekly_patterns.length - 1]?.average_completion_rate ? 
+                  `${(analyticsData.energy_patterns.weekly_patterns[analyticsData.energy_patterns.weekly_patterns.length - 1].average_completion_rate * 100).toFixed(0)}%` : "N/A"}</span>
+              </div>
+            </div>
+
+            {/* Daily Breakdown for Current Week */}
+            {analyticsData.energy_patterns.daily_patterns && analyticsData.energy_patterns.daily_patterns.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  This Week
+                </h4>
+                <div className="grid grid-cols-7 gap-1">
+                  {analyticsData.energy_patterns.daily_patterns.map((day, index) => {
+                    const energyColors = {
+                      "empty": "bg-muted/30",
+                      "very_light": "bg-green-400/30",
+                      "light": "bg-green-500/40",
+                      "balanced": "bg-primary/50",
+                      "moderate": "bg-amber-500/50",
+                      "heavy": "bg-red-500/50",
+                      "unknown": "bg-muted/20"
+                    };
+                    return (
+                      <div key={index} className="flex flex-col items-center gap-1">
+                        <div className={`w-full aspect-square rounded ${energyColors[day.energy_level as keyof typeof energyColors] || "bg-muted/30"} flex flex-col items-center justify-center`}>
+                          <span className="text-[10px] font-sans font-medium text-foreground">{day.total_tasks}</span>
+                          {day.completion_rate > 0 && (
+                            <span className="text-[8px] font-sans text-muted-foreground">{Math.round(day.completion_rate * 100)}%</span>
+                          )}
+                        </div>
+                        <span className="text-[9px] text-muted-foreground font-sans">{day.day_name.slice(0, 3)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Insights */}
+            {analyticsData.energy_patterns.insights && analyticsData.energy_patterns.insights.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <div className="space-y-2">
+                  {analyticsData.energy_patterns.insights.map((insight, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <Sparkles className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-foreground font-sans leading-relaxed">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Weekly Summary */}
+            <div className="mt-4 pt-4 border-t border-border/50">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                {analyticsData.energy_patterns.weekly_patterns.length > 0 && (() => {
+                  const currentWeek = analyticsData.energy_patterns.weekly_patterns[analyticsData.energy_patterns.weekly_patterns.length - 1];
+                  return (
+                    <>
+                      <div>
+                        <div className="text-lg font-sans font-semibold text-foreground">{currentWeek.average_daily_load.toFixed(1)}</div>
+                        <div className="text-[10px] text-muted-foreground font-sans uppercase">Avg Load</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-sans font-semibold text-foreground">{Math.round((currentWeek.average_completion_rate || 0) * 100)}%</div>
+                        <div className="text-[10px] text-muted-foreground font-sans uppercase">Completion</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-sans font-semibold text-foreground">{Math.round(currentWeek.average_energy_score || 0)}</div>
+                        <div className="text-[10px] text-muted-foreground font-sans uppercase">Energy</div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         </div>

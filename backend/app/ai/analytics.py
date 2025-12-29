@@ -420,17 +420,33 @@ def calculate_consistency_metrics(checkins: List[Dict[str, Any]], days_back: int
 
 def calculate_energy_patterns(tasks: List[Dict[str, Any]], checkins: List[Dict[str, Any]], weeks: int = 4) -> Dict[str, Any]:
     """
-    Analyze energy patterns over time.
-    Energy is inferred from task load per day.
+    Analyze energy patterns over time with detailed insights.
+    Energy is inferred from task load, completion rates, and check-in data.
     """
+    from datetime import datetime, timedelta, date
+    from collections import defaultdict
+    
     today = datetime.now(tz).date()
     energy_by_week = []
+    daily_patterns = []
+    
+    # Get tasks by date for better analysis
+    tasks_by_date = defaultdict(list)
+    for task in tasks:
+        task_date_str = task.get("date")
+        if task_date_str:
+            try:
+                task_date = date.fromisoformat(task_date_str[:10])
+                tasks_by_date[task_date].append(task)
+            except (ValueError, TypeError):
+                continue
     
     for i in range(weeks):
         week_date = today - timedelta(weeks=i)
         week_start, week_end = get_week_boundaries(week_date)
         
         week_checkins = []
+        week_tasks = []
         for checkin in checkins:
             checkin_date_str = checkin.get("date")
             if checkin_date_str:
@@ -441,35 +457,197 @@ def calculate_energy_patterns(tasks: List[Dict[str, Any]], checkins: List[Dict[s
                 except (ValueError, TypeError):
                     continue
         
-        # Calculate average daily load
+        # Get tasks for this week
+        for d in range(7):
+            day_date = week_start + timedelta(days=d)
+            if day_date in tasks_by_date:
+                week_tasks.extend(tasks_by_date[day_date])
+        
+        # Calculate detailed metrics
         daily_loads = []
+        daily_completions = []
+        daily_energy_scores = []
+        
         for checkin in week_checkins:
             completed = len(checkin.get("completedTaskIds", []))
             incomplete = len(checkin.get("incompleteTaskIds", []))
-            daily_loads.append(completed + incomplete)
+            total = completed + incomplete
+            daily_loads.append(total)
+            
+            completion_rate = completed / total if total > 0 else 0
+            daily_completions.append(completion_rate)
+            
+            # Energy score: combination of load and completion (0-100)
+            # Higher load with good completion = high energy
+            # Low load = low energy (unless very high completion)
+            if total == 0:
+                energy_score = 0
+            elif total <= 3:
+                energy_score = 30 + (completion_rate * 20)  # 30-50
+            elif total <= 6:
+                energy_score = 50 + (completion_rate * 30)  # 50-80
+            else:
+                energy_score = 70 + (completion_rate * 20)  # 70-90
+            daily_energy_scores.append(min(100, energy_score))
+        
+        # Also analyze tasks directly if check-ins are sparse
+        if len(week_checkins) < 3 and week_tasks:
+            for day_date in [week_start + timedelta(days=d) for d in range(7)]:
+                day_tasks = tasks_by_date.get(day_date, [])
+                if day_tasks:
+                    total = len(day_tasks)
+                    completed = sum(1 for t in day_tasks if t.get("completed", False))
+                    daily_loads.append(total)
+                    completion_rate = completed / total if total > 0 else 0
+                    daily_completions.append(completion_rate)
         
         avg_daily_load = sum(daily_loads) / len(daily_loads) if daily_loads else 0
+        avg_completion_rate = sum(daily_completions) / len(daily_completions) if daily_completions else 0
+        avg_energy_score = sum(daily_energy_scores) / len(daily_energy_scores) if daily_energy_scores else 0
         
-        # Classify energy level
+        # Classify energy level with more nuance
         if avg_daily_load == 0:
             energy_level = "empty"
-        elif avg_daily_load <= 3:
+        elif avg_daily_load <= 2:
+            energy_level = "very_light"
+        elif avg_daily_load <= 4:
             energy_level = "light"
         elif avg_daily_load <= 6:
             energy_level = "balanced"
+        elif avg_daily_load <= 8:
+            energy_level = "moderate"
         else:
             energy_level = "heavy"
+        
+        # Determine trend
+        trend = "stable"
+        if i < weeks - 1 and len(energy_by_week) > 0:
+            prev_load = energy_by_week[-1].get("average_daily_load", 0)
+            if avg_daily_load > prev_load * 1.2:
+                trend = "increasing"
+            elif avg_daily_load < prev_load * 0.8:
+                trend = "decreasing"
         
         energy_by_week.append({
             "week_start": week_start.isoformat(),
             "week_end": week_end.isoformat(),
-            "average_daily_load": avg_daily_load,
+            "average_daily_load": round(avg_daily_load, 1),
+            "average_completion_rate": round(avg_completion_rate, 2),
+            "average_energy_score": round(avg_energy_score, 1),
             "energy_level": energy_level,
-            "days_tracked": len(week_checkins)
+            "days_tracked": len(week_checkins),
+            "total_tasks": len(week_tasks),
+            "completed_tasks": sum(1 for t in week_tasks if t.get("completed", False))
+        })
+    
+    # Calculate overall trend
+    overall_trend = "stable"
+    if len(energy_by_week) >= 2:
+        recent_load = energy_by_week[0].get("average_daily_load", 0)
+        older_load = energy_by_week[-1].get("average_daily_load", 0)
+        if recent_load > older_load * 1.15:
+            overall_trend = "increasing"
+        elif recent_load < older_load * 0.85:
+            overall_trend = "decreasing"
+    
+    # Daily breakdown for current week
+    current_week_start, current_week_end = get_week_boundaries(today)
+    for d in range(7):
+        day_date = current_week_start + timedelta(days=d)
+        day_tasks = tasks_by_date.get(day_date, [])
+        day_checkins = [c for c in checkins if c.get("date", "")[:10] == day_date.isoformat()]
+        
+        total = len(day_tasks)
+        completed = sum(1 for t in day_tasks if t.get("completed", False))
+        completion_rate = completed / total if total > 0 else 0
+        
+        # Get energy from check-in if available
+        energy_level = "unknown"
+        if day_checkins:
+            checkin = day_checkins[0]
+            completed_count = len(checkin.get("completedTaskIds", []))
+            incomplete_count = len(checkin.get("incompleteTaskIds", []))
+            checkin_total = completed_count + incomplete_count
+            
+            if checkin_total == 0:
+                energy_level = "empty"
+            elif checkin_total <= 2:
+                energy_level = "very_light"
+            elif checkin_total <= 4:
+                energy_level = "light"
+            elif checkin_total <= 6:
+                energy_level = "balanced"
+            elif checkin_total <= 8:
+                energy_level = "moderate"
+            else:
+                energy_level = "heavy"
+        elif total > 0:
+            if total <= 2:
+                energy_level = "very_light"
+            elif total <= 4:
+                energy_level = "light"
+            elif total <= 6:
+                energy_level = "balanced"
+            elif total <= 8:
+                energy_level = "moderate"
+            else:
+                energy_level = "heavy"
+        
+        daily_patterns.append({
+            "date": day_date.isoformat(),
+            "day_name": day_date.strftime("%A"),
+            "total_tasks": total,
+            "completed_tasks": completed,
+            "completion_rate": round(completion_rate, 2),
+            "energy_level": energy_level
         })
     
     return {
-        "weekly_patterns": energy_by_week,
-        "trend": "stable"  # Could calculate if getting heavier/lighter
+        "weekly_patterns": list(reversed(energy_by_week)),  # Oldest first
+        "daily_patterns": daily_patterns,
+        "trend": overall_trend,
+        "insights": _generate_energy_insights(energy_by_week, daily_patterns)
     }
+
+def _generate_energy_insights(weekly_patterns: List[Dict], daily_patterns: List[Dict]) -> List[str]:
+    """Generate actionable insights from energy patterns."""
+    insights = []
+    
+    if not weekly_patterns:
+        return ["Not enough data to analyze energy patterns yet."]
+    
+    # Check for burnout risk
+    recent_weeks = weekly_patterns[-2:] if len(weekly_patterns) >= 2 else weekly_patterns
+    heavy_weeks = sum(1 for w in recent_weeks if w.get("energy_level") in ["heavy", "moderate"])
+    if heavy_weeks == len(recent_weeks) and len(recent_weeks) >= 2:
+        insights.append("You've been maintaining a high load consistently. Consider scheduling lighter days.")
+    
+    # Check for low energy
+    light_weeks = sum(1 for w in recent_weeks if w.get("energy_level") in ["very_light", "light", "empty"])
+    if light_weeks == len(recent_weeks):
+        insights.append("Your load has been lighter recently. You might have capacity for more.")
+    
+    # Check completion rate vs load
+    for week in recent_weeks:
+        load = week.get("average_daily_load", 0)
+        completion = week.get("average_completion_rate", 0)
+        if load > 6 and completion < 0.6:
+            insights.append("High task load with lower completion suggests you might be overcommitting.")
+            break
+    
+    # Daily pattern insights
+    if daily_patterns:
+        weekday_loads = [d["total_tasks"] for d in daily_patterns if d["day_name"] not in ["Saturday", "Sunday"]]
+        weekend_loads = [d["total_tasks"] for d in daily_patterns if d["day_name"] in ["Saturday", "Sunday"]]
+        
+        if weekday_loads and weekend_loads:
+            avg_weekday = sum(weekday_loads) / len(weekday_loads)
+            avg_weekend = sum(weekend_loads) / len(weekend_loads)
+            if avg_weekend > avg_weekday * 0.8:
+                insights.append("You're maintaining similar load on weekends. Consider lighter weekends for recovery.")
+    
+    if not insights:
+        insights.append("Your energy patterns look balanced. Keep up the good work!")
+    
+    return insights[:3]  # Max 3 insights
 

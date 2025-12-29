@@ -3306,9 +3306,11 @@ async def get_weekly_reflection_summary(request: Request, current_user: dict = D
         
         client = get_client()
         
-        system_prompt = """You are a supportive life coach. Generate a concise 1-2 sentence summary of the user's weekly reflections. 
-Consider their tasks, completion rate, and goals. Be encouraging if they're doing well, or gently suggest improvements if needed.
-Be warm, personal, and actionable. Maximum 2 sentences."""
+        system_prompt = """You are a supportive life coach. Generate exactly 2 sentences that highlight the week:
+1. First sentence: The key highlight or meaningful moment from the week (what stood out, what they accomplished, or what they learned).
+2. Second sentence: A warm, encouraging acknowledgment of their progress or effort.
+
+Be warm, personal, and genuine. Keep each sentence under 15 words. Focus on the standout moments, not general summaries."""
         
         user_prompt = f"""User's reflections from the past 7 days:
 {reflections_combined}
@@ -3317,7 +3319,7 @@ Context:
 - {completion_text}
 {goals_text}
 
-Generate a 1-2 sentence summary that either celebrates their progress or gently suggests improvements based on their reflections, tasks, and goals."""
+Generate exactly 2 sentences highlighting the week: (1) The key highlight or meaningful moment, (2) A warm acknowledgment. Focus on what stood out, not general summaries."""
         
         # Run synchronous OpenAI call in executor
         loop = asyncio.get_event_loop()
@@ -3329,8 +3331,8 @@ Generate a 1-2 sentence summary that either celebrates their progress or gently 
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=100,
-                temperature=0.7
+                max_tokens=60,
+                temperature=0.8
             )
         )
         
