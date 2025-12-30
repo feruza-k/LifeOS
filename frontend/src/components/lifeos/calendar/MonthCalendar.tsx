@@ -166,7 +166,7 @@ export function MonthCalendar({
           </span>
           
           {/* Task titles */}
-          <div className="w-full space-y-0.5 overflow-hidden flex-1">
+          <div className="w-full space-y-0 overflow-hidden flex-1">
             {displayTasks.map((task, i) => {
               const categoryColor = getCategoryColor(task.value || "");
               const bgColor = isSelected 
@@ -177,14 +177,15 @@ export function MonthCalendar({
                 <div
                   key={task.id + i}
                   className={cn(
-                    "text-[11px] leading-snug rounded px-1.5 py-0.5 font-sans truncate",
+                    "text-[11px] leading-tight rounded px-1.5 py-0 font-sans truncate",
                     task.completed && "line-through opacity-50",
                     isSelected && "text-primary-foreground"
                   )}
                   style={{
                     backgroundColor: bgColor,
                     color: isSelected ? undefined : "inherit",
-                    borderLeft: !isSelected && task.value ? `3px solid ${categoryColor}` : undefined
+                    borderLeft: !isSelected && task.value ? `3px solid ${categoryColor}` : undefined,
+                    marginBottom: i < displayTasks.length - 1 ? '2px' : '0'
                   }}
                   title={task.title}
                 >
