@@ -182,7 +182,7 @@ const Explore = () => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [displayedNote, setDisplayedNote] = useState<string>("");
   const [weeklySummary, setWeeklySummary] = useState<string>("");
-  const [currentStatsView, setCurrentStatsView] = useState<"category" | "energy" | "productivity">("category");
+  const [currentStatsView, setCurrentStatsView] = useState<"category" | "energy" | "productivity" | "habits">("category");
   const statsRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const statsCarouselRef = useRef<HTMLDivElement>(null);
   const [statsSwipeStart, setStatsSwipeStart] = useState<number | null>(null);
@@ -415,11 +415,13 @@ const Explore = () => {
     const hasCategoryBalance = analyticsData?.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0;
     const hasEnergyPatterns = analyticsData?.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0;
     const hasProductivity = analyticsData?.productivity_insights;
+    const hasHabits = habitReinforcement && habitReinforcement.risk_indicators;
     
-    const availableViews: Array<"category" | "energy" | "productivity"> = [];
+    const availableViews: Array<"category" | "energy" | "productivity" | "habits"> = [];
     if (hasCategoryBalance) availableViews.push("category");
     if (hasEnergyPatterns) availableViews.push("energy");
     if (hasProductivity) availableViews.push("productivity");
+    if (hasHabits) availableViews.push("habits");
     
     if (availableViews.length > 1) {
       // Set initial view to first available
@@ -441,7 +443,7 @@ const Explore = () => {
         }
       };
     }
-  }, [analyticsData, currentStatsView]);
+  }, [analyticsData, habitReinforcement, currentStatsView]);
 
   const handleSetFocus = async (goals: Array<{ title: string; description?: string }>) => {
     try {
@@ -609,9 +611,18 @@ const Explore = () => {
                   <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
                     {weeklyPhotos[currentPhotoIndex] && (
                       <img
-                        src={weeklyPhotos[currentPhotoIndex].url}
+                        key={`${weeklyPhotos[currentPhotoIndex].filename}-${currentPhotoIndex}-${Date.now()}`}
+                        src={`${weeklyPhotos[currentPhotoIndex].url.split('?')[0]}?t=${Date.now()}`}
                         alt="Weekly photo"
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback: try without cache-busting if it fails
+                          const target = e.target as HTMLImageElement;
+                          const baseUrl = weeklyPhotos[currentPhotoIndex].url.split('?')[0];
+                          if (target.src !== baseUrl) {
+                            target.src = baseUrl;
+                          }
+                        }}
                       />
                     )}
                     {weeklyPhotos.length > 1 && (
@@ -630,14 +641,14 @@ const Explore = () => {
                   {/* Reflection Note - centered, rotates with photo */}
                   <div className="relative aspect-square flex items-center justify-center">
                     {weeklyPhotos[currentPhotoIndex]?.note ? (
-                      <p className="text-xs text-foreground font-sans italic leading-relaxed text-center px-2">
+                      <p className="text-sm text-foreground font-handwriting italic leading-relaxed text-center px-3" style={{ fontFamily: "'Dancing Script', 'Kalam', cursive" }}>
                         {displayedNote}
                         {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
-                          <span className="inline-block w-0.5 h-3 bg-foreground ml-0.5 animate-pulse" />
+                          <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
                         )}
                       </p>
                     ) : (
-                      <p className="text-xs text-muted-foreground font-sans italic leading-relaxed text-center px-2">
+                      <p className="text-sm text-muted-foreground font-handwriting italic leading-relaxed text-center px-3" style={{ fontFamily: "'Dancing Script', 'Kalam', cursive" }}>
                         No reflection for this moment
                       </p>
                     )}
@@ -649,158 +660,6 @@ const Explore = () => {
         </div>
       )}
 
-      {/* AI-Powered Habit Reinforcement */}
-      {habitReinforcement && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
-          <div className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Habit Health
-              </h3>
-            </div>
-
-            {/* Overall Score */}
-            <div className="mb-6">
-              <div className="flex items-center justify-center mb-3">
-                <div className="relative w-28 h-28">
-                  <svg className="transform -rotate-90 w-28 h-28" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="hsl(var(--muted))"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth="8"
-                      strokeDasharray={`${2 * Math.PI * 40}`}
-                      strokeDashoffset={`${2 * Math.PI * 40 * (1 - habitReinforcement.habit_strengths.overall_score / 100)}`}
-                      className="transition-all duration-500"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-sans font-bold text-foreground">
-                      {Math.round(habitReinforcement.habit_strengths.overall_score)}%
-                    </span>
-                    <span className="text-xs font-sans text-muted-foreground mt-0.5">Overall</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Habit Strengths Grid */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="p-3 bg-background/50 rounded-xl border border-primary/10">
-                <div className="text-xs font-sans font-medium text-muted-foreground mb-1">Check-ins</div>
-                <div className="text-lg font-sans font-bold text-foreground">
-                  {Math.round(habitReinforcement.habit_strengths.checkin_consistency)}%
-                </div>
-                {habitReinforcement.habit_strengths.checkin_streak > 0 && (
-                  <div className="text-xs font-sans text-muted-foreground mt-1">
-                    🔥 {habitReinforcement.habit_strengths.checkin_streak} day streak
-                  </div>
-              )}
-              </div>
-              <div className="p-3 bg-background/50 rounded-xl border border-primary/10">
-                <div className="text-xs font-sans font-medium text-muted-foreground mb-1">Completion</div>
-                <div className="text-lg font-sans font-bold text-foreground">
-                  {Math.round(habitReinforcement.habit_strengths.completion_rate)}%
-                </div>
-                {habitReinforcement.habit_strengths.completion_streak > 0 && (
-                  <div className="text-xs font-sans text-muted-foreground mt-1">
-                    ✨ {habitReinforcement.habit_strengths.completion_streak} day streak
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Encouragement Message */}
-            {habitReinforcement.encouragement && (
-              <div className="mb-4 p-3 bg-background/30 rounded-xl border border-primary/10">
-                <div className="flex items-start gap-2">
-                  <span className="text-lg">{habitReinforcement.encouragement.emoji}</span>
-                  <p className="text-sm font-sans text-foreground leading-relaxed flex-1">
-                    {habitReinforcement.encouragement.message}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Risk Indicators */}
-            {habitReinforcement.risk_indicators && habitReinforcement.risk_indicators.length > 0 && (
-              <div className="mb-4">
-                <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-2">Attention Areas</div>
-                <div className="space-y-2">
-                  {habitReinforcement.risk_indicators.slice(0, 3).map((risk: any, index: number) => (
-                    <div
-                      key={index}
-                      className={`p-2.5 rounded-lg border ${
-                        risk.severity === "high"
-                          ? "bg-amber-500/10 border-amber-500/20"
-                          : risk.severity === "medium"
-                          ? "bg-orange-500/10 border-orange-500/20"
-                          : "bg-muted/50 border-border/50"
-                      }`}
-                    >
-                      <div className="text-xs font-sans font-medium text-foreground mb-0.5">
-                        {risk.message}
-                      </div>
-                      {risk.context && (
-                        <div className="text-xs font-sans text-muted-foreground">
-                          {risk.context}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Micro Suggestions */}
-            {habitReinforcement.micro_suggestions && habitReinforcement.micro_suggestions.length > 0 && (
-              <div>
-                <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-2">Quick Actions</div>
-                <div className="space-y-2">
-                  {habitReinforcement.micro_suggestions.slice(0, 3).map((suggestion: any, index: number) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        if (suggestion.action === "schedule_checkin") {
-                          navigate("/");
-                        } else if (suggestion.action === "plan_tasks") {
-                          navigate("/calendar");
-                        } else if (suggestion.action === "restart_streak") {
-                          navigate("/");
-                        }
-                      }}
-                      className={`w-full p-3 rounded-xl border text-left transition-all ${
-                        suggestion.priority === "high"
-                          ? "bg-primary/10 border-primary/20 hover:bg-primary/15"
-                          : "bg-background/50 border-primary/10 hover:bg-background/70"
-                      }`}
-                    >
-                      <div className="text-sm font-sans font-medium text-foreground mb-1">
-                        {suggestion.title}
-                      </div>
-                      <div className="text-xs font-sans text-muted-foreground">
-                        {suggestion.description}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Suggestions from SolAI - MOVED TO TOP */}
       {alignData.nudge && (
@@ -1155,7 +1014,8 @@ const Explore = () => {
         const hasCategoryBalance = analyticsData?.category_balance?.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0;
         const hasEnergyPatterns = analyticsData?.energy_patterns?.weekly_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0;
         const hasProductivity = analyticsData?.productivity_insights;
-        const hasAnyStats = hasCategoryBalance || hasEnergyPatterns || hasProductivity;
+        const hasHabits = habitReinforcement && habitReinforcement.risk_indicators;
+        const hasAnyStats = hasCategoryBalance || hasEnergyPatterns || hasProductivity || hasHabits;
         
         if (!hasAnyStats) return null;
         
@@ -1356,9 +1216,9 @@ const Explore = () => {
                   {analyticsData.energy_patterns.trend && (
                     <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
                       analyticsData.energy_patterns.trend === "increasing" 
-                        ? "bg-orange-500/20 text-orange-600"
+                        ? "bg-emerald-500/20 text-emerald-600"
                         : analyticsData.energy_patterns.trend === "decreasing"
-                        ? "bg-orange-500/20 text-orange-600"
+                        ? "bg-emerald-500/20 text-emerald-600"
                         : "bg-muted text-muted-foreground"
                     }`}>
                       {analyticsData.energy_patterns.trend === "increasing" ? "↑ Increasing" :
@@ -1396,14 +1256,14 @@ const Explore = () => {
                 {analyticsData.energy_patterns.weekly_patterns.slice(-4).map((week, index) => {
                   const maxLoad = Math.max(...analyticsData.energy_patterns.weekly_patterns.map(w => w.average_daily_load || 0), 1);
                   const heightPercent = (week.average_daily_load / maxLoad) * 100;
-                  // Aesthetic orange colors matching Prioritize Rest background
+                  // Aesthetic green colors matching Space Available background
                   const energyColors = {
                     "empty": "bg-muted",
-                    "very_light": "bg-orange-200",
-                    "light": "bg-orange-300",
-                    "balanced": "bg-orange-400",
-                    "moderate": "bg-orange-500",
-                    "heavy": "bg-orange-600"
+                    "very_light": "bg-emerald-200",
+                    "light": "bg-emerald-300",
+                    "balanced": "bg-emerald-400",
+                    "moderate": "bg-emerald-500",
+                    "heavy": "bg-emerald-600"
                   };
                   return (
                     <div key={index} className="flex-1 flex flex-col items-center gap-1">
@@ -1428,37 +1288,6 @@ const Explore = () => {
               </div>
             </div>
 
-            {/* Daily Breakdown for Current Week - Using Today Screen Colors */}
-            {analyticsData.energy_patterns.daily_patterns && analyticsData.energy_patterns.daily_patterns.length > 0 && (
-              <div className="mb-4">
-                <div className="grid grid-cols-7 gap-1">
-                  {analyticsData.energy_patterns.daily_patterns.map((day, index) => {
-                    // Map energy levels to Today screen balance colors
-                    const getBalanceColor = (energyLevel: string) => {
-                      if (energyLevel === "empty" || energyLevel === "very_light" || energyLevel === "light") {
-                        return "bg-balance-low";
-                      } else if (energyLevel === "balanced" || energyLevel === "moderate") {
-                        return "bg-balance-optimal";
-                      } else if (energyLevel === "heavy") {
-                        return "bg-balance-heavy";
-                      }
-                      return "bg-muted/20";
-                    };
-                    return (
-                      <div key={index} className="flex flex-col items-center gap-1">
-                        <div className={`w-full aspect-square rounded ${getBalanceColor(day.energy_level)} flex flex-col items-center justify-center`}>
-                          <span className="text-[10px] font-sans font-medium text-foreground">{day.total_tasks}</span>
-                          {day.completion_rate > 0 && (
-                            <span className="text-[8px] font-sans text-muted-foreground">{Math.round(day.completion_rate * 100)}%</span>
-                          )}
-                        </div>
-                        <span className="text-[9px] text-muted-foreground font-sans">{day.day_name.slice(0, 3)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
                 {/* Insights */}
                 {analyticsData.energy_patterns.insights && analyticsData.energy_patterns.insights.length > 0 && (
@@ -1616,9 +1445,112 @@ const Explore = () => {
               </>
             )}
 
+            {/* Habit Reinforcement View - Predictive/Forward-Looking */}
+            {currentStatsView === "habits" && habitReinforcement && habitReinforcement.risk_indicators && (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                    Habit Focus
+                  </h3>
+                </div>
+
+                {/* Forward-Looking Message */}
+                {habitReinforcement.encouragement && (
+                  <div className="mb-6 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="flex items-start gap-2">
+                      <span className="text-xl">{habitReinforcement.encouragement.emoji}</span>
+                      <p className="text-sm font-sans text-foreground leading-relaxed flex-1">
+                        {habitReinforcement.encouragement.message}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Risk Indicators - What to Watch */}
+                {habitReinforcement.risk_indicators && habitReinforcement.risk_indicators.length > 0 && (
+                  <div className="mb-6">
+                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-3">Focus Areas This Week</div>
+                    <div className="space-y-2.5">
+                      {habitReinforcement.risk_indicators.slice(0, 3).map((risk: any, index: number) => (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-xl border ${
+                            risk.severity === "high"
+                              ? "bg-amber-500/10 border-amber-500/20"
+                              : risk.severity === "medium"
+                              ? "bg-orange-500/10 border-orange-500/20"
+                              : "bg-muted/50 border-border/50"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-sm mt-0.5">
+                              {risk.severity === "high" ? "⚠️" : risk.severity === "medium" ? "⚡" : "💡"}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-sm font-sans font-medium text-foreground mb-1">
+                                {risk.message}
+                              </div>
+                              {risk.context && (
+                                <div className="text-xs font-sans text-muted-foreground">
+                                  {risk.context}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actionable Suggestions */}
+                {habitReinforcement.micro_suggestions && habitReinforcement.micro_suggestions.length > 0 && (
+                  <div>
+                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-3">Next Steps</div>
+                    <div className="space-y-2">
+                      {habitReinforcement.micro_suggestions.slice(0, 3).map((suggestion: any, index: number) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            if (suggestion.action === "schedule_checkin") {
+                              navigate("/");
+                            } else if (suggestion.action === "plan_tasks") {
+                              navigate("/calendar");
+                            } else if (suggestion.action === "restart_streak") {
+                              navigate("/");
+                            }
+                          }}
+                          className={`w-full p-3 rounded-xl border text-left transition-all ${
+                            suggestion.priority === "high"
+                              ? "bg-primary/10 border-primary/20 hover:bg-primary/15"
+                              : "bg-background/50 border-primary/10 hover:bg-background/70"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-sm mt-0.5">
+                              {suggestion.priority === "high" ? "🎯" : "✨"}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-sm font-sans font-medium text-foreground mb-1">
+                                {suggestion.title}
+                              </div>
+                              <div className="text-xs font-sans text-muted-foreground">
+                                {suggestion.description}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Navigation dots for rotating stats */}
             {(() => {
-              const availableViews: Array<"category" | "energy" | "productivity"> = [];
+              const availableViews: Array<"category" | "energy" | "productivity" | "habits"> = [];
               if (analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0) {
                 availableViews.push("category");
               }
@@ -1627,6 +1559,9 @@ const Explore = () => {
               }
               if (analyticsData.productivity_insights) {
                 availableViews.push("productivity");
+              }
+              if (habitReinforcement && habitReinforcement.risk_indicators) {
+                availableViews.push("habits");
               }
               
               if (availableViews.length > 1) {

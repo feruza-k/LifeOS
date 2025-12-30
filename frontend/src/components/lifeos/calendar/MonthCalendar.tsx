@@ -147,7 +147,7 @@ export function MonthCalendar({
           key={day.toISOString()}
           onClick={() => onSelectDate(currentDay)}
           className={cn(
-            "relative flex flex-col items-start p-0.5 min-h-[100px] rounded-lg transition-all duration-200 text-left border-l-4",
+            "relative flex flex-col items-start p-0.5 min-h-[105px] rounded-lg transition-all duration-200 text-left border-l-4",
             !isCurrentMonth && "opacity-30",
             isSelected && "bg-primary border-l-primary",
             !isSelected && isCurrentMonth && isToday && "border-l-primary/40 bg-background",
@@ -177,7 +177,7 @@ export function MonthCalendar({
                 <div
                   key={task.id + i}
                   className={cn(
-                    "text-[11px] leading-tight rounded px-1.5 py-0.5 font-sans truncate",
+                    "text-[11px] leading-tight rounded px-1.5 py-1 font-sans",
                     task.completed && "line-through opacity-50",
                     isSelected && "text-primary-foreground"
                   )}
