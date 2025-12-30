@@ -1037,11 +1037,15 @@ const Explore = () => {
       )}
 
       {/* Rotating Stats: Category Balance, Energy Patterns, Productivity Insights */}
-      {analyticsData && (
-        (analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0) ||
-        (analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0) ||
-        analyticsData.productivity_insights
-      ) && (
+      {(() => {
+        const hasCategoryBalance = analyticsData?.category_balance?.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0;
+        const hasEnergyPatterns = analyticsData?.energy_patterns?.weekly_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0;
+        const hasProductivity = analyticsData?.productivity_insights;
+        const hasAnyStats = hasCategoryBalance || hasEnergyPatterns || hasProductivity;
+        
+        if (!hasAnyStats) return null;
+        
+        return (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             {/* Category Balance View */}
@@ -1368,6 +1372,7 @@ const Explore = () => {
                     />
                   </div>
                 </div>
+                </div>
               </>
             )}
 
@@ -1418,7 +1423,8 @@ const Explore = () => {
             })()}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Upcoming Week Preview */}
       {analyticsData && analyticsData.upcoming_week_preview && analyticsData.upcoming_week_preview.total_tasks > 0 && (
