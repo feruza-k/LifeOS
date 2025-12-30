@@ -287,7 +287,10 @@ const Explore = () => {
       const [summary, analytics, habitData] = await Promise.all([
         api.getAlignSummary(),
         api.getAlignAnalytics().catch(() => null), // Analytics is optional
-        api.getHabitReinforcement().catch(() => null) // Habit reinforcement is optional
+        api.getHabitReinforcement().catch((error) => {
+          console.error("Failed to load habit reinforcement:", error);
+          return null;
+        }) // Habit reinforcement is optional
       ]);
       setAlignData(summary);
       setAnalyticsData(analytics);
@@ -460,7 +463,7 @@ const Explore = () => {
     const hasCategoryBalance = analyticsData?.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0;
     const hasEnergyPatterns = analyticsData?.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0;
     const hasProductivity = analyticsData?.productivity_insights;
-    const hasHabits = habitReinforcement && habitReinforcement.risk_indicators;
+    const hasHabits = habitReinforcement && (habitReinforcement.micro_suggestions || habitReinforcement.encouragement || habitReinforcement.risk_indicators);
     
     const availableViews: Array<"category" | "energy" | "productivity" | "habits"> = [];
     if (hasCategoryBalance) availableViews.push("category");
@@ -1069,7 +1072,7 @@ const Explore = () => {
         const hasCategoryBalance = analyticsData?.category_balance?.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0;
         const hasEnergyPatterns = analyticsData?.energy_patterns?.weekly_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0;
         const hasProductivity = analyticsData?.productivity_insights;
-        const hasHabits = habitReinforcement && habitReinforcement.risk_indicators;
+        const hasHabits = habitReinforcement && (habitReinforcement.micro_suggestions || habitReinforcement.encouragement || habitReinforcement.risk_indicators);
         const hasAnyStats = hasCategoryBalance || hasEnergyPatterns || hasProductivity || hasHabits;
         
         if (!hasAnyStats) return null;
@@ -1599,7 +1602,7 @@ const Explore = () => {
               if (analyticsData.productivity_insights) {
                 availableViews.push("productivity");
               }
-              if (habitReinforcement && (habitReinforcement.micro_suggestions || habitReinforcement.encouragement)) {
+              if (habitReinforcement && (habitReinforcement.micro_suggestions || habitReinforcement.encouragement || habitReinforcement.risk_indicators)) {
                 availableViews.push("habits");
               }
               
