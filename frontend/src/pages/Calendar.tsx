@@ -232,7 +232,7 @@ const CalendarPage = () => {
       </header>
 
       {/* Calendar Container */}
-      <div className="mx-4 bg-card rounded-2xl shadow-soft overflow-hidden animate-scale-in">
+      <div className="mx-1 bg-card rounded-2xl shadow-soft overflow-hidden animate-scale-in">
         {/* Category Filters - Inside the card */}
         <CalendarFilters 
           selectedCategories={selectedCategories} 

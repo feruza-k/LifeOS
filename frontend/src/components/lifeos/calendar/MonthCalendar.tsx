@@ -147,7 +147,7 @@ export function MonthCalendar({
           key={day.toISOString()}
           onClick={() => onSelectDate(currentDay)}
           className={cn(
-            "relative flex flex-col items-start p-2.5 min-h-[120px] rounded-lg transition-all duration-200 text-left border-l-4",
+            "relative flex flex-col items-start p-1.5 min-h-[100px] rounded-lg transition-all duration-200 text-left border-l-4",
             !isCurrentMonth && "opacity-30",
             isSelected && "bg-primary border-l-primary",
             !isSelected && isCurrentMonth && isToday && "border-l-primary/40 bg-background",
@@ -166,7 +166,7 @@ export function MonthCalendar({
           </span>
           
           {/* Task titles */}
-          <div className="w-full space-y-1 overflow-hidden flex-1">
+          <div className="w-full space-y-0.5 overflow-hidden flex-1">
             {displayTasks.map((task, i) => {
               const categoryColor = getCategoryColor(task.value || "");
               const bgColor = isSelected 
@@ -177,7 +177,7 @@ export function MonthCalendar({
                 <div
                   key={task.id + i}
                   className={cn(
-                    "text-[11px] leading-tight rounded px-2 py-1 font-sans line-clamp-2",
+                    "text-[11px] leading-snug rounded px-1.5 py-0.5 font-sans truncate",
                     task.completed && "line-through opacity-50",
                     isSelected && "text-primary-foreground"
                   )}
@@ -211,9 +211,9 @@ export function MonthCalendar({
   };
 
   return (
-    <div className="px-2 pb-3 animate-slide-up">
+    <div className="px-1 pb-3 animate-slide-up">
       {/* Weekday Headers */}
-      <div className="grid grid-cols-7 gap-0.5 mb-2">
+      <div className="grid grid-cols-7 gap-1 mb-2">
         {WEEKDAYS.map((day) => (
           <div
             key={day}
@@ -225,7 +225,7 @@ export function MonthCalendar({
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-0.5">{renderDays()}</div>
+      <div className="grid grid-cols-7 gap-1">{renderDays()}</div>
       
       <p className="text-center text-xs text-muted-foreground/60 font-sans mt-3">
         Swipe left/right to change month

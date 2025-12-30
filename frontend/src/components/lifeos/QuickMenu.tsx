@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { MoreVertical, FileText, Bell, Settings } from "lucide-react";
+import { MoreHorizontal, FileText, Bell, Settings } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ export function QuickMenu() {
           className="w-10 h-10 rounded-full bg-muted/50 hover:bg-muted flex items-center justify-center transition-all active:scale-95 hover:scale-105"
           aria-label="Open quick menu"
         >
-          <MoreVertical className="w-5 h-5 text-foreground" />
+          <MoreHorizontal className="w-5 h-5 text-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent 
