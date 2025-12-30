@@ -112,6 +112,14 @@ export function DayModal({
     setIsEditingNote(false);
   };
 
+  // Auto-save on blur with debounce
+  const handleNoteBlur = () => {
+    // Small delay to allow for any pending changes
+    setTimeout(() => {
+      handleSaveNote();
+    }, 100);
+  };
+
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -447,15 +455,34 @@ export function DayModal({
                   <div className="relative group">
                     <div 
                       onClick={() => setShowFullImage(true)}
-                      className="cursor-pointer overflow-hidden rounded-2xl shadow-md hover:shadow-lg transition-shadow"
+                      className="cursor-pointer overflow-hidden rounded-2xl shadow-md hover:shadow-lg transition-shadow relative"
                     >
                       <img
-                        src={api.getPhotoUrl(dayPhoto.filename)}
+                        key={`${dayPhoto.filename}-${Date.now()}`}
+                        src={`${api.getPhotoUrl(dayPhoto.filename)}?t=${Date.now()}`}
                         alt={`Photo from ${format(date, "MMM d")}`}
                         className="w-full aspect-video object-cover"
+                        onError={(e) => {
+                          // Fallback: try without cache-busting
+                          const target = e.target as HTMLImageElement;
+                          const baseUrl = api.getPhotoUrl(dayPhoto.filename);
+                          if (target.src !== baseUrl) {
+                            target.src = baseUrl;
+                          } else {
+                            // If still fails, show placeholder
+                            target.style.display = 'none';
+                            const placeholder = target.parentElement?.querySelector('.image-placeholder') as HTMLElement;
+                            if (placeholder) {
+                              placeholder.style.display = 'flex';
+                            }
+                          }
+                        }}
                       />
+                      <div className="image-placeholder hidden absolute inset-0 bg-muted/50 flex items-center justify-center rounded-2xl">
+                        <Image className="w-12 h-12 text-muted-foreground/40" />
+                      </div>
                     </div>
-                    {isToday && (
+                    {!isFuture && (
                       <div className="absolute top-3 right-3 flex gap-2">
                         <button
                           onClick={(e) => {
@@ -464,7 +491,7 @@ export function DayModal({
                           }}
                           disabled={isUploading}
                           className="w-9 h-9 rounded-full bg-background/95 backdrop-blur-sm text-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 shadow-md hover:scale-105"
-                          title="Retake photo"
+                          title="Update photo"
                         >
                           <Camera className="w-4 h-4" />
                         </button>
@@ -493,32 +520,14 @@ export function DayModal({
                     : "bg-muted/30 border-border/20"
                 )}>
                   {isEditingNote ? (
-                    <div className="space-y-3">
-                      <textarea
-                        value={noteContent}
-                        onChange={(e) => setNoteContent(e.target.value)}
-                        placeholder="Write your thoughts for this day..."
-                        className="w-full min-h-[120px] bg-background/50 rounded-xl p-4 text-sm font-sans text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 border border-border/30"
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setNoteContent(getMergedNoteContent());
-                            setIsEditingNote(false);
-                          }}
-                          className="flex-1 py-2.5 rounded-xl bg-muted/50 hover:bg-muted text-foreground font-sans text-sm font-medium transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSaveNote}
-                          className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-sans text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    </div>
+                    <textarea
+                      value={noteContent}
+                      onChange={(e) => setNoteContent(e.target.value)}
+                      onBlur={handleNoteBlur}
+                      placeholder="Write your thoughts for this day... (auto-saves)"
+                      className="w-full min-h-[120px] bg-background/50 rounded-xl p-4 text-sm font-sans text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 border border-border/30"
+                      autoFocus
+                    />
                   ) : (
                     <div className="space-y-3">
                       {/* Mood indicator - subtle, only if mood exists */}
@@ -579,10 +588,18 @@ export function DayModal({
         >
           <div className="relative max-w-full max-h-full">
             <img
-              src={api.getPhotoUrl(dayPhoto.filename)}
+              key={`${dayPhoto.filename}-full-${Date.now()}`}
+              src={`${api.getPhotoUrl(dayPhoto.filename)}?t=${Date.now()}`}
               alt={`Photo from ${format(date, "MMM d")}`}
               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                const baseUrl = api.getPhotoUrl(dayPhoto.filename);
+                if (target.src !== baseUrl) {
+                  target.src = baseUrl;
+                }
+              }}
             />
             <button
               onClick={() => setShowFullImage(false)}

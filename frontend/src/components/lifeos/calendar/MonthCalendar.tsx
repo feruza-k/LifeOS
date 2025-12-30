@@ -177,7 +177,7 @@ export function MonthCalendar({
                 <div
                   key={task.id + i}
                   className={cn(
-                    "text-[11px] leading-tight rounded px-1.5 py-1 font-sans",
+                    "text-[11px] leading-tight rounded px-1.5 py-1 font-sans whitespace-nowrap overflow-hidden text-ellipsis",
                     task.completed && "line-through opacity-50",
                     isSelected && "text-primary-foreground"
                   )}

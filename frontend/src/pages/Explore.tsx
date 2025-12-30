@@ -1446,7 +1446,7 @@ const Explore = () => {
             )}
 
             {/* Habit Reinforcement View - Predictive/Forward-Looking */}
-            {currentStatsView === "habits" && habitReinforcement && habitReinforcement.risk_indicators && (
+            {currentStatsView === "habits" && habitReinforcement && habitReinforcement.habit_strengths && (
               <>
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-4 h-4 text-primary" />
@@ -1455,27 +1455,84 @@ const Explore = () => {
                   </h3>
                 </div>
 
-                {/* Forward-Looking Message */}
-                {habitReinforcement.encouragement && (
-                  <div className="mb-6 p-4 bg-primary/5 rounded-xl border border-primary/10">
-                    <div className="flex items-start gap-2">
-                      <span className="text-xl">{habitReinforcement.encouragement.emoji}</span>
-                      <p className="text-sm font-sans text-foreground leading-relaxed flex-1">
-                        {habitReinforcement.encouragement.message}
-                      </p>
+                {/* Overall Habit Health Score - Circular Progress */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-center mb-3">
+                    <div className="relative w-32 h-32">
+                      <svg className="transform -rotate-90 w-32 h-32" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="none"
+                          stroke="hsl(var(--muted))"
+                          strokeWidth="8"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="none"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth="8"
+                          strokeDasharray={`${2 * Math.PI * 40}`}
+                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - habitReinforcement.habit_strengths.overall_score / 100)}`}
+                          className="transition-all duration-500"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-sans font-bold text-foreground">
+                          {Math.round(habitReinforcement.habit_strengths.overall_score)}%
+                        </span>
+                        <span className="text-xs font-sans text-muted-foreground mt-0.5">Habit Health</span>
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* Risk Indicators - What to Watch */}
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {/* Check-in Consistency */}
+                  <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Check-ins</span>
+                    </div>
+                    <div className="text-lg font-sans font-bold text-foreground mb-0.5">
+                      {Math.round(habitReinforcement.habit_strengths.checkin_consistency)}%
+                    </div>
+                    {habitReinforcement.habit_strengths.checkin_streak > 0 && (
+                      <div className="text-xs font-sans text-muted-foreground">
+                        🔥 {habitReinforcement.habit_strengths.checkin_streak} day streak
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Activity Consistency */}
+                  <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Activity</span>
+                    </div>
+                    <div className="text-lg font-sans font-bold text-foreground mb-0.5">
+                      {Math.round(habitReinforcement.habit_strengths.activity_consistency)}%
+                    </div>
+                    <div className="text-xs font-sans text-muted-foreground">
+                      Daily consistency
+                    </div>
+                  </div>
+                </div>
+
+                {/* Risk Indicators - Focus Areas */}
                 {habitReinforcement.risk_indicators && habitReinforcement.risk_indicators.length > 0 && (
-                  <div className="mb-6">
-                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-3">Focus Areas This Week</div>
-                    <div className="space-y-2.5">
-                      {habitReinforcement.risk_indicators.slice(0, 3).map((risk: any, index: number) => (
+                  <div className="mb-4">
+                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-3">Focus Areas</div>
+                    <div className="space-y-2">
+                      {habitReinforcement.risk_indicators.slice(0, 2).map((risk: any, index: number) => (
                         <div
                           key={index}
-                          className={`p-3 rounded-xl border ${
+                          className={`p-2.5 rounded-xl border ${
                             risk.severity === "high"
                               ? "bg-amber-500/10 border-amber-500/20"
                               : risk.severity === "medium"
@@ -1483,20 +1540,8 @@ const Explore = () => {
                               : "bg-muted/50 border-border/50"
                           }`}
                         >
-                          <div className="flex items-start gap-2">
-                            <span className="text-sm mt-0.5">
-                              {risk.severity === "high" ? "⚠️" : risk.severity === "medium" ? "⚡" : "💡"}
-                            </span>
-                            <div className="flex-1">
-                              <div className="text-sm font-sans font-medium text-foreground mb-1">
-                                {risk.message}
-                              </div>
-                              {risk.context && (
-                                <div className="text-xs font-sans text-muted-foreground">
-                                  {risk.context}
-                                </div>
-                              )}
-                            </div>
+                          <div className="text-xs font-sans font-medium text-foreground">
+                            {risk.message}
                           </div>
                         </div>
                       ))}
@@ -1504,45 +1549,34 @@ const Explore = () => {
                   </div>
                 )}
 
-                {/* Actionable Suggestions */}
+                {/* Top Actionable Suggestion */}
                 {habitReinforcement.micro_suggestions && habitReinforcement.micro_suggestions.length > 0 && (
                   <div>
-                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-3">Next Steps</div>
-                    <div className="space-y-2">
-                      {habitReinforcement.micro_suggestions.slice(0, 3).map((suggestion: any, index: number) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            if (suggestion.action === "schedule_checkin") {
-                              navigate("/");
-                            } else if (suggestion.action === "plan_tasks") {
-                              navigate("/calendar");
-                            } else if (suggestion.action === "restart_streak") {
-                              navigate("/");
-                            }
-                          }}
-                          className={`w-full p-3 rounded-xl border text-left transition-all ${
-                            suggestion.priority === "high"
-                              ? "bg-primary/10 border-primary/20 hover:bg-primary/15"
-                              : "bg-background/50 border-primary/10 hover:bg-background/70"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <span className="text-sm mt-0.5">
-                              {suggestion.priority === "high" ? "🎯" : "✨"}
-                            </span>
-                            <div className="flex-1">
-                              <div className="text-sm font-sans font-medium text-foreground mb-1">
-                                {suggestion.title}
-                              </div>
-                              <div className="text-xs font-sans text-muted-foreground">
-                                {suggestion.description}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-2">Next Step</div>
+                    <button
+                      onClick={() => {
+                        const suggestion = habitReinforcement.micro_suggestions[0];
+                        if (suggestion.action === "schedule_checkin") {
+                          navigate("/");
+                        } else if (suggestion.action === "plan_tasks") {
+                          navigate("/calendar");
+                        } else if (suggestion.action === "restart_streak") {
+                          navigate("/");
+                        }
+                      }}
+                      className={`w-full p-3 rounded-xl border text-left transition-all ${
+                        habitReinforcement.micro_suggestions[0].priority === "high"
+                          ? "bg-primary/10 border-primary/20 hover:bg-primary/15"
+                          : "bg-background/50 border-primary/10 hover:bg-background/70"
+                      }`}
+                    >
+                      <div className="text-sm font-sans font-medium text-foreground mb-1">
+                        {habitReinforcement.micro_suggestions[0].title}
+                      </div>
+                      <div className="text-xs font-sans text-muted-foreground">
+                        {habitReinforcement.micro_suggestions[0].description}
+                      </div>
+                    </button>
                   </div>
                 )}
               </>
