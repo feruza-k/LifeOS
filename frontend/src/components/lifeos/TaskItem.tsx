@@ -59,14 +59,14 @@ export function TaskItem({ task, onToggle, onDelete }: TaskItemProps) {
         <div className="pl-2">
           <div className="flex items-center gap-2">
             <p className={cn(
-              "font-sans font-medium text-foreground truncate",
+              "text-sm font-sans font-medium text-foreground truncate",
               task.completed && "line-through text-muted-foreground"
             )}>
               {task.title}
             </p>
           </div>
           {task.time && (
-            <p className="text-sm text-muted-foreground font-sans mt-0.5">
+            <p className="text-xs text-muted-foreground font-sans mt-0.5">
               {task.time}{task.endTime && ` - ${task.endTime}`}
               {task.endTime && (() => {
                 // Calculate duration

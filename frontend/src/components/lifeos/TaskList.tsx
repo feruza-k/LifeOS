@@ -31,7 +31,7 @@ export function TaskList({ groups, onToggleTask, onDeleteTask, onAddTask }: Task
           <div key={group.title}>
             {/* Main Section Header */}
             <div className="flex items-center justify-between mb-3 px-1">
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+              <h3 className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                 {group.title}
               </h3>
               {groupIndex === 0 && onAddTask && (

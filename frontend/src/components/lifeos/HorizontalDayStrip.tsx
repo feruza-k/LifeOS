@@ -89,7 +89,7 @@ export function HorizontalDayStrip({ selectedDate, onDateSelect }: HorizontalDay
                   {format(day, "EEE")}
                 </span>
                 <span className={cn(
-                  "text-lg font-sans font-semibold",
+                  "text-base font-sans font-semibold",
                   isSelected ? "text-primary-foreground" : isToday ? "text-primary" : "text-foreground"
                 )}>
                   {format(day, "d")}

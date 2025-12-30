@@ -147,7 +147,7 @@ export function MonthCalendar({
           key={day.toISOString()}
           onClick={() => onSelectDate(currentDay)}
           className={cn(
-            "relative flex flex-col items-start p-1.5 min-h-[100px] rounded-lg transition-all duration-200 text-left border-l-4",
+            "relative flex flex-col items-start p-0.5 min-h-[100px] rounded-lg transition-all duration-200 text-left border-l-4",
             !isCurrentMonth && "opacity-30",
             isSelected && "bg-primary border-l-primary",
             !isSelected && isCurrentMonth && isToday && "border-l-primary/40 bg-background",
@@ -211,7 +211,7 @@ export function MonthCalendar({
   };
 
   return (
-    <div className="px-1 pb-3 animate-slide-up">
+    <div className="px-0.5 pb-3 animate-slide-up">
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-0.5 mb-2">
         {WEEKDAYS.map((day) => (

@@ -2299,32 +2299,37 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
         import logging
         logger = logging.getLogger(__name__)
         
-        # Check if user already has a user-specific category with the same label (before or after update)
-        # Use the new label if provided, otherwise use the original label
-        target_label = updates_dict.get("label") if "label" in updates_dict else category.get("label", "")
+        # Get all user categories to check for existing custom version
         user_categories = await db_repo.get_categories(current_user["id"])
+        user_specific_categories = [c for c in user_categories if c.get("user_id") == current_user["id"]]
+        
+        # Strategy: Try to find existing user category that matches
+        # First, try matching by original label (in case user already customized it)
+        original_label = category.get("label", "")
         existing_user_category = next(
-            (c for c in user_categories 
-             if c.get("user_id") == current_user["id"] 
-             and c.get("label", "").lower() == target_label.lower()),
+            (c for c in user_specific_categories 
+             if c.get("label", "").lower() == original_label.lower()),
             None
         )
         
+        # If not found, check if there's a user category with the target label (new label if updating)
+        if not existing_user_category:
+            target_label = updates_dict.get("label") if "label" in updates_dict else original_label
+            existing_user_category = next(
+                (c for c in user_specific_categories 
+                 if c.get("label", "").lower() == target_label.lower()),
+                None
+            )
+        
+        
         if existing_user_category:
-            # User already has a custom version with this label, update it instead
-            # Merge updates: if only color is being updated, keep existing label; if label is updated, use new label
-            merged_updates = {**updates_dict}
-            if "label" not in merged_updates:
-                # If label wasn't in updates, keep the existing user category's label
-                merged_updates["label"] = existing_user_category.get("label")
-            result = await db_repo.update_category(existing_user_category["id"], merged_updates)
-            # Also update tasks that reference the old global category
+            # User already has a custom version, update it
+            result = await db_repo.update_category(existing_user_category["id"], updates_dict)
+            # Update tasks that reference the global category to use the user-specific one
             updated_count = await db_repo.update_tasks_category(real_category_id, existing_user_category["id"], current_user["id"])
             logger.info(f"Updated existing user category '{result.get('label')}' and updated {updated_count} tasks")
         else:
             # Create new user-specific category with updated values
-            # If only color is being updated, keep the original label
-            # If label is being updated, use the new label
             new_category = {
                 "label": updates_dict.get("label") if "label" in updates_dict else category["label"],
                 "color": updates_dict.get("color") if "color" in updates_dict else category["color"],
@@ -2332,6 +2337,7 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
             }
             result = await db_repo.add_category(new_category)
             
+            # Update tasks that reference the global category to use the new user-specific one
             updated_count = await db_repo.update_tasks_category(real_category_id, result["id"], current_user["id"])
             logger.info(f"Created new user category '{result['label']}' and updated {updated_count} tasks")
         

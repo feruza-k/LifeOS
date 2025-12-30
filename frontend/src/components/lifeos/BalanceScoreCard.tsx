@@ -43,10 +43,10 @@ export function BalanceScoreCard({
       <div className={cn("rounded-2xl p-5 shadow-card transition-all duration-300", config.className)}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-foreground/60 text-sm font-sans font-medium">
+            <p className="text-foreground/60 text-xs font-sans font-medium">
               {config.subtitle}
             </p>
-            <h2 className="text-foreground text-xl font-bold mt-0.5 font-sans">
+            <h2 className="text-foreground text-lg font-bold mt-0.5 font-sans">
               {config.label}
             </h2>
           </div>
@@ -68,7 +68,7 @@ export function BalanceScoreCard({
             </div>
           </div>}
         
-        <p className="text-foreground/70 text-sm font-sans mt-3">
+        <p className="text-foreground/70 text-xs font-sans mt-3">
           {config.description}
         </p>
       </div>

@@ -46,13 +46,13 @@ export function Header({ onTitleClick }: HeaderProps) {
       <h1 
         onClick={onTitleClick}
         className={cn(
-          "text-xl text-foreground mt-1 font-sans font-semibold",
+          "text-lg text-foreground mt-1 font-sans font-semibold",
           onTitleClick && "cursor-pointer hover:opacity-80 transition-opacity"
         )}
       >
         Today, {format(today, "MMM d")}
       </h1>
-      <p className="text-sm text-muted-foreground font-sans mt-1 leading-relaxed">
+      <p className="text-xs text-muted-foreground font-sans mt-1 leading-relaxed">
         {greeting}
       </p>
     </header>
