@@ -3,6 +3,7 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, addDays, subDay
 import { normalizeDate } from "@/utils/dateUtils";
 import { LayoutGrid, Calendar as CalendarIcon } from "lucide-react";
 import { BottomNav } from "@/components/lifeos/BottomNav";
+import { QuickMenu } from "@/components/lifeos/QuickMenu";
 import { CalendarFilters } from "@/components/lifeos/calendar/CalendarFilters";
 import { MonthCalendar } from "@/components/lifeos/calendar/MonthCalendar";
 import { WeekScheduleView } from "@/components/lifeos/calendar/WeekScheduleView";
@@ -191,8 +192,9 @@ const CalendarPage = () => {
             {format(currentMonth, "MMM yyyy")}
           </h1>
           
-          {/* View Mode Toggle - Compact */}
-          <div className="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg">
+          <div className="flex items-center gap-2">
+            {/* View Mode Toggle - Compact */}
+            <div className="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg">
             <button
               onClick={() => {
                 setViewMode("month");
@@ -223,6 +225,8 @@ const CalendarPage = () => {
               <CalendarIcon className="w-3.5 h-3.5" />
               Week
             </button>
+          </div>
+          <QuickMenu />
           </div>
         </div>
       </header>

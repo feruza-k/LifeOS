@@ -147,7 +147,7 @@ export function MonthCalendar({
           key={day.toISOString()}
           onClick={() => onSelectDate(currentDay)}
           className={cn(
-            "relative flex flex-col items-start p-2 min-h-[120px] rounded-lg transition-all duration-200 text-left border-l-4",
+            "relative flex flex-col items-start p-2.5 min-h-[120px] rounded-lg transition-all duration-200 text-left border-l-4",
             !isCurrentMonth && "opacity-30",
             isSelected && "bg-primary border-l-primary",
             !isSelected && isCurrentMonth && isToday && "border-l-primary/40 bg-background",
@@ -157,9 +157,9 @@ export function MonthCalendar({
           <span
             className={cn(
               "font-sans font-semibold mb-1",
-              isToday && !isSelected && "text-primary text-base",
-              !isToday && "text-xs",
-              isSelected ? "text-primary-foreground text-xs" : "text-foreground"
+              isToday && !isSelected && "text-primary text-[15px]",
+              !isToday && "text-[11px]",
+              isSelected ? "text-primary-foreground text-[11px]" : "text-foreground"
             )}
           >
             {format(day, "d")}
@@ -177,7 +177,7 @@ export function MonthCalendar({
                 <div
                   key={task.id + i}
                   className={cn(
-                    "text-xs leading-tight rounded px-1.5 py-0.5 font-sans line-clamp-2",
+                    "text-[11px] leading-tight rounded px-2 py-1 font-sans line-clamp-2",
                     task.completed && "line-through opacity-50",
                     isSelected && "text-primary-foreground"
                   )}
@@ -194,7 +194,7 @@ export function MonthCalendar({
             })}
             {remainingCount > 0 && (
               <span className={cn(
-                "text-[10px] font-sans font-medium",
+                "text-[9px] font-sans font-medium",
                 isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
               )}>
                 +{remainingCount} more
@@ -211,13 +211,13 @@ export function MonthCalendar({
   };
 
   return (
-    <div className="px-3 pb-3 animate-slide-up">
+    <div className="px-2 pb-3 animate-slide-up">
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-0.5 mb-2">
         {WEEKDAYS.map((day) => (
           <div
             key={day}
-            className="text-center text-xs font-sans font-medium text-muted-foreground py-1.5"
+            className="text-center text-[11px] font-sans font-medium text-muted-foreground py-1.5"
           >
             {day}
           </div>

@@ -4,6 +4,7 @@ import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calen
 import { format, parseISO } from "date-fns";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
+import { QuickMenu } from "@/components/lifeos/QuickMenu";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { api } from "@/lib/api";
@@ -545,7 +546,10 @@ const Explore = () => {
           <div>
             <h1 className="text-lg font-sans font-bold text-foreground">Explore</h1>
           </div>
-          <Compass className="w-7 h-7 text-primary" />
+          <div className="flex items-center gap-3">
+            <Compass className="w-7 h-7 text-primary" />
+            <QuickMenu />
+          </div>
         </div>
         <p className="text-muted-foreground font-sans text-sm mt-2">
           Strategic reflection and alignment

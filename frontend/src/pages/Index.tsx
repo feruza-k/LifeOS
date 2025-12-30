@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { format, isSameDay, parseISO } from "date-fns";
 import { Header } from "@/components/lifeos/Header";
-import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
+import { QuickMenu } from "@/components/lifeos/QuickMenu";
 import { HorizontalDayStrip } from "@/components/lifeos/HorizontalDayStrip";
 import { BalanceScoreCard } from "@/components/lifeos/BalanceScoreCard";
 import { TaskList } from "@/components/lifeos/TaskList";
@@ -33,7 +33,6 @@ const Index = () => {
   const [error, setError] = useState<string | null>(null);
   const [existingCheckIn, setExistingCheckIn] = useState<any>(null);
   const [existingPhoto, setExistingPhoto] = useState<{ filename: string; uploadedAt: string } | null>(null);
-  const [showSideMenu, setShowSideMenu] = useState(false);
   
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
@@ -237,13 +236,11 @@ const Index = () => {
         LifeOS, powered by SolAI
       </p>
 
-      <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
-      
       <div className="flex items-center gap-3 px-4">
-        <SideMenuButton onClick={() => setShowSideMenu(true)} />
         <div className="flex-1">
           <Header onTitleClick={() => setShowDayStrip(!showDayStrip)} />
         </div>
+        <QuickMenu />
       </div>
       {showDayStrip && (
         <HorizontalDayStrip 
