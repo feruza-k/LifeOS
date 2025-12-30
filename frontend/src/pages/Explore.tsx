@@ -312,6 +312,29 @@ const Explore = () => {
     }
   };
 
+  // Reload weekly photos when component becomes visible (user navigates back to Explore)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Reload photos when page becomes visible (user might have uploaded photos)
+        loadWeeklyPhotosAndReflections();
+      }
+    };
+    
+    // Also reload when window gains focus (user switches back to tab)
+    const handleFocus = () => {
+      loadWeeklyPhotosAndReflections();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadWeeklyPhotosAndReflections = async () => {
     try {
       // Get dates for this week
@@ -329,24 +352,46 @@ const Explore = () => {
         const dateStr = format(date, "yyyy-MM-dd");
         
         try {
+          // Use fresh API call - getNote already handles the date parameter correctly
           const note = await api.getNote(dateStr);
           if (note) {
-            // Only include if there's a photo
-            if (note.photo && note.photo.filename) {
+            // Check for photo in both new format (photo) and old format (photos array)
+            let photoData = null;
+            if (note.photo && typeof note.photo === 'object' && note.photo.filename) {
+              photoData = note.photo;
+            } else if (note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+              photoData = note.photos[0];
+            }
+            
+            if (photoData && photoData.filename) {
               photosWithNotes.push({
                 date: dateStr,
-                filename: note.photo.filename,
-                url: `${import.meta.env.VITE_API_URL || 'https://api.mylifeos.dev'}/photos/${note.photo.filename}`,
+                filename: photoData.filename,
+                url: `${import.meta.env.VITE_API_URL || 'https://api.mylifeos.dev'}/photos/${photoData.filename}`,
                 note: note.content && note.content.trim() ? note.content.trim() : undefined
               });
             }
           }
         } catch (error) {
-          // Note doesn't exist for this day, skip
+          // Note doesn't exist for this day, skip silently
+          console.debug(`No note found for ${dateStr}`);
         }
       }
       
-      setWeeklyPhotos(photosWithNotes);
+      // Reset photo index if current photo no longer exists
+      setWeeklyPhotos(prevPhotos => {
+        if (photosWithNotes.length === 0) {
+          setCurrentPhotoIndex(0);
+          return photosWithNotes;
+        }
+        
+        // If current index is out of bounds, reset to 0
+        if (currentPhotoIndex >= photosWithNotes.length) {
+          setCurrentPhotoIndex(0);
+        }
+        
+        return photosWithNotes;
+      });
     } catch (error) {
       console.error("Failed to load weekly photos and reflections:", error);
     }
@@ -611,17 +656,27 @@ const Explore = () => {
                   <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
                     {weeklyPhotos[currentPhotoIndex] && (
                       <img
-                        key={`${weeklyPhotos[currentPhotoIndex].filename}-${currentPhotoIndex}-${Date.now()}`}
-                        src={`${weeklyPhotos[currentPhotoIndex].url.split('?')[0]}?t=${Date.now()}`}
-                        alt="Weekly photo"
+                        key={`${weeklyPhotos[currentPhotoIndex].filename}-${weeklyPhotos[currentPhotoIndex].date}-${currentPhotoIndex}`}
+                        src={`${weeklyPhotos[currentPhotoIndex].url}?t=${Date.now()}&date=${weeklyPhotos[currentPhotoIndex].date}`}
+                        alt={`Weekly photo from ${format(parseISO(weeklyPhotos[currentPhotoIndex].date), "MMM d")}`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           // Fallback: try without cache-busting if it fails
                           const target = e.target as HTMLImageElement;
                           const baseUrl = weeklyPhotos[currentPhotoIndex].url.split('?')[0];
                           if (target.src !== baseUrl) {
-                            target.src = baseUrl;
+                            target.src = `${baseUrl}?date=${weeklyPhotos[currentPhotoIndex].date}`;
+                          } else {
+                            // If still fails, try reloading the photo data
+                            console.warn(`Failed to load photo: ${weeklyPhotos[currentPhotoIndex].filename}`);
+                            // Reload photos after a short delay
+                            setTimeout(() => {
+                              loadWeeklyPhotosAndReflections();
+                            }, 1000);
                           }
+                        }}
+                        onLoad={() => {
+                          // Photo loaded successfully, clear any error state
                         }}
                       />
                     )}
@@ -1409,176 +1464,126 @@ const Explore = () => {
                   </div>
                 )}
 
-                {/* Progress Bars for Detailed Metrics */}
-                <div className="space-y-3">
-                  {analyticsData.consistency && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-sans text-muted-foreground">Check-in Consistency</span>
-                        <span className="text-xs font-sans font-medium text-foreground">
-                          {Math.round(analyticsData.consistency.consistency_rate * 100)}%
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
-                          style={{ width: `${analyticsData.consistency.consistency_rate * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-sans text-muted-foreground">Task Completion</span>
-                      <span className="text-xs font-sans font-medium text-foreground">
-                        {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
-                        style={{ width: `${analyticsData.productivity_insights.completion_rate * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
               </>
             )}
 
             {/* Habit Reinforcement View - Predictive/Forward-Looking */}
-            {currentStatsView === "habits" && habitReinforcement && habitReinforcement.habit_strengths && (
+            {currentStatsView === "habits" && habitReinforcement && (
               <>
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-4 h-4 text-primary" />
                   <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                    Habit Focus
+                    This Week's Focus
                   </h3>
                 </div>
 
-                {/* Overall Habit Health Score - Circular Progress */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-center mb-3">
-                    <div className="relative w-32 h-32">
-                      <svg className="transform -rotate-90 w-32 h-32" viewBox="0 0 100 100">
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          fill="none"
-                          stroke="hsl(var(--muted))"
-                          strokeWidth="8"
-                        />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          fill="none"
-                          stroke="hsl(var(--primary))"
-                          strokeWidth="8"
-                          strokeDasharray={`${2 * Math.PI * 40}`}
-                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - habitReinforcement.habit_strengths.overall_score / 100)}`}
-                          className="transition-all duration-500"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-sans font-bold text-foreground">
-                          {Math.round(habitReinforcement.habit_strengths.overall_score)}%
-                        </span>
-                        <span className="text-xs font-sans text-muted-foreground mt-0.5">Habit Health</span>
+                {/* AI-Powered Encouragement - Prominent */}
+                {habitReinforcement.encouragement && (
+                  <div className="mb-6 p-5 bg-gradient-to-br from-primary/10 via-primary/5 to-primary/10 rounded-2xl border border-primary/20">
+                    <div className="flex items-start gap-3">
+                      <span className="text-3xl leading-none">{habitReinforcement.encouragement.emoji}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-sans text-foreground leading-relaxed font-medium">
+                          {habitReinforcement.encouragement.message}
+                        </p>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Key Metrics Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  {/* Check-in Consistency */}
-                  <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Activity className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Check-ins</span>
-                    </div>
-                    <div className="text-lg font-sans font-bold text-foreground mb-0.5">
-                      {Math.round(habitReinforcement.habit_strengths.checkin_consistency)}%
-                    </div>
-                    {habitReinforcement.habit_strengths.checkin_streak > 0 && (
-                      <div className="text-xs font-sans text-muted-foreground">
-                        🔥 {habitReinforcement.habit_strengths.checkin_streak} day streak
+                {/* Forward-Looking Predictions & Insights */}
+                <div className="space-y-4">
+                  {/* Top 3 Actionable Suggestions - Forward-Looking */}
+                  {habitReinforcement.micro_suggestions && habitReinforcement.micro_suggestions.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Zap className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Your Next Moves</span>
                       </div>
-                    )}
-                  </div>
-                  
-                  {/* Activity Consistency */}
-                  <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Activity</span>
+                      <div className="space-y-2.5">
+                        {habitReinforcement.micro_suggestions.slice(0, 3).map((suggestion: any, index: number) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              if (suggestion.action === "schedule_checkin") {
+                                navigate("/");
+                              } else if (suggestion.action === "plan_tasks") {
+                                navigate("/calendar");
+                              } else if (suggestion.action === "restart_streak") {
+                                navigate("/");
+                              } else if (suggestion.action === "diversify_categories") {
+                                navigate("/calendar");
+                              } else if (suggestion.action === "adjust_load") {
+                                navigate("/calendar");
+                              }
+                            }}
+                            className={`w-full p-3.5 rounded-xl border text-left transition-all ${
+                              suggestion.priority === "high"
+                                ? "bg-primary/10 border-primary/30 hover:bg-primary/15 hover:border-primary/40"
+                                : suggestion.priority === "medium"
+                                ? "bg-primary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/30"
+                                : "bg-background/50 border-primary/10 hover:bg-background/70 hover:border-primary/20"
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span className="text-base mt-0.5">
+                                {suggestion.priority === "high" ? "🎯" : suggestion.priority === "medium" ? "✨" : "💡"}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-sans font-medium text-foreground mb-1">
+                                  {suggestion.title}
+                                </div>
+                                <div className="text-xs font-sans text-muted-foreground leading-relaxed">
+                                  {suggestion.description}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="text-lg font-sans font-bold text-foreground mb-0.5">
-                      {Math.round(habitReinforcement.habit_strengths.activity_consistency)}%
-                    </div>
-                    <div className="text-xs font-sans text-muted-foreground">
-                      Daily consistency
-                    </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* Risk Indicators - Focus Areas */}
-                {habitReinforcement.risk_indicators && habitReinforcement.risk_indicators.length > 0 && (
-                  <div className="mb-4">
-                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-3">Focus Areas</div>
-                    <div className="space-y-2">
-                      {habitReinforcement.risk_indicators.slice(0, 2).map((risk: any, index: number) => (
-                        <div
-                          key={index}
-                          className={`p-2.5 rounded-xl border ${
-                            risk.severity === "high"
-                              ? "bg-amber-500/10 border-amber-500/20"
-                              : risk.severity === "medium"
-                              ? "bg-orange-500/10 border-orange-500/20"
-                              : "bg-muted/50 border-border/50"
-                          }`}
-                        >
-                          <div className="text-xs font-sans font-medium text-foreground">
-                            {risk.message}
+                  {/* Predictive Focus Areas - What to Watch */}
+                  {habitReinforcement.risk_indicators && habitReinforcement.risk_indicators.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Target className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Watch This Week</span>
+                      </div>
+                      <div className="space-y-2">
+                        {habitReinforcement.risk_indicators.slice(0, 2).map((risk: any, index: number) => (
+                          <div
+                            key={index}
+                            className={`p-3 rounded-xl border ${
+                              risk.severity === "high"
+                                ? "bg-amber-500/10 border-amber-500/30"
+                                : risk.severity === "medium"
+                                ? "bg-orange-500/10 border-orange-500/30"
+                                : "bg-muted/50 border-border/50"
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className="text-sm mt-0.5">
+                                {risk.severity === "high" ? "⚠️" : risk.severity === "medium" ? "⚡" : "💡"}
+                              </span>
+                              <div className="flex-1">
+                                <div className="text-xs font-sans font-medium text-foreground mb-1">
+                                  {risk.message}
+                                </div>
+                                {risk.context && (
+                                  <div className="text-xs font-sans text-muted-foreground">
+                                    {risk.context}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Top Actionable Suggestion */}
-                {habitReinforcement.micro_suggestions && habitReinforcement.micro_suggestions.length > 0 && (
-                  <div>
-                    <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-2">Next Step</div>
-                    <button
-                      onClick={() => {
-                        const suggestion = habitReinforcement.micro_suggestions[0];
-                        if (suggestion.action === "schedule_checkin") {
-                          navigate("/");
-                        } else if (suggestion.action === "plan_tasks") {
-                          navigate("/calendar");
-                        } else if (suggestion.action === "restart_streak") {
-                          navigate("/");
-                        }
-                      }}
-                      className={`w-full p-3 rounded-xl border text-left transition-all ${
-                        habitReinforcement.micro_suggestions[0].priority === "high"
-                          ? "bg-primary/10 border-primary/20 hover:bg-primary/15"
-                          : "bg-background/50 border-primary/10 hover:bg-background/70"
-                      }`}
-                    >
-                      <div className="text-sm font-sans font-medium text-foreground mb-1">
-                        {habitReinforcement.micro_suggestions[0].title}
-                      </div>
-                      <div className="text-xs font-sans text-muted-foreground">
-                        {habitReinforcement.micro_suggestions[0].description}
-                      </div>
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
 
@@ -1594,7 +1599,7 @@ const Explore = () => {
               if (analyticsData.productivity_insights) {
                 availableViews.push("productivity");
               }
-              if (habitReinforcement && habitReinforcement.risk_indicators) {
+              if (habitReinforcement && (habitReinforcement.micro_suggestions || habitReinforcement.encouragement)) {
                 availableViews.push("habits");
               }
               
@@ -1785,4 +1790,5 @@ const Explore = () => {
 }
 
 export default Explore;
+
 
