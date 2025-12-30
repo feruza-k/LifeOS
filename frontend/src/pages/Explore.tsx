@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, Edit2, Image as ImageIcon, Zap, Target, Clock, ChevronRight, PieChart } from "lucide-react";
+import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, Edit2, Zap, Target, Clock, PieChart } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
@@ -184,6 +184,9 @@ const Explore = () => {
   const [weeklySummary, setWeeklySummary] = useState<string>("");
   const [currentStatsView, setCurrentStatsView] = useState<"category" | "energy" | "productivity">("category");
   const statsRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const statsCarouselRef = useRef<HTMLDivElement>(null);
+  const [statsSwipeStart, setStatsSwipeStart] = useState<number | null>(null);
+  const [habitReinforcement, setHabitReinforcement] = useState<any>(null);
   const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
@@ -281,12 +284,14 @@ const Explore = () => {
   const loadAlignData = async () => {
     try {
       setLoading(true);
-      const [summary, analytics] = await Promise.all([
+      const [summary, analytics, habitData] = await Promise.all([
         api.getAlignSummary(),
-        api.getAlignAnalytics().catch(() => null) // Analytics is optional
+        api.getAlignAnalytics().catch(() => null), // Analytics is optional
+        api.getHabitReinforcement().catch(() => null) // Habit reinforcement is optional
       ]);
       setAlignData(summary);
       setAnalyticsData(analytics);
+      setHabitReinforcement(habitData);
       
       // Load weekly photos and reflections
       await loadWeeklyPhotosAndReflections();
@@ -556,44 +561,241 @@ const Explore = () => {
         </p>
       </header>
 
-      {/* Weekly Summary Card - Executive Overview */}
+      {/* Weekly Summary Card - Executive Overview with Photos & Reflections */}
       {alignData && alignData.week_stats && (
       <div className="px-4 py-3 animate-slide-up">
-          <div className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
+            <div className="flex items-center gap-2 mb-3">
               <Activity className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                 This Week
               </h3>
               </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3 mb-3">
               <div className="text-center">
-                <div className="text-2xl font-sans font-bold text-foreground mb-1">
+                <div className="text-xl font-sans font-bold text-foreground mb-0.5">
                   {alignData.week_stats.completed || 0}
             </div>
-                <div className="text-xs text-muted-foreground font-sans uppercase">Completed</div>
+                <div className="text-[10px] text-muted-foreground font-sans uppercase">Completed</div>
         </div>
               <div className="text-center">
-                <div className="text-2xl font-sans font-bold text-foreground mb-1">
+                <div className="text-xl font-sans font-bold text-foreground mb-0.5">
                   {alignData.week_stats.total || 0}
       </div>
-                <div className="text-xs text-muted-foreground font-sans uppercase">Total Tasks</div>
+                <div className="text-[10px] text-muted-foreground font-sans uppercase">Total Tasks</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-sans font-bold text-foreground mb-1">
+                <div className="text-xl font-sans font-bold text-foreground mb-0.5">
                   {alignData.week_stats.total > 0 
                     ? Math.round((alignData.week_stats.completed / alignData.week_stats.total) * 100)
                     : 0}%
                 </div>
-                <div className="text-xs text-muted-foreground font-sans uppercase">Rate</div>
+                <div className="text-[10px] text-muted-foreground font-sans uppercase">Rate</div>
               </div>
             </div>
             {analyticsData && analyticsData.consistency && analyticsData.consistency.current_streak > 0 && (
-              <div className="mt-4 pt-4 border-t border-primary/20 flex items-center justify-center gap-2">
-                <span className="text-sm font-sans text-foreground">🔥</span>
-                <span className="text-sm font-sans font-medium text-foreground">
+              <div className="mb-3 flex items-center justify-center gap-2">
+                <span className="text-xs font-sans text-foreground">🔥</span>
+                <span className="text-xs font-sans font-medium text-foreground">
                   {analyticsData.consistency.current_streak} day streak
                 </span>
+              </div>
+            )}
+            {/* Weekly Photos & Reflections - Merged into This Week */}
+            {weeklyPhotos.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-primary/20">
+                <div className="grid gap-3 grid-cols-2">
+                  {/* Photo Album */}
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                    {weeklyPhotos[currentPhotoIndex] && (
+                      <img
+                        src={weeklyPhotos[currentPhotoIndex].url}
+                        alt="Weekly photo"
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                    {weeklyPhotos.length > 1 && (
+                      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                        {weeklyPhotos.map((_, index) => (
+                          <div
+                            key={index}
+                            className={`h-1 rounded-full transition-all ${
+                              index === currentPhotoIndex ? "w-4 bg-white" : "w-1 bg-white/50"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* Reflection Note - centered, rotates with photo */}
+                  <div className="relative aspect-square flex items-center justify-center">
+                    {weeklyPhotos[currentPhotoIndex]?.note ? (
+                      <p className="text-xs text-foreground font-sans italic leading-relaxed text-center px-2">
+                        {displayedNote}
+                        {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
+                          <span className="inline-block w-0.5 h-3 bg-foreground ml-0.5 animate-pulse" />
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground font-sans italic leading-relaxed text-center px-2">
+                        No reflection for this moment
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* AI-Powered Habit Reinforcement */}
+      {habitReinforcement && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
+          <div className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                Habit Health
+              </h3>
+            </div>
+
+            {/* Overall Score */}
+            <div className="mb-6">
+              <div className="flex items-center justify-center mb-3">
+                <div className="relative w-28 h-28">
+                  <svg className="transform -rotate-90 w-28 h-28" viewBox="0 0 100 100">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke="hsl(var(--muted))"
+                      strokeWidth="8"
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth="8"
+                      strokeDasharray={`${2 * Math.PI * 40}`}
+                      strokeDashoffset={`${2 * Math.PI * 40 * (1 - habitReinforcement.habit_strengths.overall_score / 100)}`}
+                      className="transition-all duration-500"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-sans font-bold text-foreground">
+                      {Math.round(habitReinforcement.habit_strengths.overall_score)}%
+                    </span>
+                    <span className="text-xs font-sans text-muted-foreground mt-0.5">Overall</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Habit Strengths Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="p-3 bg-background/50 rounded-xl border border-primary/10">
+                <div className="text-xs font-sans font-medium text-muted-foreground mb-1">Check-ins</div>
+                <div className="text-lg font-sans font-bold text-foreground">
+                  {Math.round(habitReinforcement.habit_strengths.checkin_consistency)}%
+                </div>
+                {habitReinforcement.habit_strengths.checkin_streak > 0 && (
+                  <div className="text-xs font-sans text-muted-foreground mt-1">
+                    🔥 {habitReinforcement.habit_strengths.checkin_streak} day streak
+                  </div>
+              )}
+              </div>
+              <div className="p-3 bg-background/50 rounded-xl border border-primary/10">
+                <div className="text-xs font-sans font-medium text-muted-foreground mb-1">Completion</div>
+                <div className="text-lg font-sans font-bold text-foreground">
+                  {Math.round(habitReinforcement.habit_strengths.completion_rate)}%
+                </div>
+                {habitReinforcement.habit_strengths.completion_streak > 0 && (
+                  <div className="text-xs font-sans text-muted-foreground mt-1">
+                    ✨ {habitReinforcement.habit_strengths.completion_streak} day streak
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Encouragement Message */}
+            {habitReinforcement.encouragement && (
+              <div className="mb-4 p-3 bg-background/30 rounded-xl border border-primary/10">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">{habitReinforcement.encouragement.emoji}</span>
+                  <p className="text-sm font-sans text-foreground leading-relaxed flex-1">
+                    {habitReinforcement.encouragement.message}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Risk Indicators */}
+            {habitReinforcement.risk_indicators && habitReinforcement.risk_indicators.length > 0 && (
+              <div className="mb-4">
+                <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-2">Attention Areas</div>
+                <div className="space-y-2">
+                  {habitReinforcement.risk_indicators.slice(0, 3).map((risk: any, index: number) => (
+                    <div
+                      key={index}
+                      className={`p-2.5 rounded-lg border ${
+                        risk.severity === "high"
+                          ? "bg-amber-500/10 border-amber-500/20"
+                          : risk.severity === "medium"
+                          ? "bg-orange-500/10 border-orange-500/20"
+                          : "bg-muted/50 border-border/50"
+                      }`}
+                    >
+                      <div className="text-xs font-sans font-medium text-foreground mb-0.5">
+                        {risk.message}
+                      </div>
+                      {risk.context && (
+                        <div className="text-xs font-sans text-muted-foreground">
+                          {risk.context}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Micro Suggestions */}
+            {habitReinforcement.micro_suggestions && habitReinforcement.micro_suggestions.length > 0 && (
+              <div>
+                <div className="text-xs font-sans font-medium text-muted-foreground uppercase mb-2">Quick Actions</div>
+                <div className="space-y-2">
+                  {habitReinforcement.micro_suggestions.slice(0, 3).map((suggestion: any, index: number) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        if (suggestion.action === "schedule_checkin") {
+                          navigate("/");
+                        } else if (suggestion.action === "plan_tasks") {
+                          navigate("/calendar");
+                        } else if (suggestion.action === "restart_streak") {
+                          navigate("/");
+                        }
+                      }}
+                      className={`w-full p-3 rounded-xl border text-left transition-all ${
+                        suggestion.priority === "high"
+                          ? "bg-primary/10 border-primary/20 hover:bg-primary/15"
+                          : "bg-background/50 border-primary/10 hover:bg-background/70"
+                      }`}
+                    >
+                      <div className="text-sm font-sans font-medium text-foreground mb-1">
+                        {suggestion.title}
+                      </div>
+                      <div className="text-xs font-sans text-muted-foreground">
+                        {suggestion.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -946,99 +1148,7 @@ const Explore = () => {
       </div>
 
 
-      {/* Weekly Photos & Reflections Widget */}
-      {weeklyPhotos.length > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <ImageIcon className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                This Week
-              </h3>
-            </div>
-            <div className="grid gap-4 grid-cols-2">
-              {/* Photo Album */}
-              <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-                {weeklyPhotos[currentPhotoIndex] && (
-                  <img
-                    src={weeklyPhotos[currentPhotoIndex].url}
-                    alt="Weekly photo"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {weeklyPhotos.length > 1 && (
-                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
-                    {weeklyPhotos.map((_, index) => (
-                      <div
-                        key={index}
-                        className={`h-1 rounded-full transition-all ${
-                          index === currentPhotoIndex ? "w-4 bg-white" : "w-1 bg-white/50"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-              {/* Reflection Note - centered, rotates with photo */}
-              <div className="relative aspect-square flex items-center justify-center">
-                {weeklyPhotos[currentPhotoIndex]?.note ? (
-                  <p className="text-sm text-foreground font-sans italic leading-relaxed text-center px-2">
-                    {displayedNote}
-                    {displayedNote.length < (weeklyPhotos[currentPhotoIndex]?.note?.length || 0) && (
-                      <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
-                    )}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground font-sans italic leading-relaxed text-center px-2">
-                    No reflection for this moment
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Quick Actions */}
-      {analyticsData && analyticsData.quick_actions && analyticsData.quick_actions.length > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.25s" }}>
-          <div className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Quick Actions
-              </h3>
-            </div>
-            <div className="space-y-2">
-              {analyticsData.quick_actions.map((action, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    if (action.action === "schedule_category" || action.action === "schedule_goal_task") {
-                      navigate("/calendar");
-                    } else if (action.action === "review_schedule") {
-                      navigate("/week");
-                    }
-                  }}
-                  className="w-full p-3 bg-background/50 rounded-xl border border-primary/20 hover:bg-primary/10 transition-colors text-left"
-                >
-                  <div className="flex items-center justify-between">
-                <div className="flex-1">
-                      <p className="text-sm font-sans font-medium text-foreground mb-1">
-                        {action.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground font-sans">
-                        {action.message}
-                      </p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-2" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Rotating Stats: Category Balance, Energy Patterns, Productivity Insights */}
       {(() => {
@@ -1051,7 +1161,64 @@ const Explore = () => {
         
         return (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+          <div 
+            ref={statsCarouselRef}
+            className="p-5 bg-card rounded-2xl shadow-soft border border-border/50 overflow-hidden relative touch-pan-y"
+            onTouchStart={(e) => {
+              setStatsSwipeStart(e.touches[0].clientX);
+              if (statsRotateTimerRef.current) {
+                clearInterval(statsRotateTimerRef.current);
+              }
+            }}
+            onTouchMove={(e) => {
+              // Prevent scrolling while swiping
+              if (statsSwipeStart !== null) {
+                e.preventDefault();
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (statsSwipeStart === null) return;
+              
+              const endX = e.changedTouches[0].clientX;
+              const diff = statsSwipeStart - endX;
+              const threshold = 50;
+              
+              const availableViews: Array<"category" | "energy" | "productivity"> = [];
+              if (analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0) {
+                availableViews.push("category");
+              }
+              if (analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0) {
+                availableViews.push("energy");
+              }
+              if (analyticsData.productivity_insights) {
+                availableViews.push("productivity");
+              }
+              
+              if (Math.abs(diff) > threshold && availableViews.length > 1) {
+                const currentIndex = availableViews.indexOf(currentStatsView);
+                if (diff > 0 && currentIndex < availableViews.length - 1) {
+                  // Swipe left - next view
+                  setCurrentStatsView(availableViews[currentIndex + 1]);
+                } else if (diff < 0 && currentIndex > 0) {
+                  // Swipe right - previous view
+                  setCurrentStatsView(availableViews[currentIndex - 1]);
+                }
+              }
+              
+              setStatsSwipeStart(null);
+              
+              // Restart auto-rotation
+              if (availableViews.length > 1) {
+                statsRotateTimerRef.current = setInterval(() => {
+                  setCurrentStatsView((prev) => {
+                    const currentIdx = availableViews.indexOf(prev);
+                    const nextIdx = (currentIdx + 1) % availableViews.length;
+                    return availableViews[nextIdx];
+                  });
+                }, 10000);
+              }
+            }}
+          >
             {/* Category Balance View */}
             {currentStatsView === "category" && analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0 && (
               <>
@@ -1189,9 +1356,9 @@ const Explore = () => {
                   {analyticsData.energy_patterns.trend && (
                     <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
                       analyticsData.energy_patterns.trend === "increasing" 
-                        ? "bg-amber-500/20 text-amber-600"
+                        ? "bg-orange-500/20 text-orange-600"
                         : analyticsData.energy_patterns.trend === "decreasing"
-                        ? "bg-emerald-500/20 text-emerald-600"
+                        ? "bg-orange-500/20 text-orange-600"
                         : "bg-muted text-muted-foreground"
                     }`}>
                       {analyticsData.energy_patterns.trend === "increasing" ? "↑ Increasing" :
@@ -1229,14 +1396,14 @@ const Explore = () => {
                 {analyticsData.energy_patterns.weekly_patterns.slice(-4).map((week, index) => {
                   const maxLoad = Math.max(...analyticsData.energy_patterns.weekly_patterns.map(w => w.average_daily_load || 0), 1);
                   const heightPercent = (week.average_daily_load / maxLoad) * 100;
-                  // Aesthetic green colors for weekly bars
+                  // Aesthetic orange colors matching Prioritize Rest background
                   const energyColors = {
                     "empty": "bg-muted",
-                    "very_light": "bg-emerald-300",
-                    "light": "bg-emerald-400",
-                    "balanced": "bg-emerald-500",
-                    "moderate": "bg-emerald-600",
-                    "heavy": "bg-emerald-700"
+                    "very_light": "bg-orange-200",
+                    "light": "bg-orange-300",
+                    "balanced": "bg-orange-400",
+                    "moderate": "bg-orange-500",
+                    "heavy": "bg-orange-600"
                   };
                   return (
                     <div key={index} className="flex-1 flex flex-col items-center gap-1">
@@ -1264,9 +1431,6 @@ const Explore = () => {
             {/* Daily Breakdown for Current Week - Using Today Screen Colors */}
             {analyticsData.energy_patterns.daily_patterns && analyticsData.energy_patterns.daily_patterns.length > 0 && (
               <div className="mb-4">
-                <h4 className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                  This Week
-                </h4>
                 <div className="grid grid-cols-7 gap-1">
                   {analyticsData.energy_patterns.daily_patterns.map((day, index) => {
                     // Map energy levels to Today screen balance colors
@@ -1316,66 +1480,138 @@ const Explore = () => {
             {currentStatsView === "productivity" && analyticsData.productivity_insights && (
               <>
                 <div className="flex items-center gap-2 mb-4">
-                  <Clock className="w-4 h-4 text-primary" />
+                  <TrendingUp className="w-4 h-4 text-primary" />
                   <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
                     Productivity Insights
                   </h3>
                 </div>
+                
+                {/* Overall Completion - Large Visual Metric */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-center mb-3">
+                    <div className="relative w-32 h-32">
+                      <svg className="transform -rotate-90 w-32 h-32" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="none"
+                          stroke="hsl(var(--muted))"
+                          strokeWidth="8"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="none"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth="8"
+                          strokeDasharray={`${2 * Math.PI * 40}`}
+                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - analyticsData.productivity_insights.completion_rate)}`}
+                          className="transition-all duration-500"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-sans font-bold text-foreground">
+                          {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
+                        </span>
+                        <span className="text-xs font-sans text-muted-foreground mt-0.5">Completion</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {/* Most Productive Day */}
+                  {analyticsData.productivity_insights.best_day && (
+                    <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Best Day</span>
+                      </div>
+                      <div className="text-lg font-sans font-bold text-foreground mb-0.5">
+                        {analyticsData.productivity_insights.best_day.day}
+                      </div>
+                      <div className="text-xs font-sans text-muted-foreground">
+                        {Math.round(analyticsData.productivity_insights.best_day.completion_rate * 100)}% completion
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Check-in Frequency */}
+                  {analyticsData.consistency && (
+                    <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Activity className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Check-ins</span>
+                      </div>
+                      <div className="text-lg font-sans font-bold text-foreground mb-0.5">
+                        {Math.round(analyticsData.consistency.consistency_rate * 100)}%
+                      </div>
+                      <div className="text-xs font-sans text-muted-foreground">
+                        {analyticsData.consistency.days_with_checkins}/{analyticsData.consistency.total_days} days
+                        {analyticsData.consistency.current_streak > 0 && (
+                          <span className="ml-1.5">🔥 {analyticsData.consistency.current_streak}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Peak Focus Times - Visual Time Slots */}
+                {analyticsData.productivity_insights.best_times.length > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Peak Focus Times</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {analyticsData.productivity_insights.best_times.map((time, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20"
+                        >
+                          <span className="text-sm font-sans font-medium text-foreground">{time}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress Bars for Detailed Metrics */}
                 <div className="space-y-3">
-              {analyticsData.productivity_insights.best_times.length > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground font-sans">Peak focus times</span>
-                  <span className="text-sm font-sans font-medium text-foreground">
-                    {analyticsData.productivity_insights.best_times.join(", ")}
-                  </span>
-                </div>
-              )}
-              {analyticsData.productivity_insights.best_day && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground font-sans">Most productive day</span>
-                  <span className="text-sm font-sans font-medium text-foreground">
-                    {analyticsData.productivity_insights.best_day.day} ({Math.round(analyticsData.productivity_insights.best_day.completion_rate * 100)}%)
-                  </span>
-                </div>
-              )}
-              {analyticsData.consistency && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-foreground font-sans">Check-in frequency</span>
-                    <span className="text-sm font-sans font-medium text-foreground">
-                      {Math.round(analyticsData.consistency.consistency_rate * 100)}%
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${analyticsData.consistency.consistency_rate * 100}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground font-sans">
-                    <span>{analyticsData.consistency.days_with_checkins} of {analyticsData.consistency.total_days} days</span>
-                    {analyticsData.consistency.current_streak > 0 && (
-                      <span className="font-medium text-foreground">
-                        🔥 {analyticsData.consistency.current_streak} day streak
+                  {analyticsData.consistency && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-sans text-muted-foreground">Check-in Consistency</span>
+                        <span className="text-xs font-sans font-medium text-foreground">
+                          {Math.round(analyticsData.consistency.consistency_rate * 100)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all duration-500"
+                          style={{ width: `${analyticsData.consistency.consistency_rate * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-sans text-muted-foreground">Task Completion</span>
+                      <span className="text-xs font-sans font-medium text-foreground">
+                        {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
                       </span>
-                    )}
+                    </div>
+                    <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${analyticsData.productivity_insights.completion_rate * 100}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground font-sans">Overall completion</span>
-                  <span className="text-sm font-sans font-medium text-foreground">
-                    {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
-                  </span>
-                </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${analyticsData.productivity_insights.completion_rate * 100}%` }}
-                    />
-                  </div>
-                </div>
                 </div>
               </>
             )}

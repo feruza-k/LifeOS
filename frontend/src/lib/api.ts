@@ -676,6 +676,7 @@ export const api = {
   getAlignSummary: () => request("/align/summary"),
   getAlignAnalytics: () => request("/align/analytics"),
   getWeeklyReflectionSummary: () => request("/align/weekly-reflection"),
+  getHabitReinforcement: () => request("/align/habit-reinforcement"),
   formatDate: (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');

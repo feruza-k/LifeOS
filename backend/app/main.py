@@ -2297,30 +2297,58 @@ async def update_category(category_id: str, updates: CategoryUpdateRequest, curr
     # If it's a global category (user_id = NULL), create or update a user-specific copy
     if not category.get("user_id"):
         import logging
+        from sqlalchemy import select
+        from db.models import Category
+        from uuid import UUID
+        
         logger = logging.getLogger(__name__)
         
-        # Get all user categories to check for existing custom version
-        user_categories = await db_repo.get_categories(current_user["id"])
-        user_specific_categories = [c for c in user_categories if c.get("user_id") == current_user["id"]]
-        
-        # Strategy: Try to find existing user category that matches
-        # First, try matching by original label (in case user already customized it)
+        # Query database directly for user-specific categories (bypassing get_categories deduplication)
+        # Check for categories matching either the original label or the new label (if being changed)
         original_label = category.get("label", "")
-        existing_user_category = next(
-            (c for c in user_specific_categories 
-             if c.get("label", "").lower() == original_label.lower()),
-            None
-        )
+        target_label = updates_dict.get("label") if updates_dict.get("label") else original_label
         
-        # If not found, check if there's a user category with the target label (new label if updating)
-        if not existing_user_category:
-            target_label = updates_dict.get("label") if "label" in updates_dict else original_label
-            existing_user_category = next(
-                (c for c in user_specific_categories 
-                 if c.get("label", "").lower() == target_label.lower()),
-                None
+        async with db_repo._get_session() as session:
+            # Build query conditions - check for categories with either original or target label
+            from sqlalchemy import and_, or_
+            label_conditions = [Category.label.ilike(original_label)]
+            if target_label != original_label:
+                label_conditions.append(Category.label.ilike(target_label))
+            
+            result = await session.execute(
+                select(Category).where(
+                    and_(
+                        Category.user_id == UUID(current_user["id"]),
+                        or_(*label_conditions)
+                    )
+                )
             )
+            user_categories = result.scalars().all()
         
+        # Try to find existing user category by original label first (prefer original label match)
+        existing_user_category = None
+        for cat in user_categories:
+            if cat.label.lower() == original_label.lower():
+                existing_user_category = {
+                    "id": str(cat.id),
+                    "label": cat.label,
+                    "color": cat.color,
+                    "user_id": str(cat.user_id) if cat.user_id else None,
+                }
+                break
+        
+        # If not found by original label, try target label (if label is being changed)
+        if not existing_user_category and updates_dict.get("label"):
+            target_label = updates_dict.get("label")
+            for cat in user_categories:
+                if cat.label.lower() == target_label.lower():
+                    existing_user_category = {
+                        "id": str(cat.id),
+                        "label": cat.label,
+                        "color": cat.color,
+                        "user_id": str(cat.user_id) if cat.user_id else None,
+                    }
+                    break
         
         if existing_user_category:
             # User already has a custom version, update it
@@ -3284,6 +3312,29 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
             "month": current_month
         }
     }
+
+@app.get("/align/habit-reinforcement")
+async def get_habit_reinforcement(current_user: dict = Depends(get_current_user)):
+    """
+    Get AI-powered habit reinforcement analysis.
+    Returns: habit strengths, risk indicators, micro-suggestions, and encouragement.
+    """
+    from datetime import datetime, timedelta, date
+    from app.ai.habit_reinforcement import analyze_habit_health
+    from app.ai.intelligent_assistant import get_user_context
+    
+    # Get user's historical data
+    user_context = await get_user_context(current_user["id"])
+    historical = user_context.get("historical", {})
+    
+    # Get tasks and check-ins
+    tasks = historical.get("all_tasks", [])
+    checkins = historical.get("checkins", [])
+    
+    # Analyze habit health
+    analysis = analyze_habit_health(tasks, checkins, days_back=30)
+    
+    return analysis
 
 @app.get("/align/weekly-reflection")
 async def get_weekly_reflection_summary(request: Request, current_user: dict = Depends(get_current_user)):
