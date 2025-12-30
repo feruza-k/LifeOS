@@ -1101,7 +1101,7 @@ const Explore = () => {
               const diff = statsSwipeStart - endX;
               const threshold = 50;
               
-              const availableViews: Array<"category" | "energy" | "productivity"> = [];
+              const availableViews: Array<"category" | "energy" | "productivity" | "habits"> = [];
               if (analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0) {
                 availableViews.push("category");
               }
@@ -1111,16 +1111,36 @@ const Explore = () => {
               if (analyticsData.productivity_insights) {
                 availableViews.push("productivity");
               }
+              if (habitReinforcement && (habitReinforcement.micro_suggestions || habitReinforcement.encouragement || habitReinforcement.risk_indicators)) {
+                availableViews.push("habits");
+              }
               
               if (Math.abs(diff) > threshold && availableViews.length > 1) {
                 const currentIndex = availableViews.indexOf(currentStatsView);
-                if (diff > 0 && currentIndex < availableViews.length - 1) {
-                  // Swipe left - next view
-                  setCurrentStatsView(availableViews[currentIndex + 1]);
-                } else if (diff < 0 && currentIndex > 0) {
-                  // Swipe right - previous view
-                  setCurrentStatsView(availableViews[currentIndex - 1]);
+                if (currentIndex === -1) {
+                  // Current view not in available views, reset to first
+                  setCurrentStatsView(availableViews[0]);
+                } else if (diff > 0) {
+                  // Swipe left - next view (wrap around)
+                  const nextIndex = (currentIndex + 1) % availableViews.length;
+                  setCurrentStatsView(availableViews[nextIndex]);
+                } else {
+                  // Swipe right - previous view (wrap around)
+                  const prevIndex = (currentIndex - 1 + availableViews.length) % availableViews.length;
+                  setCurrentStatsView(availableViews[prevIndex]);
                 }
+                
+                // Restart auto-rotation timer after manual swipe
+                if (statsRotateTimerRef.current) {
+                  clearInterval(statsRotateTimerRef.current);
+                }
+                statsRotateTimerRef.current = setInterval(() => {
+                  setCurrentStatsView((prev) => {
+                    const idx = availableViews.indexOf(prev);
+                    const nextIdx = (idx + 1) % availableViews.length;
+                    return availableViews[nextIdx];
+                  });
+                }, 10000);
               }
               
               setStatsSwipeStart(null);
