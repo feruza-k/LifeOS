@@ -199,17 +199,12 @@ export default function Categories() {
                       className="h-8 text-sm"
                     />
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEditStart(category.id, category.label)}
-                        className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
-                      >
-                        {category.label}
-                      </button>
-                      {isGlobal && (
-                        <span className="text-xs text-muted-foreground">(Default - editing creates your own copy)</span>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => handleEditStart(category.id, category.label)}
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
+                    >
+                      {category.label}
+                    </button>
                   )}
                 </div>
 

@@ -602,13 +602,24 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
                   {(() => {
                     const selectedCategory = categories.find(c => c.value === category);
                     const categoryColor = selectedCategory?.color;
+                    // Darken the color for better visibility
+                    const darkenColor = (hex: string, percent: number) => {
+                      const num = parseInt(hex.replace("#", ""), 16);
+                      const r = Math.max(0, Math.floor((num >> 16) * (1 - percent)));
+                      const g = Math.max(0, Math.floor(((num >> 8) & 0x00FF) * (1 - percent)));
+                      const b = Math.max(0, Math.floor((num & 0x0000FF) * (1 - percent)));
+                      return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+                    };
+                    const darkerColor = categoryColor ? darkenColor(categoryColor, 0.3) : "#666";
                     return (
                       <Tag 
                         className="w-5 h-5" 
                         style={{ 
-                          color: categoryColor || "currentColor",
-                          fill: categoryColor || "currentColor",
-                          opacity: 1
+                          color: darkerColor,
+                          fill: darkerColor,
+                          opacity: 1,
+                          stroke: "#4A4A4A",
+                          strokeWidth: 0.5
                         }} 
                       />
                     );

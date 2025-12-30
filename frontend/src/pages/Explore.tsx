@@ -181,6 +181,8 @@ const Explore = () => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [displayedNote, setDisplayedNote] = useState<string>("");
   const [weeklySummary, setWeeklySummary] = useState<string>("");
+  const [currentStatsView, setCurrentStatsView] = useState<"category" | "energy" | "productivity">("category");
+  const statsRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
@@ -401,6 +403,39 @@ const Explore = () => {
       };
     }
   }, [weeklyPhotos.length]);
+
+  // Auto-rotate stats view every 10 seconds
+  useEffect(() => {
+    const hasCategoryBalance = analyticsData?.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0;
+    const hasEnergyPatterns = analyticsData?.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0;
+    const hasProductivity = analyticsData?.productivity_insights;
+    
+    const availableViews: Array<"category" | "energy" | "productivity"> = [];
+    if (hasCategoryBalance) availableViews.push("category");
+    if (hasEnergyPatterns) availableViews.push("energy");
+    if (hasProductivity) availableViews.push("productivity");
+    
+    if (availableViews.length > 1) {
+      // Set initial view to first available
+      if (!availableViews.includes(currentStatsView)) {
+        setCurrentStatsView(availableViews[0]);
+      }
+      
+      statsRotateTimerRef.current = setInterval(() => {
+        setCurrentStatsView((prev) => {
+          const currentIndex = availableViews.indexOf(prev);
+          const nextIndex = (currentIndex + 1) % availableViews.length;
+          return availableViews[nextIndex];
+        });
+      }, 10000); // 10 seconds
+      
+      return () => {
+        if (statsRotateTimerRef.current) {
+          clearInterval(statsRotateTimerRef.current);
+        }
+      };
+    }
+  }, [analyticsData, currentStatsView]);
 
   const handleSetFocus = async (goals: Array<{ title: string; description?: string }>) => {
     try {
@@ -1001,28 +1036,35 @@ const Explore = () => {
         </div>
       )}
 
-      {/* Category Balance Visualization */}
-      {analyticsData && analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0 && (
+      {/* Rotating Stats: Category Balance, Energy Patterns, Productivity Insights */}
+      {analyticsData && (
+        (analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0) ||
+        (analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0) ||
+        analyticsData.productivity_insights
+      ) && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center justify-between mb-4">
+            {/* Category Balance View */}
+            {currentStatsView === "category" && analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0 && (
+              <>
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                <PieChart className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                  Category Balance
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                  analyticsData.category_balance.status === "balanced" 
-                    ? "bg-primary/20 text-primary" 
-                    : analyticsData.category_balance.status === "imbalanced"
-                    ? "bg-amber-500/20 text-amber-600"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {analyticsData.category_balance.status === "balanced" ? "Balanced" : 
-                   analyticsData.category_balance.status === "imbalanced" ? "Imbalanced" : "Moderate"}
-                      </span>
+                    <PieChart className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                      Category Balance
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                      analyticsData.category_balance.status === "balanced" 
+                        ? "bg-primary/20 text-primary" 
+                        : analyticsData.category_balance.status === "imbalanced"
+                        ? "bg-amber-500/20 text-amber-600"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {analyticsData.category_balance.status === "balanced" ? "Balanced" : 
+                       analyticsData.category_balance.status === "imbalanced" ? "Imbalanced" : "Moderate"}
+                    </span>
                   </div>
                 </div>
             
@@ -1089,68 +1131,66 @@ const Explore = () => {
               </div>
             </div>
             
-            {/* Category Distribution List */}
-            <div className="space-y-3">
-              {Object.entries(analyticsData.category_balance.distribution)
-                .sort((a, b) => b[1] - a[1])
-                .map(([categoryId, count]) => {
-                  const categoryInfo = store.categories.find(c => c.id === categoryId);
-                  const label = categoryInfo?.label || categoryId;
-                  const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
-                  const percentage = (count / total) * 100;
-                  return (
-                    <div key={categoryId} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
-                            style={{ backgroundColor: categoryInfo?.color || "hsl(var(--primary))" }}
-                          />
-                          <span className="text-sm text-foreground font-sans font-medium">{label}</span>
+                {/* Category Distribution List */}
+                <div className="space-y-3">
+                  {Object.entries(analyticsData.category_balance.distribution)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([categoryId, count]) => {
+                      const categoryInfo = store.categories.find(c => c.id === categoryId);
+                      const label = categoryInfo?.label || categoryId;
+                      const total = Object.values(analyticsData.category_balance.distribution).reduce((a, b) => a + b, 0);
+                      const percentage = (count / total) * 100;
+                      return (
+                        <div key={categoryId} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
+                                style={{ backgroundColor: categoryInfo?.color || "hsl(var(--primary))" }}
+                              />
+                              <span className="text-sm text-foreground font-sans font-medium">{label}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-sans">{Math.round(percentage)}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500 shadow-sm"
+                              style={{ 
+                                width: `${percentage}%`,
+                                backgroundColor: categoryInfo?.color || "hsl(var(--primary))"
+                              }}
+                            />
+                          </div>
                         </div>
-                        <span className="text-xs text-muted-foreground font-sans">{Math.round(percentage)}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500 shadow-sm"
-                          style={{ 
-                            width: `${percentage}%`,
-                            backgroundColor: categoryInfo?.color || "hsl(var(--primary))"
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        </div>
-      )}
+                      );
+                    })}
+                </div>
+              </>
+            )}
 
-      {/* Energy/Load Patterns - Enhanced */}
-      {analyticsData && analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.35s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                  Energy & Load Patterns
-                </h3>
-              </div>
-              {analyticsData.energy_patterns.trend && (
-                <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                  analyticsData.energy_patterns.trend === "increasing" 
-                    ? "bg-amber-500/20 text-amber-600"
-                    : analyticsData.energy_patterns.trend === "decreasing"
-                    ? "bg-emerald-500/20 text-emerald-600"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {analyticsData.energy_patterns.trend === "increasing" ? "↑ Increasing" :
-                   analyticsData.energy_patterns.trend === "decreasing" ? "↓ Decreasing" : "→ Stable"}
-                </span>
-              )}
-            </div>
+            {/* Energy/Load Patterns View */}
+            {currentStatsView === "energy" && analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0 && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                      Energy & Load Patterns
+                    </h3>
+                  </div>
+                  {analyticsData.energy_patterns.trend && (
+                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                      analyticsData.energy_patterns.trend === "increasing" 
+                        ? "bg-amber-500/20 text-amber-600"
+                        : analyticsData.energy_patterns.trend === "decreasing"
+                        ? "bg-emerald-500/20 text-emerald-600"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {analyticsData.energy_patterns.trend === "increasing" ? "↑ Increasing" :
+                       analyticsData.energy_patterns.trend === "decreasing" ? "↓ Decreasing" : "→ Stable"}
+                    </span>
+                  )}
+                </div>
             
             {/* Weekly Summary - Moved Above Trend Chart */}
             {analyticsData.energy_patterns.weekly_patterns.length > 0 && (() => {
@@ -1248,35 +1288,32 @@ const Explore = () => {
               </div>
             )}
 
-            {/* Insights */}
-            {analyticsData.energy_patterns.insights && analyticsData.energy_patterns.insights.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <div className="space-y-2">
-                  {analyticsData.energy_patterns.insights.map((insight, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <Sparkles className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-foreground font-sans leading-relaxed">{insight}</p>
+                {/* Insights */}
+                {analyticsData.energy_patterns.insights && analyticsData.energy_patterns.insights.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="space-y-2">
+                      {analyticsData.energy_patterns.insights.map((insight, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <Sparkles className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-foreground font-sans leading-relaxed">{insight}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                )}
+              </>
             )}
-          </div>
-        </div>
-      )}
 
-
-      {/* Productivity Insights */}
-      {analyticsData && analyticsData.productivity_insights && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.45s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Productivity Insights
-          </h3>
-        </div>
-          <div className="space-y-3">
+            {/* Productivity Insights View */}
+            {currentStatsView === "productivity" && analyticsData.productivity_insights && (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                    Productivity Insights
+                  </h3>
+                </div>
+                <div className="space-y-3">
               {analyticsData.productivity_insights.best_times.length > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-foreground font-sans">Peak focus times</span>
@@ -1324,14 +1361,61 @@ const Explore = () => {
                     {Math.round(analyticsData.productivity_insights.completion_rate * 100)}%
                   </span>
                 </div>
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full transition-all duration-500"
-                    style={{ width: `${analyticsData.productivity_insights.completion_rate * 100}%` }}
-                  />
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${analyticsData.productivity_insights.completion_rate * 100}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
+
+            {/* Navigation dots for rotating stats */}
+            {(() => {
+              const availableViews: Array<"category" | "energy" | "productivity"> = [];
+              if (analyticsData.category_balance && analyticsData.category_balance.distribution && Object.keys(analyticsData.category_balance.distribution).length > 0) {
+                availableViews.push("category");
+              }
+              if (analyticsData.energy_patterns && analyticsData.energy_patterns.weekly_patterns.length > 0) {
+                availableViews.push("energy");
+              }
+              if (analyticsData.productivity_insights) {
+                availableViews.push("productivity");
+              }
+              
+              if (availableViews.length > 1) {
+                return (
+                  <div className="flex items-center justify-center gap-1.5 mt-4 pt-4 border-t border-border/50">
+                    {availableViews.map((view) => (
+                      <button
+                        key={view}
+                        onClick={() => {
+                          setCurrentStatsView(view);
+                          if (statsRotateTimerRef.current) {
+                            clearInterval(statsRotateTimerRef.current);
+                          }
+                          statsRotateTimerRef.current = setInterval(() => {
+                            setCurrentStatsView((prev) => {
+                              const currentIndex = availableViews.indexOf(prev);
+                              const nextIndex = (currentIndex + 1) % availableViews.length;
+                              return availableViews[nextIndex];
+                            });
+                          }, 10000);
+                        }}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          view === currentStatsView
+                            ? "w-6 bg-primary"
+                            : "w-1.5 bg-muted-foreground/30"
+                        }`}
+                        aria-label={`View ${view}`}
+                      />
+                    ))}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
       )}

@@ -147,7 +147,7 @@ export function MonthCalendar({
           key={day.toISOString()}
           onClick={() => onSelectDate(currentDay)}
           className={cn(
-            "relative flex flex-col items-start p-2 min-h-[100px] rounded-lg transition-all duration-200 text-left border-l-4",
+            "relative flex flex-col items-start p-2 min-h-[120px] rounded-lg transition-all duration-200 text-left border-l-4",
             !isCurrentMonth && "opacity-30",
             isSelected && "bg-primary border-l-primary",
             !isSelected && isCurrentMonth && isToday && "border-l-primary/40 bg-background",
@@ -177,7 +177,7 @@ export function MonthCalendar({
                 <div
                   key={task.id + i}
                   className={cn(
-                    "text-xs leading-snug truncate rounded px-1.5 py-1 font-sans",
+                    "text-xs leading-tight rounded px-1.5 py-0.5 font-sans line-clamp-2",
                     task.completed && "line-through opacity-50",
                     isSelected && "text-primary-foreground"
                   )}
@@ -186,6 +186,7 @@ export function MonthCalendar({
                     color: isSelected ? undefined : "inherit",
                     borderLeft: !isSelected && task.value ? `3px solid ${categoryColor}` : undefined
                   }}
+                  title={task.title}
                 >
                   {task.title}
                 </div>
@@ -212,7 +213,7 @@ export function MonthCalendar({
   return (
     <div className="px-3 pb-3 animate-slide-up">
       {/* Weekday Headers */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
+      <div className="grid grid-cols-7 gap-0.5 mb-2">
         {WEEKDAYS.map((day) => (
           <div
             key={day}
@@ -224,7 +225,7 @@ export function MonthCalendar({
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1">{renderDays()}</div>
+      <div className="grid grid-cols-7 gap-0.5">{renderDays()}</div>
       
       <p className="text-center text-xs text-muted-foreground/60 font-sans mt-3">
         Swipe left/right to change month
