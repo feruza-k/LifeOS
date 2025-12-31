@@ -541,42 +541,6 @@ const Explore = () => {
       )}
 
 
-      {/* Suggestions from SolAI - MOVED TO TOP */}
-      {alignData && alignData.nudge && (
-      <div className="px-4 py-3 animate-slide-up">
-          <div className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1">
-                <h4 className="font-sans font-semibold text-foreground mb-1">Suggestion</h4>
-                <p className="text-sm text-foreground font-sans leading-relaxed mb-3">
-                  {alignData.nudge.message}
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate("/week")}
-                    className="flex-1 text-sm font-sans"
-                  >
-                    Review Week
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex-1 text-sm font-sans"
-                  >
-                    Dismiss
-                  </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-        </div>
-      )}
-
       {/* Analytics: Completion Rate Trends */}
       {(() => {
         // Debug logging
@@ -765,6 +729,42 @@ const Explore = () => {
         </div>
       )}
 
+      {/* Suggestions from SolAI */}
+      {alignData && alignData.nudge && (
+      <div className="px-4 py-3 animate-slide-up">
+          <div className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+                <h4 className="font-sans font-semibold text-foreground mb-1">Suggestion</h4>
+                <p className="text-sm text-foreground font-sans leading-relaxed mb-3">
+                  {alignData.nudge.message}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/week")}
+                    className="flex-1 text-sm font-sans"
+                  >
+                    Review Week
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 text-sm font-sans"
+                  >
+                    Dismiss
+                  </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+        </div>
+      )}
+
       {/* Goals Carousel */}
       {goals.length > 0 ? (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
@@ -879,47 +879,6 @@ const Explore = () => {
         </div>
       )}
 
-      {/* Goal Progress - Task Connections */}
-      {analyticsData && analyticsData.goal_task_connections && Array.isArray(analyticsData.goal_task_connections) && analyticsData.goal_task_connections.length > 0 && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
-          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-                Goal Progress
-              </h3>
-            </div>
-            <div className="space-y-4">
-              {analyticsData.goal_task_connections.map((connection) => (
-                <div key={connection.goal_id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-sans font-medium text-foreground">
-                      {connection.goal_title}
-                    </h4>
-                    <span className="text-xs text-muted-foreground font-sans">
-                      {connection.total_matches} match{connection.total_matches !== 1 ? "es" : ""}
-                    </span>
-                  </div>
-                  {connection.recent_tasks && connection.recent_tasks.length > 0 && (
-                    <div className="space-y-1 pl-2 border-l-2 border-primary/20">
-                      {connection.recent_tasks.slice(0, 3).map((task, idx) => (
-                        <div key={idx} className="text-xs text-muted-foreground font-sans">
-                          • {task.title}
-                        </div>
-                      ))}
-                      {connection.recent_tasks.length > 3 && (
-                        <div className="text-xs text-muted-foreground/60 font-sans italic">
-                          +{connection.recent_tasks.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Category distribution as proxy for value alignment */}
       {alignData && alignData.value_alignment && typeof alignData.value_alignment === 'object' && Object.keys(alignData.value_alignment).length > 0 && (

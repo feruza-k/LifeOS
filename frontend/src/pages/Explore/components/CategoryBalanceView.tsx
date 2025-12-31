@@ -44,6 +44,7 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
             Category Balance
           </h3>
         </div>
+        <span className="text-xs text-muted-foreground font-sans">Past Month</span>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
             categoryBalance.status === "balanced" 
@@ -59,8 +60,8 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
       </div>
 
       {/* Pie Chart Visualization */}
-      <div className="mb-6 flex items-center justify-center">
-        <div className="relative" style={{ width: '200px', height: '200px' }}>
+      <div className="mb-4 flex items-center justify-center">
+        <div className="relative" style={{ width: '180px', height: '180px' }}>
           <svg 
             width="200" 
             height="200" 
@@ -163,7 +164,7 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
       </div>
       
       {/* Category Distribution List */}
-      <div className="space-y-3">
+      <div className="space-y-2 mt-auto">
         {Object.entries(categoryBalance.distribution)
           .sort((a, b) => b[1] - a[1])
           .map(([categoryId, count]) => {

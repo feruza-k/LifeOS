@@ -33,25 +33,28 @@ export function EnergyPatternsView({ energyPatterns }: EnergyPatternsViewProps) 
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-            Energy & Load Patterns
+            Energy Load
           </h3>
         </div>
-        {energyPatterns.trend && (
-          <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-            energyPatterns.trend === "increasing" 
-              ? "bg-emerald-500/20 text-emerald-600"
-              : energyPatterns.trend === "decreasing"
-              ? "bg-emerald-500/20 text-emerald-600"
-              : "bg-muted text-muted-foreground"
-          }`}>
-            {energyPatterns.trend === "increasing" ? "↑ Increasing" :
-             energyPatterns.trend === "decreasing" ? "↓ Decreasing" : "→ Stable"}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-sans">Past Month</span>
+          {energyPatterns.trend && (
+            <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+              energyPatterns.trend === "increasing" 
+                ? "bg-emerald-500/20 text-emerald-600"
+                : energyPatterns.trend === "decreasing"
+                ? "bg-emerald-500/20 text-emerald-600"
+                : "bg-muted text-muted-foreground"
+            }`}>
+              {energyPatterns.trend === "increasing" ? "↑ Increasing" :
+               energyPatterns.trend === "decreasing" ? "↓ Decreasing" : "→ Stable"}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Weekly Summary */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-2xl font-sans font-bold text-foreground">{currentWeek.average_daily_load.toFixed(1)}</div>
@@ -69,7 +72,7 @@ export function EnergyPatternsView({ energyPatterns }: EnergyPatternsViewProps) 
       </div>
       
       {/* Weekly Trend Chart */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex items-end justify-between h-32 gap-1 mb-2">
           {energyPatterns.weekly_patterns.slice(-4).map((week, index) => {
             const maxLoad = Math.max(...energyPatterns.weekly_patterns.map(w => w.average_daily_load || 0), 1);
@@ -99,7 +102,7 @@ export function EnergyPatternsView({ energyPatterns }: EnergyPatternsViewProps) 
 
       {/* Insights */}
       {energyPatterns.insights && energyPatterns.insights.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border/50">
+        <div className="mt-auto pt-3 border-t border-border/50">
           <div className="space-y-2">
             {energyPatterns.insights.map((insight, index) => (
               <div key={index} className="flex items-start gap-2">

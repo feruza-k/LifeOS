@@ -132,6 +132,11 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
 
   return (
     <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
+      <div className="mb-3 px-1">
+        <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+          Monthly Insights
+        </h3>
+      </div>
       <div 
         ref={statsCarouselRef}
         className="p-5 bg-card rounded-2xl shadow-soft border border-border/50 overflow-hidden relative touch-pan-y"
@@ -149,53 +154,68 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           handleSwipeEnd(endX);
         }}
       >
-        {/* Render views based on currentStatsView */}
-        {currentStatsView === "category" && hasCategoryBalance && analyticsData?.category_balance && (
-          <CategoryBalanceView 
-            categoryBalance={analyticsData.category_balance} 
-            key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
-          />
-        )}
-
-        {currentStatsView === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
-          <EnergyPatternsView 
-            energyPatterns={analyticsData.energy_patterns}
-            key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
-          />
-        )}
-
-        {currentStatsView === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
-          <ProductivityInsightsView 
-            productivityInsights={analyticsData.productivity_insights}
-            consistency={analyticsData.consistency || null}
-            key={`productivity-${analyticsData.productivity_insights.completion_rate}`}
-          />
-        )}
-        
-        {/* Fallback: if current view doesn't match, show first available */}
-        {!availableViews.includes(currentStatsView) && availableViews.length > 0 && (
-          <>
-            {availableViews[0] === "category" && hasCategoryBalance && analyticsData?.category_balance && (
+        {/* Fixed height container for all views */}
+        <div className="min-h-[480px] flex flex-col">
+          {/* Render views based on currentStatsView */}
+          {currentStatsView === "category" && hasCategoryBalance && analyticsData?.category_balance && (
+            <div className="flex-1 flex flex-col">
               <CategoryBalanceView 
                 categoryBalance={analyticsData.category_balance} 
-                key={`category-fallback-${JSON.stringify(analyticsData.category_balance.distribution)}`}
+                key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
               />
-            )}
-            {availableViews[0] === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
+            </div>
+          )}
+
+          {currentStatsView === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
+            <div className="flex-1 flex flex-col">
               <EnergyPatternsView 
                 energyPatterns={analyticsData.energy_patterns}
-                key={`energy-fallback-${analyticsData.energy_patterns.weekly_patterns.length}`}
+                key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
               />
-            )}
-            {availableViews[0] === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
+            </div>
+          )}
+
+          {currentStatsView === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
+            <div className="flex-1 flex flex-col">
               <ProductivityInsightsView 
                 productivityInsights={analyticsData.productivity_insights}
                 consistency={analyticsData.consistency || null}
-                key={`productivity-fallback-${analyticsData.productivity_insights.completion_rate}`}
+                key={`productivity-${analyticsData.productivity_insights.completion_rate}`}
               />
-            )}
-          </>
-        )}
+            </div>
+          )}
+          
+          {/* Fallback: if current view doesn't match, show first available */}
+          {!availableViews.includes(currentStatsView) && availableViews.length > 0 && (
+            <>
+              {availableViews[0] === "category" && hasCategoryBalance && analyticsData?.category_balance && (
+                <div className="flex-1 flex flex-col">
+                  <CategoryBalanceView 
+                    categoryBalance={analyticsData.category_balance} 
+                    key={`category-fallback-${JSON.stringify(analyticsData.category_balance.distribution)}`}
+                  />
+                </div>
+              )}
+              {availableViews[0] === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
+                <div className="flex-1 flex flex-col">
+                  <EnergyPatternsView 
+                    energyPatterns={analyticsData.energy_patterns}
+                    key={`energy-fallback-${analyticsData.energy_patterns.weekly_patterns.length}`}
+                  />
+                </div>
+              )}
+              {availableViews[0] === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
+                <div className="flex-1 flex flex-col">
+                  <ProductivityInsightsView 
+                    productivityInsights={analyticsData.productivity_insights}
+                    consistency={analyticsData.consistency || null}
+                    key={`productivity-fallback-${analyticsData.productivity_insights.completion_rate}`}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Navigation dots - Always show if there are multiple views */}
         {availableViews.length > 1 && (

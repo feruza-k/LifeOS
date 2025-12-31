@@ -22,11 +22,14 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
   if (!productivityInsights || productivityInsights.completion_rate === undefined || productivityInsights.completion_rate === null) {
     return (
       <>
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-            Productivity Insights
-          </h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+              Productivity
+            </h3>
+          </div>
+          <span className="text-xs text-muted-foreground font-sans">Past Month</span>
         </div>
         <div className="text-center py-8 text-muted-foreground text-sm">
           Productivity data will appear as you complete tasks
@@ -36,18 +39,21 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
   }
   
   return (
-    <>
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-4 h-4 text-primary" />
-        <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
-          Productivity Insights
-        </h3>
-      </div>
+      <>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+              Productivity
+            </h3>
+          </div>
+          <span className="text-xs text-muted-foreground font-sans">Past Month</span>
+        </div>
       
       {/* Overall Completion - Large Visual Metric */}
-      <div className="mb-6">
-        <div className="flex items-center justify-center mb-3">
-          <div className="relative" style={{ width: '128px', height: '128px' }}>
+      <div className="mb-4">
+        <div className="flex items-center justify-center mb-2">
+          <div className="relative" style={{ width: '120px', height: '120px' }}>
             <svg 
               className="transform -rotate-90" 
               viewBox="0 0 100 100"
@@ -86,7 +92,7 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-3 mb-4">
         {/* Most Productive Day */}
         {productivityInsights.best_day && (
           <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
@@ -125,18 +131,18 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
 
       {/* Peak Focus Times */}
       {productivityInsights.best_times.length > 0 && (
-        <div className="mb-4">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="mt-auto">
+          <div className="flex items-center gap-2 mb-2">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Peak Focus Times</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {productivityInsights.best_times.map((time, index) => (
+          <div className="flex flex-wrap gap-1.5">
+            {productivityInsights.best_times.slice(0, 3).map((time, index) => (
               <div
                 key={index}
-                className="px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20"
+                className="px-2.5 py-1 bg-primary/10 rounded-lg border border-primary/20"
               >
-                <span className="text-sm font-sans font-medium text-foreground">{time}</span>
+                <span className="text-xs font-sans font-medium text-foreground">{time}</span>
               </div>
             ))}
           </div>
