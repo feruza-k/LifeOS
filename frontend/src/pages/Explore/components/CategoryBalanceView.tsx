@@ -1,5 +1,6 @@
 import { PieChart } from "lucide-react";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
+import { useMemo } from "react";
 
 interface CategoryBalanceViewProps {
   categoryBalance: {
@@ -12,10 +13,38 @@ interface CategoryBalanceViewProps {
 export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProps) {
   const store = useLifeOSStore();
 
+  // Process and map categories properly
+  const categoryList = useMemo(() => {
+    const entries = Object.entries(categoryBalance.distribution || {})
+      .filter(([_, count]) => count > 0)
+      .map(([categoryId, count]) => {
+        // Try to find category by ID first
+        let categoryInfo = store.categories.find(c => c.id === categoryId);
+        
+        // If not found, try to find by label (in case ID is actually a label)
+        if (!categoryInfo) {
+          categoryInfo = store.categories.find(c => c.label.toLowerCase() === categoryId.toLowerCase());
+        }
+        
+        return {
+          id: categoryId,
+          label: categoryInfo?.label || categoryId,
+          color: categoryInfo?.color || "hsl(var(--primary))",
+          count,
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+    
+    const total = entries.reduce((sum, item) => sum + item.count, 0);
+    
+    return entries.map(item => ({
+      ...item,
+      percentage: total > 0 ? (item.count / total) * 100 : 0,
+    }));
+  }, [categoryBalance.distribution, store.categories]);
+
   // Check if we have valid data
-  const hasDistribution = categoryBalance.distribution && 
-    Object.keys(categoryBalance.distribution).length > 0 &&
-    Object.values(categoryBalance.distribution).some(count => count > 0);
+  const hasDistribution = categoryList.length > 0;
 
   if (!hasDistribution) {
     return (
@@ -27,6 +56,7 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
               Category Balance
             </h3>
           </div>
+          <span className="text-xs text-muted-foreground font-sans">Past Month</span>
         </div>
         <div className="text-center py-8 text-muted-foreground text-sm">
           No category data available yet
@@ -44,8 +74,8 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
             Category Balance
           </h3>
         </div>
-        <span className="text-xs text-muted-foreground font-sans">Past Month</span>
         <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-sans">Past Month</span>
           <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
             categoryBalance.status === "balanced" 
               ? "bg-primary/20 text-primary" 
@@ -56,6 +86,30 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
             {categoryBalance.status === "balanced" ? "Balanced" : 
              categoryBalance.status === "imbalanced" ? "Imbalanced" : "Moderate"}
           </span>
+        </div>
+      </div>
+
+      {/* Summary Stats - Match EnergyPatternsView style */}
+      <div className="mb-6">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <div className="text-2xl font-sans font-bold text-foreground">
+              {categoryList.length}
+            </div>
+            <div className="text-xs text-muted-foreground font-sans uppercase mt-1">Categories</div>
+          </div>
+          <div>
+            <div className="text-2xl font-sans font-bold text-foreground">
+              {Math.round(categoryBalance.score * 100)}%
+            </div>
+            <div className="text-xs text-muted-foreground font-sans uppercase mt-1">Balance</div>
+          </div>
+          <div>
+            <div className="text-2xl font-sans font-bold text-foreground">
+              {categoryList.reduce((sum, item) => sum + item.count, 0)}
+            </div>
+            <div className="text-xs text-muted-foreground font-sans uppercase mt-1">Total Tasks</div>
+          </div>
         </div>
       </div>
 
@@ -81,24 +135,7 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
               opacity="0.3"
             />
             {(() => {
-              const entries = Object.entries(categoryBalance.distribution || {})
-                .filter(([_, count]) => count > 0) // Filter out zero counts
-                .sort((a, b) => b[1] - a[1]);
-              
-              if (entries.length === 0) {
-                return (
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="85"
-                    fill="hsl(var(--muted))"
-                    opacity="0.2"
-                  />
-                );
-              }
-              
-              const total = entries.reduce((sum, [_, count]) => sum + count, 0);
-              if (total === 0) {
+              if (categoryList.length === 0) {
                 return (
                   <circle
                     cx="100"
@@ -116,10 +153,8 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
               const centerY = 100;
               const gap = 2;
               
-              return entries.map(([categoryId, count]) => {
-                const categoryInfo = store.categories.find(c => c.id === categoryId);
-                const percentage = (count / total) * 100;
-                const angle = (percentage / 100) * 360;
+              return categoryList.map((item) => {
+                const angle = (item.percentage / 100) * 360;
                 const startAngle = currentAngle + (gap / 2);
                 const endAngle = currentAngle + angle - (gap / 2);
                 currentAngle += angle;
@@ -141,9 +176,9 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
                 
                 return (
                   <path
-                    key={categoryId}
+                    key={item.id}
                     d={pathData}
-                    fill={categoryInfo?.color || "hsl(var(--primary))"}
+                    fill={item.color}
                     stroke="hsl(var(--background))"
                     strokeWidth="3"
                     className="transition-all duration-300 hover:opacity-80"
@@ -163,39 +198,25 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
         </div>
       </div>
       
-      {/* Category Distribution List */}
-      <div className="space-y-3">
-        {Object.entries(categoryBalance.distribution)
-          .sort((a, b) => b[1] - a[1])
-          .map(([categoryId, count]) => {
-            const categoryInfo = store.categories.find(c => c.id === categoryId);
-            const label = categoryInfo?.label || categoryId;
-            const total = Object.values(categoryBalance.distribution).reduce((a, b) => a + b, 0);
-            const percentage = (count / total) * 100;
-            return (
-              <div key={categoryId} className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
-                      style={{ backgroundColor: categoryInfo?.color || "hsl(var(--primary))" }}
-                    />
-                    <span className="text-sm text-foreground font-sans font-medium">{label}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground font-sans">{Math.round(percentage)}%</span>
-                </div>
-                <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500 shadow-sm"
-                    style={{ 
-                      width: `${percentage}%`,
-                      backgroundColor: categoryInfo?.color || "hsl(var(--primary))"
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+      {/* Category List - Clean, no bars */}
+      <div className="space-y-2">
+        {categoryList.map((item) => (
+          <div key={item.id} className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div 
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="text-sm text-foreground font-sans font-medium">{item.label}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-sans">{item.count} tasks</span>
+              <span className="text-xs text-muted-foreground font-sans font-medium">
+                {Math.round(item.percentage)}%
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );
