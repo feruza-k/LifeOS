@@ -7,6 +7,7 @@ import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { ValueTag, ValueType } from "@/components/lifeos/ValueTag";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
 import { useCoreAI } from "@/hooks/useCoreAI";
+import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
 
 const Week = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -69,17 +70,6 @@ const Week = () => {
             ))}
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center pb-24">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground font-sans">Loading week...</p>
-        </div>
-        <BottomNav />
       </div>
     );
   }
