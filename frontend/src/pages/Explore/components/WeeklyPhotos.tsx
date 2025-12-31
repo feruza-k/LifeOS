@@ -26,16 +26,21 @@ export function WeeklyPhotos({
 }: WeeklyPhotosProps) {
   const currentPhoto = photos[currentIndex];
   const photoUrl = currentPhoto ? api.getPhotoUrl(currentPhoto.filename) : null;
+  
+  // Use stable photo URL - only add cache-busting once when photo changes, not on every render
+  const stablePhotoUrl = currentPhoto && currentPhoto.filename && photoUrl 
+    ? `${photoUrl}?date=${currentPhoto.date}` 
+    : null;
 
   return (
     <div className="grid gap-3 grid-cols-2">
       {/* Photo Album */}
       <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-        {currentPhoto && currentPhoto.filename && photoUrl ? (
+        {currentPhoto && currentPhoto.filename && stablePhotoUrl ? (
           <>
             <img
               key={`${currentPhoto.filename}-${currentPhoto.date}-${currentIndex}`}
-              src={`${photoUrl}?t=${Date.now()}&date=${currentPhoto.date}`}
+              src={stablePhotoUrl}
               alt={`Weekly photo from ${format(parseISO(currentPhoto.date), "MMM d")}`}
               className="w-full h-full object-cover"
               onError={(e) => {
@@ -43,10 +48,10 @@ export function WeeklyPhotos({
                 // Check if we've already tried fallbacks (check for data attribute)
                 const hasTriedFallback = target.dataset.triedFallback === 'true';
                 
-                if (!hasTriedFallback && target.src.includes('?t=')) {
-                  // Try without cache-busting first
+                if (!hasTriedFallback) {
+                  // Try with cache-busting as fallback
                   target.dataset.triedFallback = 'true';
-                  target.src = `${photoUrl}?date=${currentPhoto.date}`;
+                  target.src = `${photoUrl}?t=${Date.now()}&date=${currentPhoto.date}`;
                 } else {
                   // If all fails, show placeholder immediately and stop retrying
                   target.style.display = 'none';

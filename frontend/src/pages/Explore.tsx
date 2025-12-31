@@ -199,13 +199,20 @@ const Explore = () => {
   } = useExploreData();
 
   // Reload photos when navigating to Explore page (to catch database changes)
+  // But only once per navigation, not on every render
+  const hasReloadedRef = useRef(false);
   useEffect(() => {
-    if (location.pathname === '/explore' && !loading) {
+    if (location.pathname === '/explore' && !loading && !hasReloadedRef.current) {
+      hasReloadedRef.current = true;
       // Small delay to ensure component is fully mounted
       const timer = setTimeout(() => {
         reloadPhotos();
-      }, 100);
+      }, 500);
       return () => clearTimeout(timer);
+    }
+    // Reset when navigating away
+    if (location.pathname !== '/explore') {
+      hasReloadedRef.current = false;
     }
   }, [location.pathname, loading, reloadPhotos]);
 

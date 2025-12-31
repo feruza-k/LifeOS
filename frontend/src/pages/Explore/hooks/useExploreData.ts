@@ -189,7 +189,24 @@ export function useExploreData() {
         );
       }
       
-      setWeeklyPhotos(photosWithNotes);
+      // Only update if the data actually changed (prevent unnecessary re-renders)
+      setWeeklyPhotos(prevPhotos => {
+        // Compare arrays to see if data actually changed
+        if (prevPhotos.length !== photosWithNotes.length) {
+          return photosWithNotes;
+        }
+        
+        // Deep comparison of photos
+        const hasChanged = prevPhotos.some((prev, index) => {
+          const current = photosWithNotes[index];
+          return !current || 
+                 prev.date !== current.date ||
+                 prev.filename !== current.filename ||
+                 prev.note !== current.note;
+        });
+        
+        return hasChanged ? photosWithNotes : prevPhotos;
+      });
     } catch (error) {
       console.error('[Explore] Error loading weekly photos:', error);
       // Silently fail - photos are optional
@@ -255,38 +272,29 @@ export function useExploreData() {
     loadData();
   }, []);
 
-  // Reload photos when page becomes visible or periodically when visible
+  // Reload photos when page becomes visible (but not too frequently to avoid loops)
   useEffect(() => {
-    let refreshInterval: NodeJS.Timeout | null = null;
+    let lastReloadTime = 0;
+    const MIN_RELOAD_INTERVAL = 5000; // Minimum 5 seconds between reloads
     
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Reload immediately when page becomes visible
-        loadWeeklyPhotosAndReflections();
-        
-        // Set up periodic refresh every 30 seconds when page is visible
-        refreshInterval = setInterval(() => {
+        const now = Date.now();
+        // Only reload if enough time has passed since last reload
+        if (now - lastReloadTime > MIN_RELOAD_INTERVAL) {
+          lastReloadTime = now;
           loadWeeklyPhotosAndReflections();
-        }, 30000); // Refresh every 30 seconds
-      } else {
-        // Clear interval when page is hidden
-        if (refreshInterval) {
-          clearInterval(refreshInterval);
-          refreshInterval = null;
         }
       }
     };
     
     const handleFocus = () => {
-      loadWeeklyPhotosAndReflections();
-    };
-    
-    // Initial setup - if page is already visible, start periodic refresh
-    if (!document.hidden) {
-      refreshInterval = setInterval(() => {
+      const now = Date.now();
+      if (now - lastReloadTime > MIN_RELOAD_INTERVAL) {
+        lastReloadTime = now;
         loadWeeklyPhotosAndReflections();
-      }, 30000);
-    }
+      }
+    };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
@@ -294,9 +302,6 @@ export function useExploreData() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-      }
     };
   }, []);
 
