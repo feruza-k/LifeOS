@@ -120,8 +120,9 @@ export function WeekScheduleView({
   };
 
   // Find empty time slots for placing anytime tasks
-  const findEmptySlots = (scheduledTasks: Task[], minHour: number = 9, maxHour: number = 20): Array<{ start: string; end: string }> => {
-    const slots: Array<{ start: string; end: string }> = [];
+  // Prefer afternoon (12 PM+) and evening slots
+  const findEmptySlots = (scheduledTasks: Task[], minHour: number = 9, maxHour: number = 20): Array<{ start: string; end: string; priority: number }> => {
+    const slots: Array<{ start: string; end: string; priority: number }> = [];
     
     // Create a sorted list of scheduled tasks with their time ranges
     const scheduledRanges = scheduledTasks
@@ -143,14 +144,22 @@ export function WeekScheduleView({
       if (currentTime < range.start) {
         // Found a gap
         const gapDuration = range.start - currentTime;
-        if (gapDuration >= 30) { // Only consider gaps of 30+ minutes
+        if (gapDuration >= 60) { // Only consider gaps of 60+ minutes (1 hour)
           const startHour = Math.floor(currentTime / 60);
           const startMin = currentTime % 60;
           const endHour = Math.floor(range.start / 60);
           const endMin = range.start % 60;
+          
+          // Calculate priority: prefer afternoon (12 PM+) and evening (2 PM+)
+          let priority = 0;
+          if (startHour >= 14) priority = 3; // Evening (2 PM+) - highest priority
+          else if (startHour >= 12) priority = 2; // Afternoon (12 PM-2 PM)
+          else priority = 1; // Morning - lowest priority
+          
           slots.push({
             start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
             end: `${endHour.toString().padStart(2, "0")}:${endMin.toString().padStart(2, "0")}`,
+            priority,
           });
         }
       }
@@ -160,17 +169,31 @@ export function WeekScheduleView({
     // Check for gap after last task until maxHour
     if (currentTime < maxHour * 60) {
       const gapDuration = maxHour * 60 - currentTime;
-      if (gapDuration >= 30) {
+      if (gapDuration >= 60) {
         const startHour = Math.floor(currentTime / 60);
         const startMin = currentTime % 60;
+        
+        // Calculate priority
+        let priority = 0;
+        if (startHour >= 14) priority = 3;
+        else if (startHour >= 12) priority = 2;
+        else priority = 1;
+        
         slots.push({
           start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
           end: `${maxHour.toString().padStart(2, "0")}:00`,
+          priority,
         });
       }
     }
     
-    return slots;
+    // Sort by priority (highest first), then by time
+    return slots.sort((a, b) => {
+      if (a.priority !== b.priority) return b.priority - a.priority;
+      const [aHour] = a.start.split(":").map(Number);
+      const [bHour] = b.start.split(":").map(Number);
+      return aHour - bHour;
+    });
   };
 
   // Get tasks for a specific date (Scheduled + Anytime placed in empty slots)
@@ -221,23 +244,47 @@ export function WeekScheduleView({
     const anytime = allTasks.filter(t => !t.time);
     
     // Find empty slots and assign anytime tasks to them
+    // Slots are already sorted by priority (afternoon/evening first)
     const emptySlots = findEmptySlots(scheduled);
-    const anytimeWithSlots = anytime.map((task, index) => {
-      const slot = emptySlots[index % emptySlots.length];
-      if (slot) {
+    
+    // Track used slots to prevent overlapping
+    const usedSlots = new Set<number>();
+    const anytimeWithSlots = anytime.map((task, taskIndex) => {
+      // Find first available slot that doesn't overlap
+      let assignedSlot = null;
+      let slotIndex = -1;
+      for (let i = 0; i < emptySlots.length; i++) {
+        if (!usedSlots.has(i)) {
+          assignedSlot = emptySlots[i];
+          slotIndex = i;
+          usedSlots.add(i);
+          break;
+        }
+      }
+      
+      if (assignedSlot) {
         // Assign to slot (but mark as anytime)
         return {
           ...task,
-          assignedTime: slot.start,
-          assignedEndTime: slot.end,
+          assignedTime: assignedSlot.start,
+          assignedEndTime: assignedSlot.end,
           isAnytime: true,
         };
       }
-      // No slot available, place at end of day (8 PM)
+      // No slot available, place at end of day (8 PM) with 1-hour offset per task to avoid overlap
+      const baseHour = 20;
+      const offsetMinutes = taskIndex * 60; // 1 hour offset per task
+      const totalMinutes = baseHour * 60 + offsetMinutes;
+      const hour = Math.floor(totalMinutes / 60);
+      const minute = totalMinutes % 60;
+      const startTime = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+      const endHour = Math.floor((totalMinutes + 60) / 60);
+      const endMin = (totalMinutes + 60) % 60;
+      const endTime = `${endHour.toString().padStart(2, "0")}:${endMin.toString().padStart(2, "0")}`;
       return {
         ...task,
-        assignedTime: "20:00",
-        assignedEndTime: "21:00",
+        assignedTime: startTime,
+        assignedEndTime: endTime,
         isAnytime: true,
       };
     });

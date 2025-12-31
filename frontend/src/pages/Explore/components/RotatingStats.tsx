@@ -115,12 +115,18 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
       >
         {/* Category Balance View */}
         {currentStatsView === "category" && analyticsData?.category_balance && (
-          <CategoryBalanceView categoryBalance={analyticsData.category_balance} />
+          <CategoryBalanceView 
+            categoryBalance={analyticsData.category_balance} 
+            key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
+          />
         )}
 
         {/* Energy/Load Patterns View */}
         {currentStatsView === "energy" && analyticsData?.energy_patterns && (
-          <EnergyPatternsView energyPatterns={analyticsData.energy_patterns} />
+          <EnergyPatternsView 
+            energyPatterns={analyticsData.energy_patterns}
+            key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
+          />
         )}
 
         {/* Productivity Insights View */}
@@ -128,6 +134,7 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           <ProductivityInsightsView 
             productivityInsights={analyticsData.productivity_insights}
             consistency={analyticsData.consistency || null}
+            key={`productivity-${analyticsData.productivity_insights.completion_rate}`}
           />
         )}
 

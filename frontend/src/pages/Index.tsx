@@ -324,15 +324,13 @@ const Index = () => {
       {/* Today's Show Reminders - Before Energy Status */}
       {todayShowReminders.length > 0 && (
         <div className="px-4 py-2 mt-2">
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {todayShowReminders.map((reminder) => (
               <div
                 key={reminder.id}
-                className="flex items-center gap-2.5 p-2.5 rounded-lg bg-primary/5 border border-primary/20"
+                className="flex items-center gap-3"
               >
-                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Bell className="w-3.5 h-3.5 text-primary" />
-                </div>
+                <Bell className="w-5 h-5 text-primary animate-bell-ring flex-shrink-0" style={{ color: 'hsl(330 26% 45%)' }} />
                 <div className="flex-1 min-w-0">
                   <p className="font-sans font-medium text-sm text-foreground">
                     {reminder.title}

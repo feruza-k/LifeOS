@@ -12,6 +12,29 @@ interface CategoryBalanceViewProps {
 export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProps) {
   const store = useLifeOSStore();
 
+  // Check if we have valid data
+  const hasDistribution = categoryBalance.distribution && 
+    Object.keys(categoryBalance.distribution).length > 0 &&
+    Object.values(categoryBalance.distribution).some(count => count > 0);
+
+  if (!hasDistribution) {
+    return (
+      <>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <PieChart className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+              Category Balance
+            </h3>
+          </div>
+        </div>
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          No category data available yet
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="flex items-center justify-between mb-4">
