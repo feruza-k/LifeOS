@@ -961,16 +961,7 @@ const Explore = () => {
         </div>
       )}
 
-      {/* Simple progress line - Always show if alignData exists */}
-      {alignData && (
-        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.25s" }}>
-          <div className="p-4 bg-card rounded-2xl shadow-soft border border-border/50">
-            <p className="text-sm text-foreground font-sans text-center">
-              {alignData.progress || "Building your alignment insights..."}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Simple progress line - Removed redundant "You completed X of Y tasks" message */}
 
 
 

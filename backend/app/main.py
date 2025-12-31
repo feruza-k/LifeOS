@@ -138,6 +138,54 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
 
+# Global exception handler to ensure CORS headers are added even on unhandled errors
+# This only catches exceptions that aren't already handled by FastAPI (like HTTPException)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handle unhandled exceptions and ensure CORS headers are present."""
+    # Don't handle HTTPException - let FastAPI handle it
+    from fastapi import HTTPException
+    if isinstance(exc, HTTPException):
+        # Re-raise to let FastAPI handle it normally
+        raise
+    
+    origin = request.headers.get("Origin")
+    allowed = False
+    
+    if origin:
+        # Check if origin is allowed (same logic as DevelopmentCORSMiddleware)
+        if not IS_PRODUCTION:
+            is_local = (
+                origin.startswith("http://localhost") or
+                origin.startswith("http://127.0.0.1") or
+                origin.startswith("http://192.168.") or
+                origin.startswith("http://10.") or
+                (origin.startswith("http://172.") and any(origin.startswith(f"http://172.{i}.") for i in range(16, 32)))
+            )
+            if is_local:
+                allowed = True
+        
+        if origin in ALLOWED_ORIGINS:
+            allowed = True
+        elif IS_PRODUCTION:
+            if ".vercel.app" in origin or "mylifeos.dev" in origin:
+                allowed = True
+    
+    # Log the error
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    # Return error response with CORS headers if origin is allowed
+    headers = {}
+    if allowed and origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=headers
+    )
+
 # CORS middleware - MUST be registered FIRST (runs LAST) to handle all CORS properly
 # This ensures OPTIONS preflight requests are handled correctly
 # We use allow_methods=["*"] and allow_headers=["*"] to be permissive,
@@ -249,7 +297,22 @@ class DevelopmentCORSMiddleware(BaseHTTPMiddleware):
                 }
             )
         
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            # If an error occurs, create a response with CORS headers
+            # This ensures 500 errors also have CORS headers
+            if allowed and origin:
+                error_response = JSONResponse(
+                    status_code=500,
+                    content={"detail": str(e)},
+                    headers={
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Credentials": "true",
+                    }
+                )
+                return error_response
+            raise
         
         # Add CORS headers to response if origin is allowed (for all requests, not just OPTIONS)
         # This overrides CORSMiddleware's headers for dynamic origins (Vercel domains)
