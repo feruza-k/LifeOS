@@ -51,9 +51,9 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
         </div>
       
       {/* Overall Completion - Large Visual Metric */}
-      <div className="mb-4">
-        <div className="flex items-center justify-center mb-2">
-          <div className="relative" style={{ width: '120px', height: '120px' }}>
+      <div className="mb-6">
+        <div className="flex items-center justify-center mb-3">
+          <div className="relative" style={{ width: '128px', height: '128px' }}>
             <svg 
               className="transform -rotate-90" 
               viewBox="0 0 100 100"
@@ -92,7 +92,7 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         {/* Most Productive Day */}
         {productivityInsights.best_day && (
           <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
@@ -129,15 +129,15 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
         )}
       </div>
 
-      {/* Peak Focus Times */}
+      {/* Peak Focus Times - Only show if there's space, limit to 2 items */}
       {productivityInsights.best_times.length > 0 && (
-        <div className="mt-auto">
+        <div>
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-sans font-medium text-muted-foreground uppercase">Peak Focus Times</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {productivityInsights.best_times.slice(0, 3).map((time, index) => (
+            {productivityInsights.best_times.slice(0, 2).map((time, index) => (
               <div
                 key={index}
                 className="px-2.5 py-1 bg-primary/10 rounded-lg border border-primary/20"

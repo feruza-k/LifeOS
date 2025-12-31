@@ -60,8 +60,8 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
       </div>
 
       {/* Pie Chart Visualization */}
-      <div className="mb-4 flex items-center justify-center">
-        <div className="relative" style={{ width: '180px', height: '180px' }}>
+      <div className="mb-6 flex items-center justify-center">
+        <div className="relative" style={{ width: '200px', height: '200px' }}>
           <svg 
             width="200" 
             height="200" 
@@ -164,7 +164,7 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
       </div>
       
       {/* Category Distribution List */}
-      <div className="space-y-2 mt-auto">
+      <div className="space-y-3">
         {Object.entries(categoryBalance.distribution)
           .sort((a, b) => b[1] - a[1])
           .map(([categoryId, count]) => {
