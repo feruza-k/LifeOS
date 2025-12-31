@@ -66,7 +66,7 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
             height="200" 
             viewBox="0 0 200 200" 
             className="transform -rotate-90"
-            style={{ display: 'block' }}
+            style={{ display: 'block', width: '200px', height: '200px' }}
             xmlns="http://www.w3.org/2000/svg"
           >
             {/* Background circle */}

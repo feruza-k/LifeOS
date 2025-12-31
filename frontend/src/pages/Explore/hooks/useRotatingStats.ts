@@ -15,18 +15,27 @@ export function useRotatingStats({
   hasProductivity,
   hasHabits,
 }: UseRotatingStatsProps) {
-  const [currentStatsView, setCurrentStatsView] = useState<StatsView>("category");
   const statsRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [statsSwipeStart, setStatsSwipeStart] = useState<number | null>(null);
 
-  // Build available views array
+  // Build available views array - use useMemo to ensure it's reactive
   const availableViews: StatsView[] = [];
   if (hasCategoryBalance) availableViews.push("category");
   if (hasEnergyPatterns) availableViews.push("energy");
   if (hasProductivity) availableViews.push("productivity");
   if (hasHabits) availableViews.push("habits");
 
-  // Set initial view to first available view
+  // Initialize currentStatsView to first available view
+  const [currentStatsView, setCurrentStatsView] = useState<StatsView>(() => {
+    // Set initial state to first available view
+    if (hasCategoryBalance) return "category";
+    if (hasEnergyPatterns) return "energy";
+    if (hasProductivity) return "productivity";
+    if (hasHabits) return "habits";
+    return "category"; // Fallback
+  });
+
+  // Update current view when available views change
   useEffect(() => {
     const views: StatsView[] = [];
     if (hasCategoryBalance) views.push("category");
