@@ -497,7 +497,7 @@ export const api = {
 
   // --- Notes ---
   getNote: (date: string) =>
-    request(`/notes?date=${date}`),
+    request(`/notes?date=${date}&_t=${Date.now()}`), // Add cache-busting timestamp
 
   saveNote: (note: SaveNoteRequest) =>
     request("/notes", {
