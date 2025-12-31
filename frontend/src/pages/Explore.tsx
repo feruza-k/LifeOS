@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Compass, Sparkles, TrendingUp, Layers, Heart, ArrowUp, ArrowDown, Calendar, Activity, Edit2, Zap, Target, Clock } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { BottomNav } from "@/components/lifeos/BottomNav";
@@ -182,6 +182,7 @@ const Explore = () => {
   const photoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
 
@@ -196,6 +197,17 @@ const Explore = () => {
     reloadPhotos,
     reloadData,
   } = useExploreData();
+
+  // Reload photos when navigating to Explore page (to catch database changes)
+  useEffect(() => {
+    if (location.pathname === '/explore' && !loading) {
+      // Small delay to ensure component is fully mounted
+      const timer = setTimeout(() => {
+        reloadPhotos();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, loading, reloadPhotos]);
 
   // Get all goals from month_goals array, fallback to month_focus for backward compatibility
   const goals = useMemo(() => {

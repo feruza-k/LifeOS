@@ -232,11 +232,25 @@ export function useExploreData() {
     loadData();
   }, []);
 
-  // Reload photos when page becomes visible
+  // Reload photos when page becomes visible or periodically when visible
   useEffect(() => {
+    let refreshInterval: NodeJS.Timeout | null = null;
+    
     const handleVisibilityChange = () => {
       if (!document.hidden) {
+        // Reload immediately when page becomes visible
         loadWeeklyPhotosAndReflections();
+        
+        // Set up periodic refresh every 30 seconds when page is visible
+        refreshInterval = setInterval(() => {
+          loadWeeklyPhotosAndReflections();
+        }, 30000); // Refresh every 30 seconds
+      } else {
+        // Clear interval when page is hidden
+        if (refreshInterval) {
+          clearInterval(refreshInterval);
+          refreshInterval = null;
+        }
       }
     };
     
@@ -244,12 +258,22 @@ export function useExploreData() {
       loadWeeklyPhotosAndReflections();
     };
     
+    // Initial setup - if page is already visible, start periodic refresh
+    if (!document.hidden) {
+      refreshInterval = setInterval(() => {
+        loadWeeklyPhotosAndReflections();
+      }, 30000);
+    }
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
     };
   }, []);
 
