@@ -68,8 +68,7 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
   const hasCategoryBalance = analyticsData?.category_balance && 
     analyticsData.category_balance.distribution &&
     typeof analyticsData.category_balance.distribution === 'object' &&
-    Object.keys(analyticsData.category_balance.distribution).length > 0 &&
-    Object.values(analyticsData.category_balance.distribution).some((v: any) => v > 0);
+    Object.keys(analyticsData.category_balance.distribution).length > 0;
   
   const hasEnergyPatterns = analyticsData?.energy_patterns && 
     analyticsData.energy_patterns.weekly_patterns &&

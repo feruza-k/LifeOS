@@ -3174,53 +3174,79 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
         monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
         monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
         
-        # Calculate category balance (past month - aggregate from monthly trends)
+        # Calculate category balance (past month - aggregate from monthly trends, fallback to weekly if needed)
         category_balance = None
+        
+        # Try monthly trends first
+        categories_aggregated = defaultdict(int)
+        has_monthly_cats = False
+        
         if monthly_trends and len(monthly_trends) > 0:
             # Aggregate categories from all monthly trends
-            monthly_categories_aggregated = defaultdict(int)
             for month_data in monthly_trends:
                 month_cats = month_data.get("categories", {})
-                for cat_key, count in month_cats.items():
+                if month_cats and len(month_cats) > 0:
+                    has_monthly_cats = True
+                    for cat_key, count in month_cats.items():
+                        if count > 0 and cat_key:
+                            categories_aggregated[cat_key] += count
+        
+        # Fallback to weekly trends if monthly doesn't have category data
+        if not has_monthly_cats and weekly_trends and len(weekly_trends) > 0:
+            logger.info(f"[Category Balance] Monthly trends don't have categories, using weekly trends")
+            for week_data in weekly_trends:
+                week_cats = week_data.get("categories", {})
+                if week_cats:
+                    for cat_key, count in week_cats.items():
+                        if count > 0 and cat_key:
+                            categories_aggregated[cat_key] += count
+        
+        # Fallback to current week if neither has data
+        if len(categories_aggregated) == 0 and current_week_metrics:
+            logger.info(f"[Category Balance] Using current week metrics as fallback")
+            week_cats = current_week_metrics.get("categories", {})
+            if week_cats:
+                for cat_key, count in week_cats.items():
                     if count > 0 and cat_key:
-                        monthly_categories_aggregated[cat_key] += count
-            
-            logger.info(f"[Category Balance] Raw monthly_categories: {dict(monthly_categories_aggregated)}")
-            
+                        categories_aggregated[cat_key] += count
+        
+        logger.info(f"[Category Balance] Raw aggregated categories: {dict(categories_aggregated)}")
+        
+        if len(categories_aggregated) > 0:
             # Get categories mapping to convert labels to IDs
             categories_list = await db_repo.get_categories(current_user["id"])
             category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
             category_id_to_label = {cat["id"]: cat["label"] for cat in categories_list}
             
             # Convert category labels to IDs if needed
-            monthly_categories_by_id = {}
-            for cat_key, count in monthly_categories_aggregated.items():
+            categories_by_id = {}
+            for cat_key, count in categories_aggregated.items():
                 if count > 0 and cat_key:
                     # Check if it's already an ID (UUID format)
                     if isinstance(cat_key, str) and len(cat_key) == 36 and cat_key.count("-") == 4:
                         # It's already an ID
-                        monthly_categories_by_id[cat_key] = monthly_categories_by_id.get(cat_key, 0) + count
+                        categories_by_id[cat_key] = categories_by_id.get(cat_key, 0) + count
                     else:
                         # It's a label or frontend value, convert to ID
                         cat_id = category_label_to_id.get(str(cat_key).lower())
                         if cat_id:
-                            monthly_categories_by_id[cat_id] = monthly_categories_by_id.get(cat_id, 0) + count
+                            categories_by_id[cat_id] = categories_by_id.get(cat_id, 0) + count
                         else:
                             # Try to find by matching any category ID that might match
                             # This handles edge cases where the key might be a partial match
                             logger.warning(f"[Category Balance] Could not convert category key '{cat_key}' to ID")
             
-            monthly_categories = monthly_categories_by_id
-            logger.info(f"[Category Balance] Converted to IDs: {monthly_categories}, total={sum(monthly_categories.values())}")
+            final_categories = categories_by_id
+            logger.info(f"[Category Balance] Converted to IDs: {final_categories}, total={sum(final_categories.values())}")
             
             # Filter out empty categories and ensure we have valid data
-            monthly_categories = {k: v for k, v in monthly_categories.items() if v > 0 and k}
-            total_cat_tasks = sum(monthly_categories.values())
-            logger.info(f"[Category Balance] Filtered: {monthly_categories}, total={total_cat_tasks}")
-            if total_cat_tasks > 0 and len(monthly_categories) > 0:
+            final_categories = {k: v for k, v in final_categories.items() if v > 0 and k}
+            total_cat_tasks = sum(final_categories.values())
+            logger.info(f"[Category Balance] Filtered: {final_categories}, total={total_cat_tasks}")
+            if total_cat_tasks > 0 and len(final_categories) > 0:
                 # Calculate balance score (0-1, where 1 is perfectly balanced)
                 # Use coefficient of variation (lower = more balanced)
-                category_counts = list(monthly_categories.values())
+                category_counts = list(final_categories.values())
                 if len(category_counts) > 1:
                     mean_count = sum(category_counts) / len(category_counts)
                     variance = sum((x - mean_count) ** 2 for x in category_counts) / len(category_counts)
@@ -3231,15 +3257,15 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
                     balance_score = 0.5  # Only one category, not balanced
                 
                 category_balance = {
-                    "distribution": monthly_categories,
+                    "distribution": final_categories,
                     "score": round(balance_score, 2),
                     "status": "balanced" if balance_score > 0.7 else "imbalanced" if balance_score < 0.4 else "moderate"
                 }
-                logger.info(f"[Category Balance] Final result (monthly): {category_balance}")
+                logger.info(f"[Category Balance] Final result: {category_balance}")
             else:
-                logger.info(f"[Category Balance] No valid data: total={total_cat_tasks}, categories={len(monthly_categories)}")
+                logger.info(f"[Category Balance] No valid data after filtering: total={total_cat_tasks}, categories={len(final_categories)}")
         else:
-            logger.info(f"[Category Balance] No monthly trends available")
+            logger.info(f"[Category Balance] No category data found in monthly/weekly trends or current week")
         
         # Get goal-task connections (from align_summary logic)
         from app.ai.goal_engine import match_tasks_to_goals
