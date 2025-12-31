@@ -371,7 +371,31 @@ const Explore = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background pb-24">
+        <p className="text-xs font-sans font-medium text-muted-foreground tracking-widest uppercase text-center pt-4 pb-2">
+          LifeOS, powered by SolAI
+        </p>
+        
+        <header className="px-6 pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-sans font-bold text-foreground">Explore</h1>
+            </div>
+            <Compass className="w-7 h-7 text-primary" />
+          </div>
+          <p className="text-muted-foreground font-sans text-sm mt-2">
+            Strategic reflection and alignment
+          </p>
+        </header>
+        
         <div className="px-4 py-4">
+          {/* Loading indicator */}
+          <div className="flex items-center justify-center py-8 mb-6">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground font-sans">Loading Explore page...</p>
+            </div>
+          </div>
+          
           {/* Header skeleton */}
           <div className="flex items-center justify-between mb-6">
             <Skeleton className="h-8 w-32" />

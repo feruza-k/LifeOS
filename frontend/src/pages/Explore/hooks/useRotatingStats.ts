@@ -18,24 +18,17 @@ export function useRotatingStats({
   const statsRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [statsSwipeStart, setStatsSwipeStart] = useState<number | null>(null);
 
-  // Build available views array - use useMemo to ensure it's reactive
+  // Build available views array
   const availableViews: StatsView[] = [];
   if (hasCategoryBalance) availableViews.push("category");
   if (hasEnergyPatterns) availableViews.push("energy");
   if (hasProductivity) availableViews.push("productivity");
   if (hasHabits) availableViews.push("habits");
 
-  // Initialize currentStatsView to first available view
-  const [currentStatsView, setCurrentStatsView] = useState<StatsView>(() => {
-    // Set initial state to first available view
-    if (hasCategoryBalance) return "category";
-    if (hasEnergyPatterns) return "energy";
-    if (hasProductivity) return "productivity";
-    if (hasHabits) return "habits";
-    return "category"; // Fallback
-  });
+  // Initialize currentStatsView - start with category as default, will update when data loads
+  const [currentStatsView, setCurrentStatsView] = useState<StatsView>("category");
 
-  // Update current view when available views change
+  // Update current view when available views change - this ensures we show the first available view
   useEffect(() => {
     const views: StatsView[] = [];
     if (hasCategoryBalance) views.push("category");
@@ -45,7 +38,7 @@ export function useRotatingStats({
     
     if (views.length > 0) {
       setCurrentStatsView((prev) => {
-        // Only update if current view is not available
+        // If current view is not available, switch to first available
         if (!views.includes(prev)) {
           return views[0];
         }

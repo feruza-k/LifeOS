@@ -113,41 +113,42 @@ export function useExploreData() {
       weekStart.setDate(today.getDate() - today.getDay());
       weekStart.setHours(0, 0, 0, 0);
       
-      const photosWithNotes: Photo[] = [];
-      
-      for (let i = 0; i < 7; i++) {
+      // Load all notes in parallel instead of sequentially
+      const datePromises = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(weekStart);
         date.setDate(weekStart.getDate() + i);
         const dateStr = format(date, "yyyy-MM-dd");
-        
-        try {
-          const note = await api.getNote(dateStr);
-          if (note) {
-            let photoData = null;
-            // Check for photo in new format first
-            if (note.photo && typeof note.photo === 'object' && note.photo.filename) {
-              photoData = note.photo;
-            } 
-            // Fallback to old photos array format
-            else if (note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
-              photoData = note.photos[0];
-            }
-            
-            const hasPhoto = photoData && photoData.filename;
-            const hasReflection = note.content && note.content.trim();
-            
-            // Include if there's at least a photo OR a reflection
-            if (hasPhoto || hasReflection) {
-              photosWithNotes.push({
-                date: dateStr,
-                filename: hasPhoto ? photoData.filename : '', // Empty if no photo
-                url: hasPhoto ? api.getPhotoUrl(photoData.filename) : '',
-                note: hasReflection ? note.content.trim() : undefined
-              });
-            }
+        return api.getNote(dateStr).catch(() => null).then(note => ({ dateStr, note }));
+      });
+      
+      const results = await Promise.all(datePromises);
+      
+      const photosWithNotes: Photo[] = [];
+      
+      for (const { dateStr, note } of results) {
+        if (note) {
+          let photoData = null;
+          // Check for photo in new format first
+          if (note.photo && typeof note.photo === 'object' && note.photo.filename) {
+            photoData = note.photo;
+          } 
+          // Fallback to old photos array format
+          else if (note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+            photoData = note.photos[0];
           }
-        } catch (error) {
-          // No note found for this day, skip silently
+          
+          const hasPhoto = photoData && photoData.filename;
+          const hasReflection = note.content && note.content.trim();
+          
+          // Include if there's at least a photo OR a reflection
+          if (hasPhoto || hasReflection) {
+            photosWithNotes.push({
+              date: dateStr,
+              filename: hasPhoto ? photoData.filename : '', // Empty if no photo
+              url: hasPhoto ? api.getPhotoUrl(photoData.filename) : '',
+              note: hasReflection ? note.content.trim() : undefined
+            });
+          }
         }
       }
       
@@ -160,28 +161,25 @@ export function useExploreData() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [summary, analytics, habitData] = await Promise.all([
+      
+      // Load main data and photos in parallel for faster loading
+      const [summary, analytics, habitData, weeklySummaryData] = await Promise.all([
         api.getAlignSummary(),
         api.getAlignAnalytics().catch(() => null),
-        api.getHabitReinforcement().catch((error) => {
-          return null;
-        })
+        api.getHabitReinforcement().catch(() => null),
+        api.getWeeklyReflectionSummary().catch(() => null)
       ]);
       
       setAlignData(summary);
       setAnalyticsData(analytics);
       setHabitReinforcement(habitData);
       
-      await loadWeeklyPhotosAndReflections();
-      
-      try {
-        const summaryData = await api.getWeeklyReflectionSummary();
-        if (summaryData?.summary) {
-          setWeeklySummary(summaryData.summary);
-        }
-      } catch (error) {
-        // Weekly summary is optional
+      if (weeklySummaryData?.summary) {
+        setWeeklySummary(weeklySummaryData.summary);
       }
+      
+      // Load photos in parallel (they're already optimized to load in parallel)
+      await loadWeeklyPhotosAndReflections();
     } catch (error) {
       console.error("Failed to load align data:", error);
       toast.error("Failed to load alignment data");

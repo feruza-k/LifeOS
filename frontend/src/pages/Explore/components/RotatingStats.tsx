@@ -2,7 +2,6 @@ import { useRef } from "react";
 import { CategoryBalanceView } from "./CategoryBalanceView";
 import { EnergyPatternsView } from "./EnergyPatternsView";
 import { ProductivityInsightsView } from "./ProductivityInsightsView";
-import { HabitFocusView } from "./HabitFocusView";
 import { useRotatingStats } from "../hooks/useRotatingStats";
 
 interface AnalyticsData {
@@ -72,11 +71,6 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
     Array.isArray(analyticsData.energy_patterns.weekly_patterns) &&
     analyticsData.energy_patterns.weekly_patterns.length > 0;
   const hasProductivity = !!analyticsData?.productivity_insights;
-  const hasHabits = habitReinforcement && (
-    (Array.isArray(habitReinforcement.micro_suggestions) && habitReinforcement.micro_suggestions.length > 0) ||
-    habitReinforcement.encouragement || 
-    (Array.isArray(habitReinforcement.risk_indicators) && habitReinforcement.risk_indicators.length > 0)
-  );
 
   const {
     currentStatsView,
@@ -89,10 +83,10 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
     hasCategoryBalance,
     hasEnergyPatterns,
     hasProductivity,
-    hasHabits,
+    hasHabits: false, // Removed habits from carousel
   });
 
-  const hasAnyStats = hasCategoryBalance || hasEnergyPatterns || hasProductivity || hasHabits;
+  const hasAnyStats = hasCategoryBalance || hasEnergyPatterns || hasProductivity;
   
   // Debug: Log what data is available
   if (import.meta.env.DEV) {
@@ -100,13 +94,13 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
       hasCategoryBalance,
       hasEnergyPatterns,
       hasProductivity,
-      hasHabits,
       hasAnyStats,
       categoryBalance: analyticsData?.category_balance,
       energyPatterns: analyticsData?.energy_patterns,
       productivityInsights: analyticsData?.productivity_insights,
       currentStatsView,
-      availableViews
+      availableViews,
+      analyticsData: analyticsData ? Object.keys(analyticsData) : null
     });
   }
 
@@ -142,32 +136,46 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           handleSwipeEnd(endX);
         }}
       >
-        {/* Render the current view - ensure it always shows when available */}
-        {currentStatsView === "category" && hasCategoryBalance && analyticsData?.category_balance && (
-          <CategoryBalanceView 
-            categoryBalance={analyticsData.category_balance} 
-            key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
-          />
-        )}
-
-        {currentStatsView === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
-          <EnergyPatternsView 
-            energyPatterns={analyticsData.energy_patterns}
-            key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
-          />
-        )}
-
-        {currentStatsView === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
-          <ProductivityInsightsView 
-            productivityInsights={analyticsData.productivity_insights}
-            consistency={analyticsData.consistency || null}
-            key={`productivity-${analyticsData.productivity_insights.completion_rate}`}
-          />
-        )}
-
-        {currentStatsView === "habits" && hasHabits && habitReinforcement && (
-          <HabitFocusView habitReinforcement={habitReinforcement} />
-        )}
+        {/* Determine which view to actually render */}
+        {(() => {
+          // Use current view if available, otherwise use first available
+          const viewToRender = availableViews.includes(currentStatsView) 
+            ? currentStatsView 
+            : (availableViews.length > 0 ? availableViews[0] : null);
+          
+          if (!viewToRender) return null;
+          
+          // Render the determined view
+          if (viewToRender === "category" && hasCategoryBalance && analyticsData?.category_balance) {
+            return (
+              <CategoryBalanceView 
+                categoryBalance={analyticsData.category_balance} 
+                key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
+              />
+            );
+          }
+          
+          if (viewToRender === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns) {
+            return (
+              <EnergyPatternsView 
+                energyPatterns={analyticsData.energy_patterns}
+                key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
+              />
+            );
+          }
+          
+          if (viewToRender === "productivity" && hasProductivity && analyticsData?.productivity_insights) {
+            return (
+              <ProductivityInsightsView 
+                productivityInsights={analyticsData.productivity_insights}
+                consistency={analyticsData.consistency || null}
+                key={`productivity-${analyticsData.productivity_insights.completion_rate}`}
+              />
+            );
+          }
+          
+          return null;
+        })()}
 
         {/* Navigation dots - Always show if there are multiple views */}
         {availableViews.length > 1 && (

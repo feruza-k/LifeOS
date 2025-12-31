@@ -65,10 +65,19 @@ class DatabaseRepo:
     def _note_to_dict(self, note: Note) -> Dict:
         photo = None
         if note.photo_filename:
-            photo = {
-                "filename": note.photo_filename,
-                "uploadedAt": note.photo_uploaded_at.isoformat() if note.photo_uploaded_at else None
-            }
+            # Verify photo file exists before returning it
+            # We check here to avoid returning broken photo references
+            # The actual cleanup happens in the GET /notes endpoint
+            try:
+                from app.storage.photo_storage import photo_exists
+                if photo_exists(note.photo_filename):
+                    photo = {
+                        "filename": note.photo_filename,
+                        "uploadedAt": note.photo_uploaded_at.isoformat() if note.photo_uploaded_at else None
+                    }
+            except Exception:
+                # If we can't check, don't return the photo to be safe
+                pass
         return {
             "id": str(note.id),
             "user_id": str(note.user_id),

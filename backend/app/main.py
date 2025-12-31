@@ -1780,6 +1780,16 @@ async def get_note(
     """Get note for a specific date (user-scoped)."""
     note = await db_repo.get_note(date, current_user["id"])
     if note:
+        # Clean up photo reference if file doesn't exist
+        if note.get("photo") and note["photo"] and isinstance(note["photo"], dict):
+            photo_filename = note["photo"].get("filename")
+            if photo_filename and not photo_exists(photo_filename):
+                # Photo file doesn't exist - remove reference from database
+                logger.warning(f"Photo file {photo_filename} not found for note {date}, cleaning up reference")
+                note["photo"] = None
+                await db_repo.save_note(note, current_user["id"])
+                # Reload note to get updated version
+                note = await db_repo.get_note(date, current_user["id"])
         return note
     return None
 
