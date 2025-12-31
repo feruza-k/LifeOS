@@ -292,12 +292,15 @@ const Explore = () => {
   };
 
   // Typing animation effect for notes
+  // Use stable dependencies to prevent restarting animation
+  const currentNote = useMemo(() => weeklyPhotos[currentPhotoIndex]?.note || "", [weeklyPhotos, currentPhotoIndex]);
+  const currentPhotoId = useMemo(() => `${weeklyPhotos[currentPhotoIndex]?.date}-${weeklyPhotos[currentPhotoIndex]?.filename}`, [weeklyPhotos, currentPhotoIndex]);
+  
   useEffect(() => {
-    const currentNote = weeklyPhotos[currentPhotoIndex]?.note || "";
-    
     // Clear any existing typing animation
     if (typingTimerRef.current) {
       clearInterval(typingTimerRef.current);
+      typingTimerRef.current = null;
     }
     
     // Reset displayed note
@@ -323,6 +326,7 @@ const Explore = () => {
         setDisplayedNote(currentNote);
         if (typingTimerRef.current) {
           clearInterval(typingTimerRef.current);
+          typingTimerRef.current = null;
         }
       }
     }, intervalTime);
@@ -330,9 +334,10 @@ const Explore = () => {
     return () => {
       if (typingTimerRef.current) {
         clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
       }
     };
-  }, [currentPhotoIndex, weeklyPhotos]);
+  }, [currentNote, currentPhotoId]); // Use stable memoized values
 
   // Auto-rotate photos if there are multiple
   // Match rotation time to typing duration (12s typing + 2s pause = 14s total)

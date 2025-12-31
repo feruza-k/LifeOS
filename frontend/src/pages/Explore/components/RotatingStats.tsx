@@ -66,14 +66,16 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
   const statsCarouselRef = useRef<HTMLDivElement>(null);
 
   const hasCategoryBalance = analyticsData?.category_balance?.distribution && 
+    typeof analyticsData.category_balance.distribution === 'object' &&
     Object.keys(analyticsData.category_balance.distribution).length > 0;
   const hasEnergyPatterns = analyticsData?.energy_patterns?.weekly_patterns && 
+    Array.isArray(analyticsData.energy_patterns.weekly_patterns) &&
     analyticsData.energy_patterns.weekly_patterns.length > 0;
   const hasProductivity = !!analyticsData?.productivity_insights;
   const hasHabits = habitReinforcement && (
-    habitReinforcement.micro_suggestions || 
+    (Array.isArray(habitReinforcement.micro_suggestions) && habitReinforcement.micro_suggestions.length > 0) ||
     habitReinforcement.encouragement || 
-    habitReinforcement.risk_indicators
+    (Array.isArray(habitReinforcement.risk_indicators) && habitReinforcement.risk_indicators.length > 0)
   );
 
   const {
@@ -92,7 +94,34 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
 
   const hasAnyStats = hasCategoryBalance || hasEnergyPatterns || hasProductivity || hasHabits;
   
-  if (!hasAnyStats) return null;
+  // Debug: Log what data is available
+  if (import.meta.env.DEV) {
+    console.log('[RotatingStats] Data check:', {
+      hasCategoryBalance,
+      hasEnergyPatterns,
+      hasProductivity,
+      hasHabits,
+      hasAnyStats,
+      categoryBalance: analyticsData?.category_balance,
+      energyPatterns: analyticsData?.energy_patterns,
+      productivityInsights: analyticsData?.productivity_insights,
+      currentStatsView,
+      availableViews
+    });
+  }
+
+  if (!hasAnyStats) {
+    // Show a placeholder instead of returning null
+    return (
+      <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
+        <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            Analytics data will appear here as you use LifeOS
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.3s" }}>
@@ -114,7 +143,7 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
         }}
       >
         {/* Category Balance View */}
-        {currentStatsView === "category" && analyticsData?.category_balance && (
+        {currentStatsView === "category" && hasCategoryBalance && analyticsData?.category_balance && (
           <CategoryBalanceView 
             categoryBalance={analyticsData.category_balance} 
             key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
@@ -122,7 +151,7 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
         )}
 
         {/* Energy/Load Patterns View */}
-        {currentStatsView === "energy" && analyticsData?.energy_patterns && (
+        {currentStatsView === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
           <EnergyPatternsView 
             energyPatterns={analyticsData.energy_patterns}
             key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
@@ -130,7 +159,7 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
         )}
 
         {/* Productivity Insights View */}
-        {currentStatsView === "productivity" && analyticsData?.productivity_insights && (
+        {currentStatsView === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
           <ProductivityInsightsView 
             productivityInsights={analyticsData.productivity_insights}
             consistency={analyticsData.consistency || null}
@@ -139,8 +168,15 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
         )}
 
         {/* Habit Reinforcement View */}
-        {currentStatsView === "habits" && habitReinforcement && (
+        {currentStatsView === "habits" && hasHabits && habitReinforcement && (
           <HabitFocusView habitReinforcement={habitReinforcement} />
+        )}
+
+        {/* Fallback if current view doesn't match any available data */}
+        {!availableViews.includes(currentStatsView) && availableViews.length > 0 && (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            Loading view...
+          </div>
         )}
 
         {/* Navigation dots */}

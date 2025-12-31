@@ -96,8 +96,11 @@ export function DayModal({
 
   // Update photo when photo prop changes
   useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[DayModal] Photo prop changed:', photo, 'for date:', format(date, "yyyy-MM-dd"));
+    }
     setDayPhoto(photo || null);
-  }, [photo]);
+  }, [photo, date]);
 
   // Only show photo-notes tab for past and today, not for future days
   const tabs: TabType[] = isFuture ? ["tasks"] : ["tasks", "photo-notes"];
@@ -463,13 +466,17 @@ export function DayModal({
                         alt={`Photo from ${format(date, "MMM d")}`}
                         className="w-full aspect-video object-cover"
                         onError={(e) => {
-                          // Fallback: try without cache-busting
                           const target = e.target as HTMLImageElement;
+                          // Check if we've already tried fallback
+                          const hasTriedFallback = target.dataset.triedFallback === 'true';
                           const baseUrl = api.getPhotoUrl(dayPhoto.filename);
-                          if (target.src !== baseUrl) {
+                          
+                          if (!hasTriedFallback && target.src !== baseUrl) {
+                            // Try without cache-busting once
+                            target.dataset.triedFallback = 'true';
                             target.src = baseUrl;
                           } else {
-                            // If still fails, show placeholder
+                            // If still fails, show placeholder and stop retrying
                             target.style.display = 'none';
                             const placeholder = target.parentElement?.querySelector('.image-placeholder') as HTMLElement;
                             if (placeholder) {
@@ -477,9 +484,20 @@ export function DayModal({
                             }
                           }
                         }}
+                        onLoad={(e) => {
+                          // Hide placeholder when image loads successfully
+                          const target = e.target as HTMLImageElement;
+                          const placeholder = target.parentElement?.querySelector('.image-placeholder') as HTMLElement;
+                          if (placeholder) {
+                            placeholder.style.display = 'none';
+                          }
+                        }}
                       />
-                      <div className="image-placeholder hidden absolute inset-0 bg-muted/50 flex items-center justify-center rounded-2xl">
-                        <Image className="w-12 h-12 text-muted-foreground/40" />
+                      <div className="image-placeholder absolute inset-0 bg-muted/50 flex items-center justify-center rounded-2xl" style={{ display: 'none' }}>
+                        <div className="text-center">
+                          <Image className="w-12 h-12 text-muted-foreground/40 mx-auto mb-2" />
+                          <p className="text-xs text-muted-foreground/60 font-sans">Photo not found</p>
+                        </div>
                       </div>
                     </div>
                     {!isFuture && (

@@ -40,23 +40,21 @@ export function WeeklyPhotos({
               className="w-full h-full object-cover"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                // Try without cache-busting first
-                if (target.src.includes('?t=')) {
+                // Check if we've already tried fallbacks (check for data attribute)
+                const hasTriedFallback = target.dataset.triedFallback === 'true';
+                
+                if (!hasTriedFallback && target.src.includes('?t=')) {
+                  // Try without cache-busting first
+                  target.dataset.triedFallback = 'true';
                   target.src = `${photoUrl}?date=${currentPhoto.date}`;
-                } else if (target.src !== photoUrl) {
-                  // Try just the base URL
-                  target.src = photoUrl;
                 } else {
-                  // If all fails, show placeholder
+                  // If all fails, show placeholder immediately and stop retrying
                   target.style.display = 'none';
                   const placeholder = target.parentElement?.querySelector('.image-placeholder') as HTMLElement;
                   if (placeholder) {
                     placeholder.style.display = 'flex';
                   }
-                  // Reload photos after a delay
-                  setTimeout(() => {
-                    onReload();
-                  }, 2000);
+                  // Don't call onReload() - the photo doesn't exist, stop the loop
                 }
               }}
               onLoad={(e) => {

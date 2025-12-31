@@ -34,14 +34,24 @@ export function useRotatingStats({
     if (hasProductivity) views.push("productivity");
     if (hasHabits) views.push("habits");
     
-    if (views.length > 0 && !views.includes(currentStatsView)) {
-      setCurrentStatsView(views[0]);
+    if (views.length > 0) {
+      setCurrentStatsView((prev) => {
+        // Only update if current view is not available
+        if (!views.includes(prev)) {
+          return views[0];
+        }
+        return prev;
+      });
     }
-  }, [hasCategoryBalance, hasEnergyPatterns, hasProductivity, hasHabits, currentStatsView]);
+  }, [hasCategoryBalance, hasEnergyPatterns, hasProductivity, hasHabits]);
 
   // Auto-rotate stats view every 10 seconds
   useEffect(() => {
     if (availableViews.length > 1) {
+      // Set initial view to first available
+      if (!availableViews.includes(currentStatsView)) {
+        setCurrentStatsView(availableViews[0]);
+      }
       
       statsRotateTimerRef.current = setInterval(() => {
         setCurrentStatsView((prev) => {

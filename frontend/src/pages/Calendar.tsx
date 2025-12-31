@@ -81,22 +81,39 @@ const CalendarPage = () => {
       if (note) {
         setNotes(prev => ({ ...prev, [dateStr]: note?.content || "" }));
         try {
+          // Check for photo in new format first
           if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
             setPhotos(prev => ({ ...prev, [dateStr]: note.photo }));
-          } else if (note && note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+            if (import.meta.env.DEV) {
+              console.log('[Calendar] Photo loaded for', dateStr, ':', note.photo);
+            }
+          } 
+          // Fallback to old photos array format
+          else if (note && note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
             // Migrate from old photos array to single photo (take first photo)
             setPhotos(prev => ({ ...prev, [dateStr]: note.photos[0] }));
+            if (import.meta.env.DEV) {
+              console.log('[Calendar] Photo loaded from array for', dateStr, ':', note.photos[0]);
+            }
           } else {
             setPhotos(prev => ({ ...prev, [dateStr]: null }));
+            if (import.meta.env.DEV) {
+              console.log('[Calendar] No photo found for', dateStr);
+            }
           }
         } catch (error) {
+          console.error('[Calendar] Error loading photo for', dateStr, ':', error);
           setPhotos(prev => ({ ...prev, [dateStr]: null }));
         }
       } else {
         // No note found, set photo to null
         setPhotos(prev => ({ ...prev, [dateStr]: null }));
+        if (import.meta.env.DEV) {
+          console.log('[Calendar] No note found for', dateStr);
+        }
       }
-    }).catch(() => {
+    }).catch((error) => {
+      console.error('[Calendar] Error loading note for', dateStr, ':', error);
       // On error, set photo to null
       setPhotos(prev => ({ ...prev, [dateStr]: null }));
     });

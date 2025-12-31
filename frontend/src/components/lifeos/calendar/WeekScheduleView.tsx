@@ -120,7 +120,7 @@ export function WeekScheduleView({
   };
 
   // Find empty time slots for placing anytime tasks
-  // Prefer afternoon (12 PM+) and evening slots
+  // Prefer afternoon (12 PM+) and evening slots, group tasks together when possible
   const findEmptySlots = (scheduledTasks: Task[], minHour: number = 9, maxHour: number = 20): Array<{ start: string; end: string; priority: number }> => {
     const slots: Array<{ start: string; end: string; priority: number }> = [];
     
@@ -137,30 +137,61 @@ export function WeekScheduleView({
       })
       .sort((a, b) => a.start - b.start);
     
+    // If no scheduled tasks, create default slots throughout the day (preferring afternoon/evening)
+    if (scheduledRanges.length === 0) {
+      // Create slots at preferred times: 2 PM, 3 PM, 4 PM, 5 PM, 6 PM, 7 PM
+      const preferredHours = [14, 15, 16, 17, 18, 19]; // 2 PM to 7 PM
+      for (const hour of preferredHours) {
+        if (hour < maxHour) {
+          slots.push({
+            start: `${hour.toString().padStart(2, "0")}:00`,
+            end: `${(hour + 1).toString().padStart(2, "0")}:00`,
+            priority: 3, // Highest priority for afternoon/evening
+          });
+        }
+      }
+      // Add morning slots as fallback (lower priority)
+      const morningHours = [10, 11]; // 10 AM, 11 AM
+      for (const hour of morningHours) {
+        if (hour < maxHour) {
+          slots.push({
+            start: `${hour.toString().padStart(2, "0")}:00`,
+            end: `${(hour + 1).toString().padStart(2, "0")}:00`,
+            priority: 1, // Lower priority for morning
+          });
+        }
+      }
+      return slots;
+    }
+    
     // Find gaps between scheduled tasks
     let currentTime = minHour * 60; // Start from 9 AM
     
     for (const range of scheduledRanges) {
       if (currentTime < range.start) {
-        // Found a gap
+        // Found a gap - break it into 1-hour slots
         const gapDuration = range.start - currentTime;
-        if (gapDuration >= 60) { // Only consider gaps of 60+ minutes (1 hour)
-          const startHour = Math.floor(currentTime / 60);
-          const startMin = currentTime % 60;
-          const endHour = Math.floor(range.start / 60);
-          const endMin = range.start % 60;
-          
-          // Calculate priority: prefer afternoon (12 PM+) and evening (2 PM+)
-          let priority = 0;
-          if (startHour >= 14) priority = 3; // Evening (2 PM+) - highest priority
-          else if (startHour >= 12) priority = 2; // Afternoon (12 PM-2 PM)
-          else priority = 1; // Morning - lowest priority
-          
-          slots.push({
-            start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
-            end: `${endHour.toString().padStart(2, "0")}:${endMin.toString().padStart(2, "0")}`,
-            priority,
-          });
+        if (gapDuration >= 60) {
+          // Create multiple 1-hour slots within this gap
+          let slotStart = currentTime;
+          while (slotStart + 60 <= range.start) {
+            const startHour = Math.floor(slotStart / 60);
+            const startMin = slotStart % 60;
+            
+            // Calculate priority: prefer afternoon (12 PM+) and evening (2 PM+)
+            let priority = 0;
+            if (startHour >= 14) priority = 3; // Evening (2 PM+) - highest priority
+            else if (startHour >= 12) priority = 2; // Afternoon (12 PM-2 PM)
+            else priority = 1; // Morning - lowest priority
+            
+            slots.push({
+              start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
+              end: `${(startHour + 1).toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
+              priority,
+            });
+            
+            slotStart += 60; // Move to next hour
+          }
         }
       }
       currentTime = Math.max(currentTime, range.end);
@@ -170,24 +201,30 @@ export function WeekScheduleView({
     if (currentTime < maxHour * 60) {
       const gapDuration = maxHour * 60 - currentTime;
       if (gapDuration >= 60) {
-        const startHour = Math.floor(currentTime / 60);
-        const startMin = currentTime % 60;
-        
-        // Calculate priority
-        let priority = 0;
-        if (startHour >= 14) priority = 3;
-        else if (startHour >= 12) priority = 2;
-        else priority = 1;
-        
-        slots.push({
-          start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
-          end: `${maxHour.toString().padStart(2, "0")}:00`,
-          priority,
-        });
+        // Create multiple 1-hour slots
+        let slotStart = currentTime;
+        while (slotStart + 60 <= maxHour * 60) {
+          const startHour = Math.floor(slotStart / 60);
+          const startMin = slotStart % 60;
+          
+          // Calculate priority
+          let priority = 0;
+          if (startHour >= 14) priority = 3;
+          else if (startHour >= 12) priority = 2;
+          else priority = 1;
+          
+          slots.push({
+            start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
+            end: `${(startHour + 1).toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
+            priority,
+          });
+          
+          slotStart += 60;
+        }
       }
     }
     
-    // Sort by priority (highest first), then by time
+    // Sort by priority (highest first), then by time (earlier first within same priority)
     return slots.sort((a, b) => {
       if (a.priority !== b.priority) return b.priority - a.priority;
       const [aHour] = a.start.split(":").map(Number);
@@ -271,16 +308,14 @@ export function WeekScheduleView({
           isAnytime: true,
         };
       }
-      // No slot available, place at end of day (8 PM) with 1-hour offset per task to avoid overlap
-      const baseHour = 20;
-      const offsetMinutes = taskIndex * 60; // 1 hour offset per task
-      const totalMinutes = baseHour * 60 + offsetMinutes;
-      const hour = Math.floor(totalMinutes / 60);
-      const minute = totalMinutes % 60;
+      // No slot available - this shouldn't happen often, but fallback to evening slots
+      // Place in evening hours (6 PM, 7 PM, 8 PM) with offset
+      const eveningHours = [18, 19, 20]; // 6 PM, 7 PM, 8 PM
+      const hourIndex = taskIndex % eveningHours.length;
+      const hour = eveningHours[hourIndex];
+      const minute = 0;
       const startTime = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      const endHour = Math.floor((totalMinutes + 60) / 60);
-      const endMin = (totalMinutes + 60) % 60;
-      const endTime = `${endHour.toString().padStart(2, "0")}:${endMin.toString().padStart(2, "0")}`;
+      const endTime = `${(hour + 1).toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
       return {
         ...task,
         assignedTime: startTime,
