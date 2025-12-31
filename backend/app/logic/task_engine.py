@@ -185,6 +185,37 @@ async def create_task_async(fields: dict, user_id: str):
         except Exception:
             pass
     
+    # Convert frontend "value" field to backend "category_id" if needed
+    if "value" in fields and not fields.get("category_id"):
+        from db.repo import db_repo
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        categories = await db_repo.get_categories(user_id)
+        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories}
+        
+        frontend_value = fields["value"]
+        if isinstance(frontend_value, str) and len(frontend_value) == 36 and frontend_value.count("-") == 4:
+            # It's already a UUID (category ID)
+            fields["category_id"] = frontend_value
+        elif frontend_value.lower() in category_label_to_id:
+            # It's a category label, convert to ID
+            fields["category_id"] = category_label_to_id[frontend_value.lower()]
+        else:
+            # Try legacy value mapping
+            value_to_label = {
+                "social": "social",
+                "self": "self",
+                "work": "work",
+                "growth": "growth",
+                "essentials": "essentials",
+            }
+            mapped_label = value_to_label.get(frontend_value.lower(), "growth")
+            if mapped_label in category_label_to_id:
+                fields["category_id"] = category_label_to_id[mapped_label]
+            else:
+                logger.warning(f"Could not map value '{frontend_value}' to any category UUID for user {user_id}")
+    
     # Create task via database
     created = await db_repo.add_task_dict(fields)
     return created

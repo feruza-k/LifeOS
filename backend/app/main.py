@@ -3210,7 +3210,7 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
                     if count > 0 and cat_key:
                         categories_aggregated[cat_key] += count
         
-        logger.info(f"[Category Balance] Raw aggregated categories: {dict(categories_aggregated)}")
+        logger.info(f"[Category Balance] Raw aggregated categories: {dict(categories_aggregated)}, count={len(categories_aggregated)}")
         
         if len(categories_aggregated) > 0:
             # Get categories mapping to convert labels to IDs
@@ -3220,21 +3220,29 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
             
             # Convert category labels to IDs if needed
             categories_by_id = {}
+            conversion_failures = []
             for cat_key, count in categories_aggregated.items():
                 if count > 0 and cat_key:
                     # Check if it's already an ID (UUID format)
                     if isinstance(cat_key, str) and len(cat_key) == 36 and cat_key.count("-") == 4:
                         # It's already an ID
                         categories_by_id[cat_key] = categories_by_id.get(cat_key, 0) + count
+                        logger.debug(f"[Category Balance] Using category ID directly: {cat_key} (count: {count})")
                     else:
                         # It's a label or frontend value, convert to ID
-                        cat_id = category_label_to_id.get(str(cat_key).lower())
+                        cat_key_lower = str(cat_key).lower()
+                        cat_id = category_label_to_id.get(cat_key_lower)
                         if cat_id:
                             categories_by_id[cat_id] = categories_by_id.get(cat_id, 0) + count
+                            logger.debug(f"[Category Balance] Converted '{cat_key}' -> {cat_id} (count: {count})")
                         else:
                             # Try to find by matching any category ID that might match
                             # This handles edge cases where the key might be a partial match
-                            logger.warning(f"[Category Balance] Could not convert category key '{cat_key}' to ID")
+                            conversion_failures.append(f"'{cat_key}' (count: {count})")
+                            logger.warning(f"[Category Balance] Could not convert category key '{cat_key}' to ID. Available labels: {list(category_label_to_id.keys())[:5]}")
+            
+            if conversion_failures:
+                logger.warning(f"[Category Balance] Failed to convert {len(conversion_failures)} category keys: {conversion_failures[:5]}")
             
             final_categories = categories_by_id
             logger.info(f"[Category Balance] Converted to IDs: {final_categories}, total={sum(final_categories.values())}")

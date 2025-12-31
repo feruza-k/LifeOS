@@ -65,15 +65,6 @@ export function WeeklySummary({
           </div>
         </div>
         
-        {consistency && consistency.current_streak > 0 && (
-          <div className="mb-3 flex items-center justify-center gap-2">
-            <span className="text-xs font-sans text-foreground">🔥</span>
-            <span className="text-xs font-sans font-medium text-foreground">
-              {consistency.current_streak} day streak
-            </span>
-          </div>
-        )}
-        
         {weeklyPhotos.length > 0 && (
           <div className="mt-3 pt-3 border-t border-primary/20">
             <WeeklyPhotos

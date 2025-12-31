@@ -733,6 +733,7 @@ async def _get_historical_context(user_id: str, days_back: int = 30) -> Dict[str
                 "time": task.datetime.strftime("%H:%M") if task.datetime else None,
                 "datetime": task.datetime.isoformat() if task.datetime else None,
                 "completed": task.completed,
+                "category_id": str(task.category_id) if task.category_id else None,
                 "category": task.category,
                 "energy": task.energy,
                 "notes": task.notes,
