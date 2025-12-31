@@ -254,28 +254,10 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pb-48">
-        <div className="px-4 py-4">
-          {/* Header skeleton */}
-          <div className="flex items-center gap-3 mb-4">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-8 w-8 rounded-full ml-auto" />
-          </div>
-          
-          {/* Balance Score Card skeleton */}
-          <SkeletonCard className="mb-4" />
-          
-          {/* Task lists skeleton */}
-          <div className="space-y-4">
-            <div>
-              <Skeleton className="h-4 w-24 mb-2" />
-              <SkeletonList count={3} />
-            </div>
-            <div>
-              <Skeleton className="h-4 w-24 mb-2" />
-              <SkeletonList count={2} />
-            </div>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground font-sans">Loading Today Page...</p>
         </div>
       </div>
     );
