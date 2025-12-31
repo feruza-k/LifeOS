@@ -57,11 +57,6 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
     headers["Content-Type"] = "application/json";
   }
 
-  // Debug logging for mobile
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    console.log(`[API] Requesting: ${url}`);
-  }
-
   try {
     // Build fetch options - ensure we don't override headers or credentials
     const fetchOptions: RequestInit = {
@@ -70,16 +65,7 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
       credentials: "include",  // Always include cookies (httpOnly tokens)
     };
     
-    console.log(`[API] Making ${fetchOptions.method || 'GET'} request to ${url}`, {
-      hasHeaders: !!fetchOptions.headers,
-      headerKeys: fetchOptions.headers ? Object.keys(fetchOptions.headers as Record<string, string>) : [],
-      hasBody: !!fetchOptions.body,
-      credentials: fetchOptions.credentials
-    });
-    
     const res = await fetch(url, fetchOptions);
-    
-    console.log(`[API] Response: ${res.status} ${res.statusText} for ${url}`);
     
     if (res.status === 401) {
       // If we should skip refresh (e.g., for signup, session checks), read the actual error
@@ -230,9 +216,7 @@ export const api = {
     
     // Ensure BASE_URL uses HTTPS in production (Railway redirects HTTP to HTTPS, causing 405)
     const loginUrl = `${BASE_URL}/auth/login`;
-    console.log(`[API] Login request to: ${loginUrl}`);
-    console.log(`[API] BASE_URL value: ${BASE_URL}`);
-    console.log(`[API] Full login URL: ${loginUrl}`);
+      // Debug logging removed for production
     
     try {
       const res = await fetch(loginUrl, {
@@ -242,8 +226,7 @@ export const api = {
         // Don't set Content-Type header - browser sets it automatically for FormData with boundary
       });
       
-      console.log(`[API] Login response status: ${res.status}, statusText: ${res.statusText}`);
-      console.log(`[API] Login response URL: ${res.url}`);
+      // Debug logging removed for production
       
       if (!res.ok) {
         let errorMessage = "Login failed";
@@ -261,7 +244,7 @@ export const api = {
         throw new Error(errorMessage);
       }
       // For successful response, read as JSON
-      console.log(`[API] Login successful`);
+      // Login successful
       return res.json();
     } catch (error) {
       // Log network errors
@@ -285,7 +268,7 @@ export const api = {
     // Skip auto-refresh to avoid loops, just check session
     // This endpoint returns 401 if not logged in, which is normal - don't treat as error
     // Explicitly ensure credentials are included
-    console.log("[API] getCurrentUser - checking credentials, BASE_URL:", BASE_URL);
+    // Checking user credentials
     return request("/auth/me", {
       credentials: "include",  // Explicitly include cookies
     }, 0, true).catch((error) => {

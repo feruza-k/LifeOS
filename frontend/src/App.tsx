@@ -5,19 +5,31 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import Index from "./pages/Index";
-import Week from "./pages/Week";
-import Calendar from "./pages/Calendar";
-import Explore from "./pages/Explore";
-import Notes from "./pages/Notes";
-import Reminders from "./pages/Reminders";
-import Settings from "./pages/Settings";
-import Categories from "./pages/Categories";
-import Profile from "./pages/Profile";
-import Auth from "./pages/Auth";
-import VerifyEmail from "./pages/VerifyEmail";
-import NotFound from "./pages/NotFound";
+
+// Lazy load heavy pages for code splitting
+const Week = lazy(() => import("./pages/Week"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const Explore = lazy(() => import("./pages/Explore"));
+const Notes = lazy(() => import("./pages/Notes"));
+const Reminders = lazy(() => import("./pages/Reminders"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Categories = lazy(() => import("./pages/Categories"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Auth = lazy(() => import("./pages/Auth"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Loading component for lazy-loaded routes
+const PageLoader = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="text-center">
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+      <p className="text-sm text-muted-foreground font-sans">Loading...</p>
+    </div>
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,103 +85,104 @@ const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
 const VerifyEmailRoute = () => {
   // Allow verification without authentication (users might click email link before logging in)
   // The verify-email-by-token endpoint doesn't require authentication
-  return <VerifyEmail />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <VerifyEmail />
+    </Suspense>
+  );
 };
 
 const AppRoutes = () => {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/verify-email" element={<VerifyEmailRoute />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Index />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/week"
-          element={
-            <ProtectedRoute>
-              <Week />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/calendar"
-          element={
-            <ProtectedRoute>
-              <Calendar />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/explore"
-          element={
-            <ProtectedRoute>
-              <Explore />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/align"
-          element={<Navigate to="/explore" replace />}
-        />
-        <Route
-          path="/notes"
-          element={
-            <ProtectedRoute>
-              <Notes />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reminders"
-          element={
-            <ProtectedRoute>
-              <Reminders />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/categories"
-          element={
-            <ProtectedRoute>
-              <Categories />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/verify-email" element={<VerifyEmailRoute />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/week"
+            element={
+              <ProtectedRoute>
+                <Week />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <Calendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/explore"
+            element={
+              <ProtectedRoute>
+                <Explore />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/align"
+            element={<Navigate to="/explore" replace />}
+          />
+          <Route
+            path="/notes"
+            element={
+              <ProtectedRoute>
+                <Notes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reminders"
+            element={
+              <ProtectedRoute>
+                <Reminders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <ProtectedRoute>
+                <Categories />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };
 
 const App = () => {
-  // Log app initialization
-  if (typeof window !== 'undefined') {
-    console.log('[App] Initializing LifeOS...');
-  }
-  
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

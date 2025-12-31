@@ -377,7 +377,7 @@ const Explore = () => {
           }
         } catch (error) {
           // Note doesn't exist for this day, skip silently
-          console.debug(`No note found for ${dateStr}`);
+          // No note found for this day, skip
         }
       }
       
