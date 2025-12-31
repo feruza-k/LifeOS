@@ -238,10 +238,10 @@ const Index = () => {
   const handleToggleTask = useCallback(async (id: string) => {
     const result = await store.toggleTask(id);
     // Show goal notification if task matches a goal
-    if (result && result.goalMatch) {
+    if (result && typeof result === 'object' && 'goalMatch' in result && result.goalMatch) {
       setGoalNotification(result.goalMatch);
     }
-  };
+  }, [store]);
 
   // Divider between Scheduled & Anytime
   const Divider = () => (
