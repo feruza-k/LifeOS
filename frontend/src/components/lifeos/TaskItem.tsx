@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Trash2, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ValueType } from "./ValueTag";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
+import { AddTaskModal } from "./AddTaskModal";
 
 export interface Task {
   id: string;
@@ -11,16 +12,19 @@ export interface Task {
   endTime?: string;
   completed: boolean;
   value: ValueType;
+  date?: string;
 }
 
 interface TaskItemProps {
   task: Task;
   onToggle: (id: string) => void;
   onDelete?: (id: string) => void;
+  onUpdate?: (id: string, updates: Partial<Task>) => void;
 }
 
-export function TaskItem({ task, onToggle, onDelete }: TaskItemProps) {
-  const [showDelete, setShowDelete] = useState(false);
+export function TaskItem({ task, onToggle, onDelete, onUpdate }: TaskItemProps) {
+  const [showActions, setShowActions] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   return (
     <div 
@@ -28,8 +32,8 @@ export function TaskItem({ task, onToggle, onDelete }: TaskItemProps) {
         "flex items-center gap-3 p-4 rounded-xl bg-card shadow-soft transition-all duration-200",
         task.completed && "opacity-60"
       )}
-      onMouseEnter={() => setShowDelete(true)}
-      onMouseLeave={() => setShowDelete(false)}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
     >
       <button
         onClick={() => onToggle(task.id)}
@@ -87,16 +91,42 @@ export function TaskItem({ task, onToggle, onDelete }: TaskItemProps) {
         </div>
       </div>
       
-      {onDelete && (
-        <button
-          onClick={() => onDelete(task.id)}
-          className={cn(
-            "p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200",
-            showDelete ? "opacity-100" : "opacity-0 md:opacity-0"
-          )}
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+      <div className="flex items-center gap-1">
+        {onUpdate && (
+          <button
+            onClick={() => setShowEdit(true)}
+            className={cn(
+              "p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200",
+              showActions ? "opacity-100" : "opacity-0 md:opacity-0"
+            )}
+          >
+            <Edit3 className="w-4 h-4" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(task.id)}
+            className={cn(
+              "p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200",
+              showActions ? "opacity-100" : "opacity-0 md:opacity-0"
+            )}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Edit Task Modal */}
+      {showEdit && onUpdate && (
+        <AddTaskModal
+          isOpen={showEdit}
+          onClose={() => setShowEdit(false)}
+          task={task}
+          date={task.date || new Date().toISOString().slice(0, 10)}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onAdd={() => {}} // Not used when editing
+        />
       )}
     </div>
   );

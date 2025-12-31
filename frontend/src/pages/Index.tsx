@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { format, isSameDay, parseISO } from "date-fns";
+import { format, isSameDay, parseISO, isToday } from "date-fns";
 import { Header } from "@/components/lifeos/Header";
 import { QuickMenu } from "@/components/lifeos/QuickMenu";
 import { HorizontalDayStrip } from "@/components/lifeos/HorizontalDayStrip";
@@ -19,6 +19,7 @@ import { Task } from "@/components/lifeos/TaskItem";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { Eye, Bell } from "lucide-react";
 
 
 
@@ -129,6 +130,27 @@ const Index = () => {
   // Separate scheduled tasks (with time) from anytime tasks (without time)
   const scheduledTasks = legacyTasks.filter(t => t.time).sort((a, b) => (a.time || "").localeCompare(b.time || ""));;
   const anytimeTasks = legacyTasks.filter(t => !t.time);
+
+  // Get reminders that should be shown for today
+  const todayShowReminders = useMemo(() => {
+    if (!store.reminders) return [];
+    const currentDateStr = format(selectedDate, "yyyy-MM-dd");
+    return store.reminders.filter(r => {
+      // Must be "show" type
+      if (r.type !== "show") return false;
+      // Must be visible
+      if (r.visible === false) return false;
+      // Must have dueDate that matches today
+      if (!r.dueDate) return false;
+      try {
+        const reminderDate = parseISO(r.dueDate);
+        const reminderDateStr = format(reminderDate, "yyyy-MM-dd");
+        return reminderDateStr === currentDateStr;
+      } catch {
+        return false;
+      }
+    });
+  }, [store.reminders, selectedDate]);
 
 
   const taskGroups = [
@@ -259,12 +281,51 @@ const Index = () => {
           totalTasks={totalCount}
         />
       </div>
+
+      {/* Today's Show Reminders */}
+      {todayShowReminders.length > 0 && (
+        <div className="px-4 py-3 mt-4">
+          <div className="space-y-2">
+            {todayShowReminders.map((reminder) => (
+              <div
+                key={reminder.id}
+                className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border/50"
+              >
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <Eye className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-sans font-medium text-sm text-foreground">
+                    {reminder.title}
+                  </p>
+                  {reminder.note && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {reminder.note}
+                    </p>
+                  )}
+                  {reminder.time && (
+                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                      <Bell className="w-3 h-3" />
+                      {reminder.time}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
        {/* Scheduled */}
       <TaskList
         groups={[{ title: "Scheduled", tasks: scheduledTasks }]}
         onToggleTask={handleToggleTask}
         onDeleteTask={store.deleteTask}
+        onUpdateTask={async (id, updates) => {
+          await store.updateTask(id, updates);
+          // Reload today's tasks after update
+          await store.loadTasksForDate(selectedDate);
+        }}
         onAddTask={() => setShowAddTask(true)}
       />
 
@@ -278,6 +339,11 @@ const Index = () => {
         groups={[{ title: "Anytime", tasks: anytimeTasks }]}
         onToggleTask={handleToggleTask}
         onDeleteTask={store.deleteTask}
+        onUpdateTask={async (id, updates) => {
+          await store.updateTask(id, updates);
+          // Reload today's tasks after update
+          await store.loadTasksForDate(selectedDate);
+        }}
       />
 
       

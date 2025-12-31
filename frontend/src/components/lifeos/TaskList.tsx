@@ -17,10 +17,11 @@ interface TaskListProps {
   groups: TaskGroup[];
   onToggleTask: (id: string) => void;
   onDeleteTask?: (id: string) => void;
+  onUpdateTask?: (id: string, updates: Partial<import("./TaskItem").Task>) => void;
   onAddTask?: () => void;
 }
 
-export function TaskList({ groups, onToggleTask, onDeleteTask, onAddTask }: TaskListProps) {
+export function TaskList({ groups, onToggleTask, onDeleteTask, onUpdateTask, onAddTask }: TaskListProps) {
   return (
     <div className="px-4 py-4 space-y-6 animate-slide-up" style={{ animationDelay: "0.3s" }}>
       {groups.map((group, groupIndex) => {
@@ -60,6 +61,7 @@ export function TaskList({ groups, onToggleTask, onDeleteTask, onAddTask }: Task
                             task={task} 
                             onToggle={onToggleTask}
                             onDelete={onDeleteTask}
+                            onUpdate={onUpdateTask}
                           />
                         ))}
                       </div>
@@ -82,6 +84,7 @@ export function TaskList({ groups, onToggleTask, onDeleteTask, onAddTask }: Task
                       task={task} 
                       onToggle={onToggleTask}
                       onDelete={onDeleteTask}
+                      onUpdate={onUpdateTask}
                     />
                   ))}
                 </div>

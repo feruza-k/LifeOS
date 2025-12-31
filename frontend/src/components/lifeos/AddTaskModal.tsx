@@ -256,6 +256,7 @@ export function AddTaskModal({ isOpen, onClose, onAdd, date, task, initialTime, 
         time: isScheduled ? startTime : undefined,
         endTime: isScheduled ? (endTime || calculateEndTime(startTime, duration)) : undefined,
         value: category,
+        date: format(taskDate, "yyyy-MM-dd"), // Include date in updates
         ...(repeatConfig && { repeat: repeatConfig }),
       });
       resetForm();

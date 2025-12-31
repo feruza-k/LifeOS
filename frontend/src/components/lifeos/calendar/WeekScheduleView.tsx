@@ -119,16 +119,71 @@ export function WeekScheduleView({
     return `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`;
   };
 
-  // Get tasks for a specific date (Week View = Scheduled Tasks Only)
+  // Find empty time slots for placing anytime tasks
+  const findEmptySlots = (scheduledTasks: Task[], minHour: number = 9, maxHour: number = 20): Array<{ start: string; end: string }> => {
+    const slots: Array<{ start: string; end: string }> = [];
+    
+    // Create a sorted list of scheduled tasks with their time ranges
+    const scheduledRanges = scheduledTasks
+      .filter(t => t.time && t.endTime)
+      .map(t => {
+        const [startH, startM] = t.time!.split(":").map(Number);
+        const [endH, endM] = t.endTime!.split(":").map(Number);
+        return {
+          start: startH * 60 + startM,
+          end: endH * 60 + endM,
+        };
+      })
+      .sort((a, b) => a.start - b.start);
+    
+    // Find gaps between scheduled tasks
+    let currentTime = minHour * 60; // Start from 9 AM
+    
+    for (const range of scheduledRanges) {
+      if (currentTime < range.start) {
+        // Found a gap
+        const gapDuration = range.start - currentTime;
+        if (gapDuration >= 30) { // Only consider gaps of 30+ minutes
+          const startHour = Math.floor(currentTime / 60);
+          const startMin = currentTime % 60;
+          const endHour = Math.floor(range.start / 60);
+          const endMin = range.start % 60;
+          slots.push({
+            start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
+            end: `${endHour.toString().padStart(2, "0")}:${endMin.toString().padStart(2, "0")}`,
+          });
+        }
+      }
+      currentTime = Math.max(currentTime, range.end);
+    }
+    
+    // Check for gap after last task until maxHour
+    if (currentTime < maxHour * 60) {
+      const gapDuration = maxHour * 60 - currentTime;
+      if (gapDuration >= 30) {
+        const startHour = Math.floor(currentTime / 60);
+        const startMin = currentTime % 60;
+        slots.push({
+          start: `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`,
+          end: `${maxHour.toString().padStart(2, "0")}:00`,
+        });
+      }
+    }
+    
+    return slots;
+  };
+
+  // Get tasks for a specific date (Scheduled + Anytime placed in empty slots)
   const getTasksForDate = (dateStr: string) => {
     // Normalize date string for comparison
     const normalizedDateStr = normalizeDate(dateStr);
     if (!normalizedDateStr) return { scheduled: [], anytime: [] };
     
+    // Filter tasks by date and category
     const allTasks = tasks.filter(
       (task) => {
-        // Must have date and time (scheduled tasks only)
-        if (!task.date || !task.time) return false;
+        // Must have date
+        if (!task.date) return false;
         
         // Normalize task date for comparison
         const taskDate = normalizeDate(task.date);
@@ -137,35 +192,57 @@ export function WeekScheduleView({
         // Date must match
         if (taskDate !== normalizedDateStr) return false;
         
-        // Category matching logic (same as month view):
-        // - If no categories selected OR all categories selected, show all tasks
-        // - Otherwise, show tasks that match selected categories OR tasks without a value
+        // Category matching logic
         const allCategoryIds = categories.map(c => c.id);
         const allSelected = selectedCategories.length === 0 || 
                            (selectedCategories.length === allCategoryIds.length && 
                             allCategoryIds.every(id => selectedCategories.includes(id)));
         
         if (allSelected) {
-          return true; // All categories selected = no filter, show all
+          return true;
         }
         
-        // If task has a value, check if it matches selected categories
         if (task.value) {
           return selectedCategories.includes(task.value);
         }
         
-        // If task has no value, show it anyway (legacy task or uncategorized)
         return true;
       }
     );
     
-    // Only scheduled tasks - sorted by time
-    const scheduled = allTasks.sort((a, b) => {
-      if (!a.time || !b.time) return 0;
-      return a.time.localeCompare(b.time);
+    // Separate scheduled and anytime tasks
+    const scheduled = allTasks
+      .filter(t => t.time)
+      .sort((a, b) => {
+        if (!a.time || !b.time) return 0;
+        return a.time.localeCompare(b.time);
+      });
+    
+    const anytime = allTasks.filter(t => !t.time);
+    
+    // Find empty slots and assign anytime tasks to them
+    const emptySlots = findEmptySlots(scheduled);
+    const anytimeWithSlots = anytime.map((task, index) => {
+      const slot = emptySlots[index % emptySlots.length];
+      if (slot) {
+        // Assign to slot (but mark as anytime)
+        return {
+          ...task,
+          assignedTime: slot.start,
+          assignedEndTime: slot.end,
+          isAnytime: true,
+        };
+      }
+      // No slot available, place at end of day (8 PM)
+      return {
+        ...task,
+        assignedTime: "20:00",
+        assignedEndTime: "21:00",
+        isAnytime: true,
+      };
     });
     
-    return { scheduled, anytime: [] };
+    return { scheduled, anytime: anytimeWithSlots };
   };
 
   const handlers = useSwipeable({
@@ -347,6 +424,78 @@ export function WeekScheduleView({
                         )}>
                           {task.title}
                         </p>
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Anytime Tasks - placed in empty slots */}
+                  {anytime.map((task: any) => {
+                    if (!task.assignedTime) return null;
+                    const duration = task.assignedEndTime 
+                      ? (() => {
+                          const [startH, startM] = task.assignedTime.split(":").map(Number);
+                          const [endH, endM] = task.assignedEndTime.split(":").map(Number);
+                          return (endH * 60 + endM) - (startH * 60 + startM);
+                        })()
+                      : 60;
+                    const style = getTaskStyle(task.assignedTime, duration);
+                    const categoryColor = getCategoryColor(task.value || "");
+                    return (
+                      <button
+                        key={task.id}
+                        data-task-block
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const now = Date.now();
+                          
+                          if (tapTimeout) {
+                            clearTimeout(tapTimeout);
+                            setTapTimeout(null);
+                          }
+                          
+                          if (lastTap && lastTap.taskId === task.id && now - lastTap.time < 250) {
+                            onToggleTask(task.id);
+                            setLastTap(null);
+                            setTapTimeout(null);
+                          } else {
+                            setLastTap({ taskId: task.id, time: now });
+                            const timeout = setTimeout(() => {
+                              setLastTap((prev) => {
+                                if (prev && prev.taskId === task.id) {
+                                  setEditingTask(task);
+                                  return null;
+                                }
+                                return prev;
+                              });
+                              setTapTimeout(null);
+                            }, 250);
+                            setTapTimeout(timeout);
+                          }
+                        }}
+                        style={{ 
+                          top: style.top, 
+                          height: style.height,
+                          backgroundColor: hexToRgba(categoryColor, 0.3),
+                          borderLeft: `4px dashed ${categoryColor}`,
+                        }}
+                        className={cn(
+                          "absolute left-0.5 right-0.5 rounded px-1 py-1 overflow-hidden transition-all duration-300 flex items-start text-left",
+                          "hover:opacity-90 active:scale-[0.98] pointer-events-auto",
+                          task.completed ? "opacity-35" : "opacity-70"
+                        )}
+                      >
+                        <div className="flex items-start gap-1 w-full">
+                          <p className={cn(
+                            "text-[9px] font-sans font-medium text-foreground leading-tight break-words flex-1",
+                            task.completed && "line-through opacity-70",
+                            "line-clamp-3"
+                          )}>
+                            {task.title}
+                          </p>
+                          <span className="text-[7px] text-muted-foreground font-sans italic shrink-0 mt-0.5">
+                            anytime
+                          </span>
+                        </div>
                       </button>
                     );
                   })}

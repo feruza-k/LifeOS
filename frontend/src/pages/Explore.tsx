@@ -305,10 +305,10 @@ const Explore = () => {
       return;
     }
     
-    // Calculate typing speed (reveal over 4.5 seconds, leaving 0.5s pause)
-    const typingDuration = 4500; // 4.5 seconds
+    // Calculate typing speed (reveal over 7 seconds, leaving 1s pause)
+    const typingDuration = 7000; // 7 seconds - slower, more readable
     const totalChars = currentNote.length;
-    const intervalTime = 30; // Update every 30ms for smooth animation
+    const intervalTime = 50; // Update every 50ms for smoother, slower animation
     const charsPerInterval = Math.max(1, Math.ceil((totalChars * intervalTime) / typingDuration));
     
     let currentCharIndex = 0;
@@ -333,11 +333,12 @@ const Explore = () => {
   }, [currentPhotoIndex, weeklyPhotos]);
 
   // Auto-rotate photos if there are multiple
+  // Match rotation time to typing duration (7s typing + 1s pause = 8s total)
   useEffect(() => {
     if (weeklyPhotos.length > 1) {
       photoRotateTimerRef.current = setInterval(() => {
         setCurrentPhotoIndex((prev) => (prev + 1) % weeklyPhotos.length);
-      }, 5000);
+      }, 8000); // 8 seconds to match typing duration + pause
       
       return () => {
         if (photoRotateTimerRef.current) {
@@ -481,7 +482,7 @@ const Explore = () => {
 
 
       {/* Suggestions from SolAI - MOVED TO TOP */}
-      {alignData.nudge && (
+      {alignData && alignData.nudge && (
       <div className="px-4 py-3 animate-slide-up">
           <div className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20">
           <div className="flex items-start gap-3">
@@ -775,6 +776,17 @@ const Explore = () => {
         </div>
       )}
 
+      {/* Debug: Always show something after Focus to verify rendering */}
+      {alignData && (
+        <div className="px-4 py-3">
+          <div className="p-3 bg-muted/30 rounded-xl border border-border/30">
+            <p className="text-xs text-muted-foreground font-sans text-center">
+              Sections loading... (If you see this, rendering is working)
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Goal Progress - Task Connections */}
       {analyticsData && analyticsData.goal_task_connections && analyticsData.goal_task_connections.length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
@@ -857,12 +869,12 @@ const Explore = () => {
         </div>
       )}
 
-      {/* Simple progress line */}
-      {alignData && alignData.progress && (
+      {/* Simple progress line - Always show if alignData exists */}
+      {alignData && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.25s" }}>
           <div className="p-4 bg-card rounded-2xl shadow-soft border border-border/50">
             <p className="text-sm text-foreground font-sans text-center">
-              {alignData.progress}
+              {alignData.progress || "Building your alignment insights..."}
             </p>
           </div>
         </div>
@@ -872,10 +884,12 @@ const Explore = () => {
 
 
       {/* Rotating Stats: Category Balance, Energy Patterns, Productivity Insights */}
-      <RotatingStats
-        analyticsData={analyticsData}
-        habitReinforcement={habitReinforcement}
-      />
+      {(analyticsData || habitReinforcement) && (
+        <RotatingStats
+          analyticsData={analyticsData}
+          habitReinforcement={habitReinforcement}
+        />
+      )}
 
       {/* Upcoming Week Preview */}
       {analyticsData && analyticsData.upcoming_week_preview && analyticsData.upcoming_week_preview.total_tasks > 0 && (

@@ -93,9 +93,9 @@ interface HabitReinforcement {
 
 interface Photo {
   date: string;
-  filename: string;
-  url: string;
-  note?: string;
+  filename: string; // Can be empty if no photo
+  url: string; // Can be empty if no photo
+  note?: string; // Can be undefined if no reflection
 }
 
 export function useExploreData() {
@@ -133,12 +133,16 @@ export function useExploreData() {
               photoData = note.photos[0];
             }
             
-            if (photoData && photoData.filename) {
+            const hasPhoto = photoData && photoData.filename;
+            const hasReflection = note.content && note.content.trim();
+            
+            // Include if there's at least a photo OR a reflection
+            if (hasPhoto || hasReflection) {
               photosWithNotes.push({
                 date: dateStr,
-                filename: photoData.filename,
-                url: api.getPhotoUrl(photoData.filename),
-                note: note.content && note.content.trim() ? note.content.trim() : undefined
+                filename: hasPhoto ? photoData.filename : '', // Empty if no photo
+                url: hasPhoto ? api.getPhotoUrl(photoData.filename) : '',
+                note: hasReflection ? note.content.trim() : undefined
               });
             }
           }

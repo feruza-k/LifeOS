@@ -31,7 +31,7 @@ export function WeeklyPhotos({
     <div className="grid gap-3 grid-cols-2">
       {/* Photo Album */}
       <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-        {currentPhoto && photoUrl ? (
+        {currentPhoto && currentPhoto.filename && photoUrl ? (
           <>
             <img
               key={`${currentPhoto.filename}-${currentPhoto.date}-${currentIndex}`}
@@ -73,8 +73,14 @@ export function WeeklyPhotos({
             </div>
           </>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-            <Image className="w-12 h-12 text-muted-foreground/40" />
+          // No photo - show camera-shy placeholder
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-muted/30 via-muted/20 to-muted/30">
+            <div className="w-16 h-16 rounded-full bg-muted/40 flex items-center justify-center mb-3">
+              <Image className="w-8 h-8 text-muted-foreground/40" />
+            </div>
+            <p className="text-xs text-muted-foreground/60 font-sans text-center px-4">
+              This was a camera-shy day ✨
+            </p>
           </div>
         )}
         {photos.length > 1 && (
@@ -106,12 +112,17 @@ export function WeeklyPhotos({
             )}
           </p>
         ) : (
-          <p 
-            className="text-base text-muted-foreground font-handwriting italic leading-relaxed text-center px-4" 
-            style={{ fontFamily: "'Dancing Script', 'Kalam', cursive" }}
-          >
-            No reflection for this moment
-          </p>
+          // No reflection - show a thoughtful placeholder
+          <div className="text-center px-4">
+            <p 
+              className="text-base text-muted-foreground font-handwriting italic leading-relaxed" 
+              style={{ fontFamily: "'Dancing Script', 'Kalam', cursive" }}
+            >
+              {currentPhoto?.filename 
+                ? "A moment captured, but thoughts left unspoken..."
+                : "A day lived, quietly and fully ✨"}
+            </p>
+          </div>
         )}
       </div>
     </div>
