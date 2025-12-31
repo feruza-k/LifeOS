@@ -51,7 +51,30 @@ const Week = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center pb-24">
+      <div className="min-h-screen bg-background pb-24">
+        <div className="px-4 py-4">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between mb-6">
+            <Skeleton className="h-8 w-32" />
+            <div className="flex gap-2">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-8 w-8 rounded-full" />
+            </div>
+          </div>
+          
+          {/* Week view skeleton */}
+          <div className="space-y-4">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center pb-24">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground font-sans">Loading week...</p>

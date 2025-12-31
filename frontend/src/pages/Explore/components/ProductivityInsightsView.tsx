@@ -31,7 +31,12 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
       <div className="mb-6">
         <div className="flex items-center justify-center mb-3">
           <div className="relative w-32 h-32">
-            <svg className="transform -rotate-90 w-32 h-32" viewBox="0 0 100 100">
+            <svg 
+              className="transform -rotate-90 w-32 h-32" 
+              viewBox="0 0 100 100"
+              style={{ display: 'block', width: '128px', height: '128px' }}
+              xmlns="http://www.w3.org/2000/svg"
+            >
               <circle
                 cx="50"
                 cy="50"
@@ -48,7 +53,7 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
                 stroke="hsl(var(--primary))"
                 strokeWidth="8"
                 strokeDasharray={`${2 * Math.PI * 40}`}
-                strokeDashoffset={`${2 * Math.PI * 40 * (1 - productivityInsights.completion_rate)}`}
+                strokeDashoffset={`${2 * Math.PI * 40 * (1 - (productivityInsights.completion_rate || 0))}`}
                 className="transition-all duration-500"
                 strokeLinecap="round"
               />

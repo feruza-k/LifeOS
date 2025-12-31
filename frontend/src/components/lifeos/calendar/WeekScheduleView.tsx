@@ -431,13 +431,8 @@ export function WeekScheduleView({
                   {/* Anytime Tasks - placed in empty slots */}
                   {anytime.map((task: any) => {
                     if (!task.assignedTime) return null;
-                    const duration = task.assignedEndTime 
-                      ? (() => {
-                          const [startH, startM] = task.assignedTime.split(":").map(Number);
-                          const [endH, endM] = task.assignedEndTime.split(":").map(Number);
-                          return (endH * 60 + endM) - (startH * 60 + startM);
-                        })()
-                      : 60;
+                    // Always use 60 minutes (1 hour) for anytime tasks
+                    const duration = 60;
                     const style = getTaskStyle(task.assignedTime, duration);
                     const categoryColor = getCategoryColor(task.value || "");
                     return (
@@ -479,23 +474,22 @@ export function WeekScheduleView({
                           borderLeft: `4px dashed ${categoryColor}`,
                         }}
                         className={cn(
-                          "absolute left-0.5 right-0.5 rounded px-1 py-1 overflow-hidden transition-all duration-300 flex items-start text-left",
+                          "absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden transition-all duration-300 text-left",
                           "hover:opacity-90 active:scale-[0.98] pointer-events-auto",
                           task.completed ? "opacity-35" : "opacity-70"
                         )}
+                        title={task.title}
                       >
-                        <div className="flex items-start gap-1 w-full">
-                          <p className={cn(
-                            "text-[9px] font-sans font-medium text-foreground leading-tight break-words flex-1",
-                            task.completed && "line-through opacity-70",
-                            "line-clamp-3"
-                          )}>
-                            {task.title}
-                          </p>
-                          <span className="text-[7px] text-muted-foreground font-sans italic shrink-0 mt-0.5">
-                            anytime
-                          </span>
-                        </div>
+                        <p className={cn(
+                          "text-[9px] font-sans font-medium text-foreground leading-tight break-words",
+                          task.completed && "line-through opacity-70",
+                          "line-clamp-2"
+                        )}>
+                          {task.title}
+                        </p>
+                        <span className="text-[6px] text-muted-foreground/60 font-sans italic absolute bottom-0.5 right-1">
+                          anytime
+                        </span>
                       </button>
                     );
                   })}

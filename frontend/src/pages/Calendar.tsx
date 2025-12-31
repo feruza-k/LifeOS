@@ -76,31 +76,30 @@ const CalendarPage = () => {
     if (!selectedDate) return;
     
     const dateStr = format(selectedDate, "yyyy-MM-dd");
-    if (!notes[dateStr]) {
-      store.loadNote(dateStr).then(note => {
-        if (note) {
-          setNotes(prev => ({ ...prev, [dateStr]: note?.content || "" }));
-          try {
-            if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
-              setPhotos(prev => ({ ...prev, [dateStr]: note.photo }));
-            } else if (note && note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
-              // Migrate from old photos array to single photo (take first photo)
-              setPhotos(prev => ({ ...prev, [dateStr]: note.photos[0] }));
-            } else {
-              setPhotos(prev => ({ ...prev, [dateStr]: null }));
-            }
-          } catch (error) {
+    // Always reload note to get latest photo data (especially after login/commit)
+    store.loadNote(dateStr).then(note => {
+      if (note) {
+        setNotes(prev => ({ ...prev, [dateStr]: note?.content || "" }));
+        try {
+          if (note && note.photo && typeof note.photo === 'object' && note.photo.filename) {
+            setPhotos(prev => ({ ...prev, [dateStr]: note.photo }));
+          } else if (note && note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+            // Migrate from old photos array to single photo (take first photo)
+            setPhotos(prev => ({ ...prev, [dateStr]: note.photos[0] }));
+          } else {
             setPhotos(prev => ({ ...prev, [dateStr]: null }));
           }
+        } catch (error) {
+          setPhotos(prev => ({ ...prev, [dateStr]: null }));
         }
-      }).catch(() => {
-      });
-    } else {
-      // If note exists but photo doesn't, initialize photo
-      if (!(dateStr in photos)) {
+      } else {
+        // No note found, set photo to null
         setPhotos(prev => ({ ...prev, [dateStr]: null }));
       }
-    }
+    }).catch(() => {
+      // On error, set photo to null
+      setPhotos(prev => ({ ...prev, [dateStr]: null }));
+    });
     // Load check-in for this date
     if (!checkIns[dateStr]) {
       api.getCheckIn(dateStr).then(checkIn => {

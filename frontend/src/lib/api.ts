@@ -1,4 +1,88 @@
 import { BASE_URL } from "@/constants/config";
+import { Task, Reminder, MonthlyFocus, Category } from "@/types/lifeos";
+
+// Type definitions for API requests
+interface CreateTaskRequest {
+  title: string;
+  time?: string;
+  endTime?: string;
+  value?: string;
+  date: string;
+  completed?: boolean;
+  repeat?: {
+    type: string;
+    weekDays?: number[];
+    startDate?: string;
+    endDate?: string;
+    customDates?: string[];
+  };
+}
+
+interface UpdateTaskRequest {
+  title?: string;
+  time?: string;
+  endTime?: string;
+  value?: string;
+  date?: string;
+  completed?: boolean;
+}
+
+interface SaveNoteRequest {
+  date: string;
+  content: string;
+  photo?: { filename: string; uploadedAt: string } | null;
+}
+
+interface SaveCheckInRequest {
+  date: string;
+  completedTaskIds: string[];
+  incompleteTaskIds: string[];
+  movedTasks: { taskId: string; newDate: string }[];
+  note?: string;
+  mood?: string;
+}
+
+interface CreateReminderRequest {
+  title: string;
+  description?: string;
+  dueDate?: string;
+  time?: string;
+  type?: "notify" | "show";
+  note?: string;
+  visible?: boolean;
+}
+
+interface UpdateReminderRequest {
+  title?: string;
+  description?: string;
+  dueDate?: string;
+  time?: string;
+  type?: "notify" | "show";
+  note?: string;
+  visible?: boolean;
+}
+
+interface SaveMonthlyFocusRequest {
+  month: string;
+  title: string;
+  description?: string;
+}
+
+interface MonthlyGoal {
+  title: string;
+  description?: string;
+  progress?: number;
+}
+
+interface CreateCategoryRequest {
+  label: string;
+  color: string;
+}
+
+interface UpdateCategoryRequest {
+  label?: string;
+  color?: string;
+}
 
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
@@ -181,7 +265,7 @@ async function request(path: string, options: RequestInit = {}, retryCount = 0, 
       throw new Error(data.error || 'An error occurred');
     }
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Enhanced error logging for debugging
     console.error(`[API Error] URL: ${url}`, error);
     
@@ -388,13 +472,13 @@ export const api = {
   getTaskSuggestions: (limit: number = 6) =>
     request(`/tasks/suggestions?limit=${limit}`),
 
-  createTask: (task: any) =>
+  createTask: (task: CreateTaskRequest) =>
     request("/tasks", {
       method: "POST",
       body: JSON.stringify(task),
     }),
 
-  updateTask: (id: string, updates: any) =>
+  updateTask: (id: string, updates: UpdateTaskRequest) =>
     request(`/tasks/${id}`, {
       method: "PATCH",
       body: JSON.stringify(updates),
@@ -415,7 +499,7 @@ export const api = {
   getNote: (date: string) =>
     request(`/notes?date=${date}`),
 
-  saveNote: (note: any) =>
+  saveNote: (note: SaveNoteRequest) =>
     request("/notes", {
       method: "POST",
       body: JSON.stringify(note),
@@ -470,7 +554,7 @@ export const api = {
   getCheckIn: (date: string) =>
     request(`/checkins?date=${date}`),
 
-  saveCheckIn: (data: any) =>
+  saveCheckIn: (data: SaveCheckInRequest) =>
     request("/checkins", {
       method: "POST",
       body: JSON.stringify(data),
@@ -479,13 +563,13 @@ export const api = {
   // --- Reminders ---
   getAllReminders: () => request("/reminders"),
 
-  createReminder: (reminder: any) =>
+  createReminder: (reminder: CreateReminderRequest) =>
     request("/reminders", {
       method: "POST",
       body: JSON.stringify(reminder),
     }),
 
-  updateReminder: (id: string, updates: any) =>
+  updateReminder: (id: string, updates: UpdateReminderRequest) =>
     request(`/reminders/${id}`, {
       method: "PATCH",
       body: JSON.stringify(updates),
@@ -501,13 +585,13 @@ export const api = {
   getMonthlyGoals: (month: string) =>
     request(`/monthly-goals?month=${month}`),
 
-  saveMonthlyFocus: (focus: any) =>
+  saveMonthlyFocus: (focus: SaveMonthlyFocusRequest) =>
     request("/monthly-focus", {
       method: "POST",
       body: JSON.stringify(focus),
     }),
 
-  saveMonthlyGoals: (month: string, goals: any[]) =>
+  saveMonthlyGoals: (month: string, goals: MonthlyGoal[]) =>
     request("/monthly-goals", {
       method: "POST",
       body: JSON.stringify({ month, goals }),
@@ -640,13 +724,13 @@ export const api = {
 
   getCategory: (id: string) => request(`/categories/${id}`),
 
-  createCategory: (category: any) =>
+  createCategory: (category: CreateCategoryRequest) =>
     request("/categories", {
       method: "POST",
       body: JSON.stringify(category),
     }),
 
-  updateCategory: (id: string, updates: any) =>
+  updateCategory: (id: string, updates: UpdateCategoryRequest) =>
     request(`/categories/${id}`, {
       method: "PATCH",
       body: JSON.stringify(updates),

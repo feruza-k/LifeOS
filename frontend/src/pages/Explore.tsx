@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { WeeklySummary } from "./Explore/components/WeeklySummary";
 import { RotatingStats } from "./Explore/components/RotatingStats";
 import { useExploreData } from "./Explore/hooks/useExploreData";
+import { Skeleton, SkeletonCard, SkeletonList, SkeletonText } from "@/components/ui/skeleton";
 
 interface AlignData {
   direction: {
@@ -305,10 +306,10 @@ const Explore = () => {
       return;
     }
     
-    // Calculate typing speed (reveal over 7 seconds, leaving 1s pause)
-    const typingDuration = 7000; // 7 seconds - slower, more readable
+    // Calculate typing speed (reveal over 12 seconds, leaving 2s pause)
+    const typingDuration = 12000; // 12 seconds - slower, more readable
     const totalChars = currentNote.length;
-    const intervalTime = 50; // Update every 50ms for smoother, slower animation
+    const intervalTime = 100; // Update every 100ms for smoother, slower animation
     const charsPerInterval = Math.max(1, Math.ceil((totalChars * intervalTime) / typingDuration));
     
     let currentCharIndex = 0;
@@ -333,12 +334,12 @@ const Explore = () => {
   }, [currentPhotoIndex, weeklyPhotos]);
 
   // Auto-rotate photos if there are multiple
-  // Match rotation time to typing duration (7s typing + 1s pause = 8s total)
+  // Match rotation time to typing duration (12s typing + 2s pause = 14s total)
   useEffect(() => {
     if (weeklyPhotos.length > 1) {
       photoRotateTimerRef.current = setInterval(() => {
         setCurrentPhotoIndex((prev) => (prev + 1) % weeklyPhotos.length);
-      }, 8000); // 8 seconds to match typing duration + pause
+      }, 14000); // 14 seconds to match typing duration + pause
       
       return () => {
         if (photoRotateTimerRef.current) {
@@ -363,10 +364,39 @@ const Explore = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground font-sans">Loading alignment...</p>
+      <div className="min-h-screen bg-background pb-24">
+        <div className="px-4 py-4">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between mb-6">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+          
+          {/* Weekly Summary skeleton */}
+          <SkeletonCard className="mb-6" />
+          
+          {/* Rotating stats skeleton */}
+          <div className="bg-card rounded-xl p-6 mb-6 border border-border">
+            <Skeleton className="h-6 w-48 mb-4" />
+            <Skeleton className="h-64 w-full mb-4" />
+            <div className="flex gap-2 justify-center">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-2 w-2 rounded-full" />
+              ))}
+            </div>
+          </div>
+          
+          {/* Focus section skeleton */}
+          <div className="bg-card rounded-xl p-6 mb-6 border border-border">
+            <Skeleton className="h-6 w-32 mb-4" />
+            <SkeletonText lines={3} />
+          </div>
+          
+          {/* Goal Progress skeleton */}
+          <div className="bg-card rounded-xl p-6 mb-6 border border-border">
+            <Skeleton className="h-6 w-40 mb-4" />
+            <SkeletonList count={3} />
+          </div>
         </div>
       </div>
     );
@@ -772,17 +802,6 @@ const Explore = () => {
                 Set Monthly Focus
               </Button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Debug: Always show something after Focus to verify rendering */}
-      {alignData && (
-        <div className="px-4 py-3">
-          <div className="p-3 bg-muted/30 rounded-xl border border-border/30">
-            <p className="text-xs text-muted-foreground font-sans text-center">
-              Sections loading... (If you see this, rendering is working)
-            </p>
           </div>
         </div>
       )}

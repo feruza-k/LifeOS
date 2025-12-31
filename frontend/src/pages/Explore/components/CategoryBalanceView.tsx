@@ -38,11 +38,54 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
       {/* Pie Chart Visualization */}
       <div className="mb-6 flex items-center justify-center">
         <div className="relative">
-          <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+          <svg 
+            width="200" 
+            height="200" 
+            viewBox="0 0 200 200" 
+            className="transform -rotate-90"
+            style={{ display: 'block' }}
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Background circle */}
+            <circle
+              cx="100"
+              cy="100"
+              r="85"
+              fill="none"
+              stroke="hsl(var(--muted))"
+              strokeWidth="3"
+              opacity="0.3"
+            />
             {(() => {
-              const entries = Object.entries(categoryBalance.distribution)
+              const entries = Object.entries(categoryBalance.distribution || {})
+                .filter(([_, count]) => count > 0) // Filter out zero counts
                 .sort((a, b) => b[1] - a[1]);
-              const total = Object.values(categoryBalance.distribution).reduce((a, b) => a + b, 0);
+              
+              if (entries.length === 0) {
+                return (
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="hsl(var(--muted))"
+                    opacity="0.2"
+                  />
+                );
+              }
+              
+              const total = entries.reduce((sum, [_, count]) => sum + count, 0);
+              if (total === 0) {
+                return (
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="hsl(var(--muted))"
+                    opacity="0.2"
+                  />
+                );
+              }
+              
               let currentAngle = 0;
               const radius = 85;
               const centerX = 100;

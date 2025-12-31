@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { format, isSameDay, parseISO, isToday } from "date-fns";
 import { Header } from "@/components/lifeos/Header";
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Eye, Bell } from "lucide-react";
+import { Skeleton, SkeletonCard, SkeletonList } from "@/components/ui/skeleton";
 
 
 
@@ -32,7 +33,14 @@ const Index = () => {
   const [showDayStrip, setShowDayStrip] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [existingCheckIn, setExistingCheckIn] = useState<any>(null);
+  const [existingCheckIn, setExistingCheckIn] = useState<{ 
+    id: string; 
+    date: string; 
+    completedTaskIds: string[]; 
+    incompleteTaskIds: string[]; 
+    note?: string; 
+    mood?: string;
+  } | null>(null);
   const [existingPhoto, setExistingPhoto] = useState<{ filename: string; uploadedAt: string } | null>(null);
   
   const store = useLifeOSStore();
@@ -101,35 +109,46 @@ const Index = () => {
       store.loadReminders();
     }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
   
-    // Filter tasks for the selected date
-    const currentDateStr = format(selectedDate, "yyyy-MM-dd");
-    const todayTasks = (store.tasks ?? []).filter(t => {
-      if (!t.date) return false;
-      // Normalize date format for comparison
-      let taskDate = t.date;
-      if (typeof taskDate === 'string') {
-        if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
-        if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
-        if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
-      } else if (taskDate instanceof Date) {
-        taskDate = taskDate.toISOString().slice(0, 10);
-      }
-      return taskDate === currentDateStr;
-    });
+    // Memoize date string to avoid recalculating on every render
+    const currentDateStr = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
 
-  // Convert to legacy format for TaskList
-  const legacyTasks: Task[] = todayTasks.map(t => ({
-    id: t.id,
-    title: t.title,
-    time: t.time,
-    endTime: t.endTime,
-    completed: t.completed,
-    value: t.value,
-  }));
+    // Memoize task filtering and processing
+    const todayTasks = useMemo(() => {
+      return (store.tasks ?? []).filter(t => {
+        if (!t.date) return false;
+        // Normalize date format for comparison
+        let taskDate = t.date;
+        if (typeof taskDate === 'string') {
+          if (taskDate.includes('T')) taskDate = taskDate.split('T')[0];
+          if (taskDate.includes(' ')) taskDate = taskDate.split(' ')[0];
+          if (taskDate.length > 10) taskDate = taskDate.substring(0, 10);
+        } else if (taskDate instanceof Date) {
+          taskDate = taskDate.toISOString().slice(0, 10);
+        }
+        return taskDate === currentDateStr;
+      });
+    }, [store.tasks, currentDateStr]);
 
-  // Separate scheduled tasks (with time) from anytime tasks (without time)
-  const scheduledTasks = legacyTasks.filter(t => t.time).sort((a, b) => (a.time || "").localeCompare(b.time || ""));;
-  const anytimeTasks = legacyTasks.filter(t => !t.time);
+    // Memoize legacy format conversion
+    const legacyTasks: Task[] = useMemo(() => {
+      return todayTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        time: t.time,
+        endTime: t.endTime,
+        completed: t.completed,
+        value: t.value,
+      }));
+    }, [todayTasks]);
+
+    // Memoize task separation and sorting
+    const scheduledTasks = useMemo(() => {
+      return legacyTasks.filter(t => t.time).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    }, [legacyTasks]);
+
+    const anytimeTasks = useMemo(() => {
+      return legacyTasks.filter(t => !t.time);
+    }, [legacyTasks]);
 
   // Get reminders that should be shown for today
   const todayShowReminders = useMemo(() => {
@@ -153,16 +172,18 @@ const Index = () => {
   }, [store.reminders, selectedDate]);
 
 
-  const taskGroups = [
+  // Memoize task groups
+  const taskGroups = useMemo(() => [
     { title: "Scheduled", tasks: scheduledTasks },
     { title: "Anytime", tasks: anytimeTasks },
-  ];  
+  ], [scheduledTasks, anytimeTasks]);
 
+  // Memoize completion counts
+  const completedCount = useMemo(() => legacyTasks.filter(t => t.completed).length, [legacyTasks]);
+  const totalCount = useMemo(() => legacyTasks.length, [legacyTasks]);
 
-  const completedCount = legacyTasks.filter(t => t.completed).length;
-  const totalCount = legacyTasks.length;
-
-  const mapEnergyStatus = (backendStatus?: string): "low" | "optimal" | "heavy" => {
+  // Memoize energy status mapping
+  const mapEnergyStatus = useCallback((backendStatus?: string): "low" | "optimal" | "heavy" => {
     if (!backendStatus) return "optimal";
     switch (backendStatus) {
       case "space_available":
@@ -174,11 +195,18 @@ const Index = () => {
       default:
         return "optimal";
     }
-  };
+  }, []);
 
-  const energyStatus = mapEnergyStatus(store.today?.energy?.status);
+  const energyStatus = useMemo(() => mapEnergyStatus(store.today?.energy?.status), [store.today?.energy?.status, mapEnergyStatus]);
 
-  const handleAddTask = async (task: { title: string; time?: string; endTime?: string; value: any; date: string; repeat?: any }) => {
+  const handleAddTask = useCallback(async (task: { 
+    title: string; 
+    time?: string; 
+    endTime?: string; 
+    value: string | undefined; 
+    date: string; 
+    repeat?: { type: string; weekDays?: number[]; startDate?: string; endDate?: string; customDates?: string[] } | undefined 
+  }) => {
     try {
       const result = await store.addTask({
         title: task.title,
@@ -200,13 +228,14 @@ const Index = () => {
       // Task created successfully - modal will close automatically
       // Return the task object for compatibility
       return result?.task || result;
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to add task. Please try again.");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to add task. Please try again.";
+      toast.error(errorMessage);
       throw error; // Re-throw so AddTaskModal can handle it
     }
-  };
+  }, [store]);
   
-  const handleToggleTask = async (id: string) => {
+  const handleToggleTask = useCallback(async (id: string) => {
     const result = await store.toggleTask(id);
     // Show goal notification if task matches a goal
     if (result && result.goalMatch) {
@@ -225,10 +254,28 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading LifeOS...</p>
+      <div className="min-h-screen bg-background pb-48">
+        <div className="px-4 py-4">
+          {/* Header skeleton */}
+          <div className="flex items-center gap-3 mb-4">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-8 w-8 rounded-full ml-auto" />
+          </div>
+          
+          {/* Balance Score Card skeleton */}
+          <SkeletonCard className="mb-4" />
+          
+          {/* Task lists skeleton */}
+          <div className="space-y-4">
+            <div>
+              <Skeleton className="h-4 w-24 mb-2" />
+              <SkeletonList count={3} />
+            </div>
+            <div>
+              <Skeleton className="h-4 w-24 mb-2" />
+              <SkeletonList count={2} />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -254,11 +301,11 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background pb-48">
       {/* Top Brand */}
-      <p className="text-xs font-sans font-medium text-muted-foreground tracking-widest uppercase text-center pt-4 pb-1">
+      <p className="text-xs font-sans font-medium text-muted-foreground tracking-widest uppercase text-center pt-4 pb-2">
         LifeOS, powered by SolAI
       </p>
 
-      <div className="flex items-center gap-3 px-4">
+      <div className="flex items-center gap-3 px-4 mb-2">
         <div className="flex-1">
           <Header onTitleClick={() => setShowDayStrip(!showDayStrip)} />
         </div>
@@ -273,40 +320,26 @@ const Index = () => {
           }} 
         />
       )}
-      
-      <div className="mt-4">
-        <BalanceScoreCard 
-          status={energyStatus} 
-          tasksCompleted={completedCount}
-          totalTasks={totalCount}
-        />
-      </div>
 
-      {/* Today's Show Reminders */}
+      {/* Today's Show Reminders - Before Energy Status */}
       {todayShowReminders.length > 0 && (
-        <div className="px-4 py-3 mt-4">
-          <div className="space-y-2">
+        <div className="px-4 py-2 mt-2">
+          <div className="space-y-1.5">
             {todayShowReminders.map((reminder) => (
               <div
                 key={reminder.id}
-                className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border/50"
+                className="flex items-center gap-2.5 p-2.5 rounded-lg bg-primary/5 border border-primary/20"
               >
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                  <Eye className="w-4 h-4 text-muted-foreground" />
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-3.5 h-3.5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-sans font-medium text-sm text-foreground">
                     {reminder.title}
                   </p>
                   {reminder.note && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                       {reminder.note}
-                    </p>
-                  )}
-                  {reminder.time && (
-                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                      <Bell className="w-3 h-3" />
-                      {reminder.time}
                     </p>
                   )}
                 </div>
@@ -315,6 +348,14 @@ const Index = () => {
           </div>
         </div>
       )}
+      
+      <div className="mt-4">
+        <BalanceScoreCard 
+          status={energyStatus} 
+          tasksCompleted={completedCount}
+          totalTasks={totalCount}
+        />
+      </div>
       
        {/* Scheduled */}
       <TaskList

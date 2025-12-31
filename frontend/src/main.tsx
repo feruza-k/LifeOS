@@ -2,13 +2,61 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Add error handler for uncaught errors
+// Enhanced error logging for uncaught errors
 window.addEventListener("error", (event) => {
-  console.error("[Global Error]", event.error);
+  const errorData = {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+    error: event.error,
+    timestamp: new Date().toISOString(),
+    url: window.location.href,
+  };
+
+  console.error("[Global Error]", errorData);
+
+  // Log to localStorage in production for debugging
+  if (import.meta.env.PROD) {
+    try {
+      const existingErrors = JSON.parse(localStorage.getItem("lifeos_errors") || "[]");
+      existingErrors.push({
+        ...errorData,
+        error: event.error?.toString(),
+        stack: event.error?.stack?.substring(0, 1000),
+      });
+      const recentErrors = existingErrors.slice(-10);
+      localStorage.setItem("lifeos_errors", JSON.stringify(recentErrors));
+    } catch (e) {
+      // Silently fail
+    }
+  }
 });
 
 window.addEventListener("unhandledrejection", (event) => {
-  console.error("[Unhandled Promise Rejection]", event.reason);
+  const errorData = {
+    reason: event.reason,
+    timestamp: new Date().toISOString(),
+    url: window.location.href,
+  };
+
+  console.error("[Unhandled Promise Rejection]", errorData);
+
+  // Log to localStorage in production
+  if (import.meta.env.PROD) {
+    try {
+      const existingErrors = JSON.parse(localStorage.getItem("lifeos_errors") || "[]");
+      existingErrors.push({
+        ...errorData,
+        reason: event.reason?.toString(),
+        stack: event.reason?.stack?.substring(0, 1000),
+      });
+      const recentErrors = existingErrors.slice(-10);
+      localStorage.setItem("lifeos_errors", JSON.stringify(recentErrors));
+    } catch (e) {
+      // Silently fail
+    }
+  }
 });
 
 // Register Service Worker for PWA
