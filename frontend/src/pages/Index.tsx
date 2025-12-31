@@ -330,7 +330,7 @@ const Index = () => {
                 key={reminder.id}
                 className="flex items-center gap-3"
               >
-                <Bell className="w-5 h-5 text-primary animate-bell-ring flex-shrink-0" style={{ color: 'hsl(330 26% 45%)' }} />
+                <Bell className="w-4 h-4 text-primary animate-bell-ring flex-shrink-0" style={{ color: 'hsl(330 26% 45%)', fill: 'hsl(330 26% 45%)' }} />
                 <div className="flex-1 min-w-0">
                   <p className="font-sans font-medium text-sm text-foreground">
                     {reminder.title}

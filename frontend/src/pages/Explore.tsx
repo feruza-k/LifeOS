@@ -194,6 +194,7 @@ const Explore = () => {
     weeklySummary,
     loading,
     reloadPhotos,
+    reloadData,
   } = useExploreData();
 
   // Get all goals from month_goals array, fallback to month_focus for backward compatibility
@@ -548,7 +549,7 @@ const Explore = () => {
       )}
 
       {/* Analytics: Completion Rate Trends */}
-      {analyticsData && ((trendView === "weekly" && analyticsData.weekly_trends && analyticsData.weekly_trends.length > 0) || (trendView === "monthly" && analyticsData.monthly_trends && analyticsData.monthly_trends.length > 0)) && (
+      {analyticsData && ((trendView === "weekly" && analyticsData.weekly_trends && Array.isArray(analyticsData.weekly_trends) && analyticsData.weekly_trends.length > 0) || (trendView === "monthly" && analyticsData.monthly_trends && Array.isArray(analyticsData.monthly_trends) && analyticsData.monthly_trends.length > 0)) && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.05s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center justify-between mb-4">
@@ -807,7 +808,7 @@ const Explore = () => {
       )}
 
       {/* Goal Progress - Task Connections */}
-      {analyticsData && analyticsData.goal_task_connections && analyticsData.goal_task_connections.length > 0 && (
+      {analyticsData && analyticsData.goal_task_connections && Array.isArray(analyticsData.goal_task_connections) && analyticsData.goal_task_connections.length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-4">
@@ -849,7 +850,7 @@ const Explore = () => {
       )}
 
       {/* Category distribution as proxy for value alignment */}
-      {alignData && alignData.value_alignment && Object.keys(alignData.value_alignment).length > 0 && (
+      {alignData && alignData.value_alignment && typeof alignData.value_alignment === 'object' && Object.keys(alignData.value_alignment).length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-3">
@@ -964,7 +965,7 @@ const Explore = () => {
       )}
 
       {/* Analytics: Category Drift Detection */}
-      {analyticsData && analyticsData.drift_analysis && analyticsData.drift_analysis.drift_indicators && Object.keys(analyticsData.drift_analysis.drift_indicators).length > 0 && (
+      {analyticsData && analyticsData.drift_analysis && analyticsData.drift_analysis.drift_indicators && typeof analyticsData.drift_analysis.drift_indicators === 'object' && Object.keys(analyticsData.drift_analysis.drift_indicators).length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.45s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50 border-amber-500/30">
             <div className="flex items-center gap-2 mb-3">

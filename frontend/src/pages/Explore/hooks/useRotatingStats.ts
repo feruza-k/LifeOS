@@ -26,13 +26,22 @@ export function useRotatingStats({
   if (hasProductivity) availableViews.push("productivity");
   if (hasHabits) availableViews.push("habits");
 
+  // Set initial view to first available view
+  useEffect(() => {
+    const views: StatsView[] = [];
+    if (hasCategoryBalance) views.push("category");
+    if (hasEnergyPatterns) views.push("energy");
+    if (hasProductivity) views.push("productivity");
+    if (hasHabits) views.push("habits");
+    
+    if (views.length > 0 && !views.includes(currentStatsView)) {
+      setCurrentStatsView(views[0]);
+    }
+  }, [hasCategoryBalance, hasEnergyPatterns, hasProductivity, hasHabits, currentStatsView]);
+
   // Auto-rotate stats view every 10 seconds
   useEffect(() => {
     if (availableViews.length > 1) {
-      // Set initial view to first available
-      if (!availableViews.includes(currentStatsView)) {
-        setCurrentStatsView(availableViews[0]);
-      }
       
       statsRotateTimerRef.current = setInterval(() => {
         setCurrentStatsView((prev) => {
