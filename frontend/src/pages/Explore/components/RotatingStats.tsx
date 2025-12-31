@@ -142,7 +142,7 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           handleSwipeEnd(endX);
         }}
       >
-        {/* Category Balance View */}
+        {/* Render the current view - ensure it always shows when available */}
         {currentStatsView === "category" && hasCategoryBalance && analyticsData?.category_balance && (
           <CategoryBalanceView 
             categoryBalance={analyticsData.category_balance} 
@@ -150,7 +150,6 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           />
         )}
 
-        {/* Energy/Load Patterns View */}
         {currentStatsView === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
           <EnergyPatternsView 
             energyPatterns={analyticsData.energy_patterns}
@@ -158,7 +157,6 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           />
         )}
 
-        {/* Productivity Insights View */}
         {currentStatsView === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
           <ProductivityInsightsView 
             productivityInsights={analyticsData.productivity_insights}
@@ -167,38 +165,8 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           />
         )}
 
-        {/* Habit Reinforcement View */}
         {currentStatsView === "habits" && hasHabits && habitReinforcement && (
           <HabitFocusView habitReinforcement={habitReinforcement} />
-        )}
-
-        {/* Fallback if current view doesn't match any available data */}
-        {availableViews.length > 0 && !availableViews.includes(currentStatsView) && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            <div>Loading view...</div>
-            <div className="text-xs mt-2">Available: {availableViews.join(", ")}</div>
-            <div className="text-xs mt-1">Current: {currentStatsView}</div>
-          </div>
-        )}
-
-        {/* Debug: Show if no view is rendering (only in dev) */}
-        {import.meta.env.DEV && availableViews.length > 0 && (
-          (currentStatsView === "category" && !hasCategoryBalance) ||
-          (currentStatsView === "energy" && !hasEnergyPatterns) ||
-          (currentStatsView === "productivity" && !hasProductivity) ||
-          (currentStatsView === "habits" && !hasHabits)
-        ) && (
-          <div className="text-center py-8 text-muted-foreground text-sm border border-amber-500/30 bg-amber-500/5 rounded-lg p-4">
-            <div className="font-semibold">⚠️ View data mismatch</div>
-            <div className="text-xs mt-2">Current view: {currentStatsView}</div>
-            <div className="text-xs mt-1">Available views: {availableViews.join(", ")}</div>
-            <div className="text-xs mt-1">
-              Has data: category={hasCategoryBalance ? "✓" : "✗"}, 
-              energy={hasEnergyPatterns ? "✓" : "✗"}, 
-              productivity={hasProductivity ? "✓" : "✗"}, 
-              habits={hasHabits ? "✓" : "✗"}
-            </div>
-          </div>
         )}
 
         {/* Navigation dots - Always show if there are multiple views */}
@@ -225,14 +193,6 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           </div>
         )}
 
-        {/* Show navigation even with single view in dev mode for debugging */}
-        {import.meta.env.DEV && availableViews.length === 1 && (
-          <div className="flex items-center justify-center gap-1.5 mt-4 pt-4 border-t border-border/50">
-            <div className="text-xs text-muted-foreground">
-              Single view: {availableViews[0]}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
