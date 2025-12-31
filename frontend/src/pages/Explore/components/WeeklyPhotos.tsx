@@ -1,5 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { Image } from "lucide-react";
+import { api } from "@/lib/api";
 
 interface Photo {
   date: string;
@@ -24,33 +25,60 @@ export function WeeklyPhotos({
   onReload,
 }: WeeklyPhotosProps) {
   const currentPhoto = photos[currentIndex];
+  const photoUrl = currentPhoto ? api.getPhotoUrl(currentPhoto.filename) : null;
 
   return (
     <div className="grid gap-3 grid-cols-2">
       {/* Photo Album */}
       <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-        {currentPhoto && (
-          <img
-            key={`${currentPhoto.filename}-${currentPhoto.date}-${currentIndex}`}
-            src={`${currentPhoto.url}?t=${Date.now()}&date=${currentPhoto.date}`}
-            alt={`Weekly photo from ${format(parseISO(currentPhoto.date), "MMM d")}`}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              const baseUrl = currentPhoto.url.split('?')[0];
-              if (target.src !== baseUrl) {
-                target.src = `${baseUrl}?date=${currentPhoto.date}`;
-              } else {
-                // Reload photos after a short delay
-                setTimeout(() => {
-                  onReload();
-                }, 1000);
-              }
-            }}
-          />
+        {currentPhoto && photoUrl ? (
+          <>
+            <img
+              key={`${currentPhoto.filename}-${currentPhoto.date}-${currentIndex}`}
+              src={`${photoUrl}?t=${Date.now()}&date=${currentPhoto.date}`}
+              alt={`Weekly photo from ${format(parseISO(currentPhoto.date), "MMM d")}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                // Try without cache-busting first
+                if (target.src.includes('?t=')) {
+                  target.src = `${photoUrl}?date=${currentPhoto.date}`;
+                } else if (target.src !== photoUrl) {
+                  // Try just the base URL
+                  target.src = photoUrl;
+                } else {
+                  // If all fails, show placeholder
+                  target.style.display = 'none';
+                  const placeholder = target.parentElement?.querySelector('.image-placeholder') as HTMLElement;
+                  if (placeholder) {
+                    placeholder.style.display = 'flex';
+                  }
+                  // Reload photos after a delay
+                  setTimeout(() => {
+                    onReload();
+                  }, 2000);
+                }
+              }}
+              onLoad={(e) => {
+                // Hide placeholder when image loads
+                const target = e.target as HTMLImageElement;
+                const placeholder = target.parentElement?.querySelector('.image-placeholder') as HTMLElement;
+                if (placeholder) {
+                  placeholder.style.display = 'none';
+                }
+              }}
+            />
+            <div className="image-placeholder hidden absolute inset-0 bg-muted/50 flex items-center justify-center">
+              <Image className="w-12 h-12 text-muted-foreground/40" />
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+            <Image className="w-12 h-12 text-muted-foreground/40" />
+          </div>
         )}
         {photos.length > 1 && (
-          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
             {photos.map((_, index) => (
               <button
                 key={index}
@@ -65,11 +93,11 @@ export function WeeklyPhotos({
         )}
       </div>
       
-      {/* Reflection Note */}
-      <div className="relative aspect-square flex items-center justify-center">
+      {/* Reflection Note - Top Middle */}
+      <div className="relative aspect-square flex items-start justify-center pt-6">
         {currentPhoto?.note ? (
           <p 
-            className="text-sm text-foreground font-handwriting italic leading-relaxed text-center px-3" 
+            className="text-base text-foreground font-handwriting italic leading-relaxed text-center px-4" 
             style={{ fontFamily: "'Dancing Script', 'Kalam', cursive" }}
           >
             {displayedNote}
@@ -79,7 +107,7 @@ export function WeeklyPhotos({
           </p>
         ) : (
           <p 
-            className="text-sm text-muted-foreground font-handwriting italic leading-relaxed text-center px-3" 
+            className="text-base text-muted-foreground font-handwriting italic leading-relaxed text-center px-4" 
             style={{ fontFamily: "'Dancing Script', 'Kalam', cursive" }}
           >
             No reflection for this moment

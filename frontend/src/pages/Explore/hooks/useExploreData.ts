@@ -3,6 +3,8 @@ import { api } from "@/lib/api";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
+// Import api.getPhotoUrl for photo URL construction
+
 interface AlignData {
   direction: {
     narrative: string;
@@ -122,9 +124,12 @@ export function useExploreData() {
           const note = await api.getNote(dateStr);
           if (note) {
             let photoData = null;
+            // Check for photo in new format first
             if (note.photo && typeof note.photo === 'object' && note.photo.filename) {
               photoData = note.photo;
-            } else if (note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
+            } 
+            // Fallback to old photos array format
+            else if (note.photos && Array.isArray(note.photos) && note.photos.length > 0) {
               photoData = note.photos[0];
             }
             
@@ -132,13 +137,13 @@ export function useExploreData() {
               photosWithNotes.push({
                 date: dateStr,
                 filename: photoData.filename,
-                url: `${import.meta.env.VITE_API_URL || 'https://api.mylifeos.dev'}/photos/${photoData.filename}`,
+                url: api.getPhotoUrl(photoData.filename),
                 note: note.content && note.content.trim() ? note.content.trim() : undefined
               });
             }
           }
         } catch (error) {
-          // No note found for this day, skip
+          // No note found for this day, skip silently
         }
       }
       
@@ -206,6 +211,10 @@ export function useExploreData() {
     };
   }, []);
 
+  const reloadData = async () => {
+    await loadData();
+  };
+
   return {
     alignData,
     analyticsData,
@@ -214,6 +223,7 @@ export function useExploreData() {
     weeklySummary,
     loading,
     reloadPhotos: loadWeeklyPhotosAndReflections,
+    reloadData,
   };
 }
 
