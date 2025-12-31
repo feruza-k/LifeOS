@@ -578,7 +578,26 @@ const Explore = () => {
       )}
 
       {/* Analytics: Completion Rate Trends */}
-      {analyticsData && ((trendView === "weekly" && analyticsData.weekly_trends && Array.isArray(analyticsData.weekly_trends) && analyticsData.weekly_trends.length > 0) || (trendView === "monthly" && analyticsData.monthly_trends && Array.isArray(analyticsData.monthly_trends) && analyticsData.monthly_trends.length > 0)) && (
+      {(() => {
+        // Debug logging
+        if (import.meta.env.DEV) {
+          console.log('[Explore] Completion Trends check:', {
+            hasAnalyticsData: !!analyticsData,
+            weeklyTrends: analyticsData?.weekly_trends,
+            monthlyTrends: analyticsData?.monthly_trends,
+            weeklyLength: analyticsData?.weekly_trends?.length,
+            monthlyLength: analyticsData?.monthly_trends?.length,
+            weeklyIsArray: Array.isArray(analyticsData?.weekly_trends),
+            monthlyIsArray: Array.isArray(analyticsData?.monthly_trends),
+            trendView
+          });
+        }
+        
+        const hasWeekly = analyticsData?.weekly_trends && Array.isArray(analyticsData.weekly_trends) && analyticsData.weekly_trends.length > 0;
+        const hasMonthly = analyticsData?.monthly_trends && Array.isArray(analyticsData.monthly_trends) && analyticsData.monthly_trends.length > 0;
+        
+        return analyticsData && (hasWeekly || hasMonthly);
+      })() && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.05s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center justify-between mb-4">
@@ -616,10 +635,34 @@ const Explore = () => {
               </div>
             {/* Line Chart Visualization */}
             {(() => {
-              const trends = trendView === "weekly" 
-                ? (analyticsData.weekly_trends || []).slice(-4)
-                : (analyticsData.monthly_trends || []).slice(-6);
-              const maxValue = trends.length > 0 ? Math.max(...trends.map(t => t.completion_rate), 1) : 1;
+              // Determine which trends to use - prefer the selected view, but fallback to available data
+              let trends: Array<any> = [];
+              let effectiveView: "weekly" | "monthly" = trendView;
+              
+              if (trendView === "weekly" && analyticsData.weekly_trends && analyticsData.weekly_trends.length > 0) {
+                trends = analyticsData.weekly_trends.slice(-4);
+                effectiveView = "weekly";
+              } else if (trendView === "monthly" && analyticsData.monthly_trends && analyticsData.monthly_trends.length > 0) {
+                trends = analyticsData.monthly_trends.slice(-6);
+                effectiveView = "monthly";
+              } else if (analyticsData.weekly_trends && analyticsData.weekly_trends.length > 0) {
+                // Fallback to weekly if monthly not available
+                trends = analyticsData.weekly_trends.slice(-4);
+                effectiveView = "weekly";
+              } else if (analyticsData.monthly_trends && analyticsData.monthly_trends.length > 0) {
+                // Fallback to monthly if weekly not available
+                trends = analyticsData.monthly_trends.slice(-6);
+                effectiveView = "monthly";
+              }
+              
+              if (trends.length === 0) {
+                return (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No trend data available yet
+                  </div>
+                );
+              }
+              const maxValue = trends.length > 0 ? Math.max(...trends.map(t => t.completion_rate || 0), 1) : 1;
               const width = 300;
               const height = 100;
               const step = trends.length > 1 ? width / (trends.length - 1) : width;
@@ -653,7 +696,7 @@ const Explore = () => {
                           let path = `M 0 ${height}`;
                           trends.forEach((point, index) => {
                             const x = index * step;
-                            const y = height - (point.completion_rate / maxValue) * height;
+                            const y = height - ((point.completion_rate || 0) / maxValue) * height;
                             path += index === 0 ? ` L ${x} ${y}` : ` L ${x} ${y}`;
                           });
                           path += ` L ${width} ${height} Z`;
@@ -665,7 +708,7 @@ const Explore = () => {
                       <polyline
                         points={trends.map((point, index) => {
                           const x = index * step;
-                          const y = height - (point.completion_rate / maxValue) * height;
+                          const y = height - ((point.completion_rate || 0) / maxValue) * height;
                           return `${x},${y}`;
                         }).join(' ')}
                         fill="none"
@@ -677,7 +720,7 @@ const Explore = () => {
                       {/* Data points */}
                       {trends.map((point, index) => {
                         const x = index * step;
-                        const y = height - (point.completion_rate / maxValue) * height;
+                        const y = height - ((point.completion_rate || 0) / maxValue) * height;
                         return (
                           <circle
                             key={index}
@@ -695,12 +738,12 @@ const Explore = () => {
                   {/* Labels and values */}
                   <div className="flex justify-between items-end text-xs">
                     {trends.map((point, index) => {
-                      const dateStr = trendView === "weekly" ? point.week_start : point.month;
-                      const date = trendView === "weekly" 
+                      const dateStr = effectiveView === "weekly" ? point.week_start : point.month;
+                      const date = effectiveView === "weekly" 
                         ? parseISO(dateStr)
                         : parseISO(`${dateStr}-01`);
-                      const completionRate = Math.round(point.completion_rate * 100);
-                      const label = trendView === "weekly"
+                      const completionRate = Math.round((point.completion_rate || 0) * 100);
+                      const label = effectiveView === "weekly"
                         ? format(date, "MMM d")
                         : format(date, "MMM");
                       return (

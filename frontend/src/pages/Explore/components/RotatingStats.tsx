@@ -64,13 +64,22 @@ interface RotatingStatsProps {
 export function RotatingStats({ analyticsData, habitReinforcement }: RotatingStatsProps) {
   const statsCarouselRef = useRef<HTMLDivElement>(null);
 
-  const hasCategoryBalance = analyticsData?.category_balance?.distribution && 
+  // More lenient checks - allow data even if some fields are missing
+  const hasCategoryBalance = analyticsData?.category_balance && 
+    analyticsData.category_balance.distribution &&
     typeof analyticsData.category_balance.distribution === 'object' &&
-    Object.keys(analyticsData.category_balance.distribution).length > 0;
-  const hasEnergyPatterns = analyticsData?.energy_patterns?.weekly_patterns && 
+    Object.keys(analyticsData.category_balance.distribution).length > 0 &&
+    Object.values(analyticsData.category_balance.distribution).some((v: any) => v > 0);
+  
+  const hasEnergyPatterns = analyticsData?.energy_patterns && 
+    analyticsData.energy_patterns.weekly_patterns &&
     Array.isArray(analyticsData.energy_patterns.weekly_patterns) &&
     analyticsData.energy_patterns.weekly_patterns.length > 0;
-  const hasProductivity = !!analyticsData?.productivity_insights;
+  
+  const hasProductivity = analyticsData?.productivity_insights && 
+    (analyticsData.productivity_insights.completion_rate !== undefined ||
+     analyticsData.productivity_insights.best_times?.length > 0 ||
+     analyticsData.productivity_insights.best_day !== null);
 
   const {
     currentStatsView,
@@ -100,7 +109,8 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
       productivityInsights: analyticsData?.productivity_insights,
       currentStatsView,
       availableViews,
-      analyticsData: analyticsData ? Object.keys(analyticsData) : null
+      analyticsData: analyticsData ? Object.keys(analyticsData) : null,
+      fullAnalyticsData: analyticsData
     });
   }
 

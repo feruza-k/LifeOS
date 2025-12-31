@@ -43,6 +43,21 @@ interface AlignData {
 }
 
 interface AnalyticsData {
+  weekly_trends?: Array<{
+    week_start: string;
+    week_end: string;
+    tasks_planned: number;
+    tasks_completed: number;
+    completion_rate: number;
+    categories: Record<string, number>;
+  }>;
+  monthly_trends?: Array<{
+    month: string;
+    tasks_planned: number;
+    tasks_completed: number;
+    completion_rate: number;
+    categories: Record<string, number>;
+  }>;
   category_balance?: {
     distribution: Record<string, number>;
     score: number;
@@ -165,14 +180,35 @@ export function useExploreData() {
       // Load main data and photos in parallel for faster loading
       const [summary, analytics, habitData, weeklySummaryData] = await Promise.all([
         api.getAlignSummary(),
-        api.getAlignAnalytics().catch(() => null),
-        api.getHabitReinforcement().catch(() => null),
-        api.getWeeklyReflectionSummary().catch(() => null)
+        api.getAlignAnalytics().catch((error) => {
+          console.error('[useExploreData] Failed to load analytics:', error);
+          return null;
+        }),
+        api.getHabitReinforcement().catch((error) => {
+          console.error('[useExploreData] Failed to load habit reinforcement:', error);
+          return null;
+        }),
+        api.getWeeklyReflectionSummary().catch((error) => {
+          console.error('[useExploreData] Failed to load weekly summary:', error);
+          return null;
+        })
       ]);
       
       setAlignData(summary);
       setAnalyticsData(analytics);
       setHabitReinforcement(habitData);
+      
+      // Debug: Log analytics data structure
+      if (import.meta.env.DEV) {
+        console.log('[useExploreData] Analytics data received:', {
+          hasData: !!analytics,
+          keys: analytics ? Object.keys(analytics) : [],
+          categoryBalance: analytics?.category_balance,
+          energyPatterns: analytics?.energy_patterns,
+          productivityInsights: analytics?.productivity_insights,
+          fullData: analytics
+        });
+      }
       
       if (weeklySummaryData?.summary) {
         setWeeklySummary(weeklySummaryData.summary);

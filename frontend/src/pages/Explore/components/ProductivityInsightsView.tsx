@@ -18,6 +18,23 @@ interface ProductivityInsightsViewProps {
 }
 
 export function ProductivityInsightsView({ productivityInsights, consistency }: ProductivityInsightsViewProps) {
+  // Safety check - if completion_rate is not available, show placeholder
+  if (!productivityInsights || productivityInsights.completion_rate === undefined || productivityInsights.completion_rate === null) {
+    return (
+      <>
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+            Productivity Insights
+          </h3>
+        </div>
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          Productivity data will appear as you complete tasks
+        </div>
+      </>
+    );
+  }
+  
   return (
     <>
       <div className="flex items-center gap-2 mb-4">
