@@ -18,18 +18,18 @@ export function useRotatingStats({
   const statsRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [statsSwipeStart, setStatsSwipeStart] = useState<number | null>(null);
 
-  // Build available views array
+  // Build available views array - Productivity first
   const availableViews: StatsView[] = [];
-  if (hasCategoryBalance) availableViews.push("category");
-  if (hasEnergyPatterns) availableViews.push("energy");
   if (hasProductivity) availableViews.push("productivity");
+  if (hasEnergyPatterns) availableViews.push("energy");
+  if (hasCategoryBalance) availableViews.push("category");
   if (hasHabits) availableViews.push("habits");
 
-  // Initialize currentStatsView - use first available view, or category as fallback
+  // Initialize currentStatsView - use first available view (productivity first), or category as fallback
   const [currentStatsView, setCurrentStatsView] = useState<StatsView>(() => {
-    if (hasCategoryBalance) return "category";
-    if (hasEnergyPatterns) return "energy";
     if (hasProductivity) return "productivity";
+    if (hasEnergyPatterns) return "energy";
+    if (hasCategoryBalance) return "category";
     if (hasHabits) return "habits";
     return "category"; // Fallback
   });

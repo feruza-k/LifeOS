@@ -370,63 +370,10 @@ const Explore = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pb-24">
-        <p className="text-xs font-sans font-medium text-muted-foreground tracking-widest uppercase text-center pt-4 pb-2">
-          LifeOS, powered by SolAI
-        </p>
-        
-        <header className="px-6 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-sans font-bold text-foreground">Explore</h1>
-            </div>
-            <Compass className="w-7 h-7 text-primary" />
-          </div>
-          <p className="text-muted-foreground font-sans text-sm mt-2">
-            Strategic reflection and alignment
-          </p>
-        </header>
-        
-        <div className="px-4 py-4">
-          {/* Loading indicator */}
-          <div className="flex items-center justify-center py-8 mb-6">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-muted-foreground font-sans">Loading Explore page...</p>
-            </div>
-          </div>
-          
-          {/* Header skeleton */}
-          <div className="flex items-center justify-between mb-6">
-            <Skeleton className="h-8 w-32" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-          </div>
-          
-          {/* Weekly Summary skeleton */}
-          <SkeletonCard className="mb-6" />
-          
-          {/* Rotating stats skeleton */}
-          <div className="bg-card rounded-xl p-6 mb-6 border border-border">
-            <Skeleton className="h-6 w-48 mb-4" />
-            <Skeleton className="h-64 w-full mb-4" />
-            <div className="flex gap-2 justify-center">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-2 w-2 rounded-full" />
-              ))}
-            </div>
-          </div>
-          
-          {/* Focus section skeleton */}
-          <div className="bg-card rounded-xl p-6 mb-6 border border-border">
-            <Skeleton className="h-6 w-32 mb-4" />
-            <SkeletonText lines={3} />
-          </div>
-          
-          {/* Goal Progress skeleton */}
-          <div className="bg-card rounded-xl p-6 mb-6 border border-border">
-            <Skeleton className="h-6 w-40 mb-4" />
-            <SkeletonList count={3} />
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground font-sans">Loading Explore page...</p>
         </div>
       </div>
     );

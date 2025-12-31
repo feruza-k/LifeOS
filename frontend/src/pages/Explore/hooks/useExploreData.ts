@@ -177,7 +177,7 @@ export function useExploreData() {
     try {
       setLoading(true);
       
-      // Load main data and photos in parallel for faster loading
+      // Load main data first - show page as soon as this is ready
       const [summary, analytics, habitData, weeklySummaryData] = await Promise.all([
         api.getAlignSummary(),
         api.getAlignAnalytics().catch((error) => {
@@ -214,12 +214,16 @@ export function useExploreData() {
         setWeeklySummary(weeklySummaryData.summary);
       }
       
-      // Load photos in parallel (they're already optimized to load in parallel)
-      await loadWeeklyPhotosAndReflections();
+      // Stop loading state immediately - show page content
+      setLoading(false);
+      
+      // Load photos in background (non-blocking)
+      loadWeeklyPhotosAndReflections().catch(() => {
+        // Silently fail - photos are optional
+      });
     } catch (error) {
       console.error("Failed to load align data:", error);
       toast.error("Failed to load alignment data");
-    } finally {
       setLoading(false);
     }
   };
