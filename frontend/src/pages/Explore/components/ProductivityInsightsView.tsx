@@ -99,8 +99,8 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
       <div className="mb-6">
         <div className="grid grid-cols-2 gap-3">
           {/* Best Day */}
-          <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="p-3 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
+            <div className="flex items-center gap-2 mb-1.5">
               <div className="p-1.5 bg-primary/20 rounded-lg">
                 <Calendar className="w-3.5 h-3.5 text-primary" />
               </div>
@@ -108,7 +108,7 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
             </div>
             {productivityInsights.best_day ? (
               <>
-                <div className="text-xl font-sans font-bold text-foreground mb-1">
+                <div className="text-lg font-sans font-bold text-foreground mb-0.5">
                   {productivityInsights.best_day.day}
                 </div>
                 <div className="text-xs font-sans text-muted-foreground">
@@ -116,15 +116,15 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
                 </div>
               </>
             ) : (
-              <div className="text-lg font-sans font-medium text-muted-foreground">
+              <div className="text-sm font-sans font-medium text-muted-foreground">
                 No data yet
               </div>
             )}
           </div>
 
           {/* Check-ins */}
-          <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="p-3 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
+            <div className="flex items-center gap-2 mb-1.5">
               <div className="p-1.5 bg-primary/20 rounded-lg">
                 <Activity className="w-3.5 h-3.5 text-primary" />
               </div>
@@ -132,7 +132,7 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
             </div>
             {consistency ? (
               <>
-                <div className="text-xl font-sans font-bold text-foreground mb-1">
+                <div className="text-lg font-sans font-bold text-foreground mb-0.5">
                   {checkInRate}%
                 </div>
                 <div className="text-xs font-sans text-muted-foreground">
@@ -140,7 +140,7 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
                 </div>
               </>
             ) : (
-              <div className="text-lg font-sans font-medium text-muted-foreground">
+              <div className="text-sm font-sans font-medium text-muted-foreground">
                 No data yet
               </div>
             )}
@@ -148,22 +148,22 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
         </div>
       </div>
 
-      {/* Peak Focus Times - Visual Timeline */}
+      {/* Peak Focus Times - Compact Design */}
       {productivityInsights.best_times.length > 0 && (
-        <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="p-3 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
+          <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-primary/20 rounded-lg">
               <Clock className="w-3.5 h-3.5 text-primary" />
             </div>
             <span className="text-[10px] font-sans font-medium text-muted-foreground uppercase">Peak Focus Times</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {productivityInsights.best_times.slice(0, 4).map((time, index) => (
+          <div className="flex flex-wrap gap-1.5">
+            {productivityInsights.best_times.slice(0, 3).map((time, index) => (
               <div
                 key={index}
-                className="px-3 py-1.5 bg-primary/15 rounded-lg border border-primary/25 backdrop-blur-sm"
+                className="px-2.5 py-1 bg-primary/15 rounded-md border border-primary/20"
               >
-                <span className="text-sm font-sans font-semibold text-foreground">{time}</span>
+                <span className="text-xs font-sans font-medium text-foreground">{time}</span>
               </div>
             ))}
           </div>
