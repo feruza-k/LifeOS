@@ -775,9 +775,50 @@ const Explore = () => {
         </div>
       )}
 
+      {/* Goal Progress - Task Connections */}
+      {analyticsData && analyticsData.goal_task_connections && analyticsData.goal_task_connections.length > 0 && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.15s" }}>
+          <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                Goal Progress
+              </h3>
+            </div>
+            <div className="space-y-4">
+              {analyticsData.goal_task_connections.map((connection) => (
+                <div key={connection.goal_id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-sans font-medium text-foreground">
+                      {connection.goal_title}
+                    </h4>
+                    <span className="text-xs text-muted-foreground font-sans">
+                      {connection.total_matches} match{connection.total_matches !== 1 ? "es" : ""}
+                    </span>
+                  </div>
+                  {connection.recent_tasks && connection.recent_tasks.length > 0 && (
+                    <div className="space-y-1 pl-2 border-l-2 border-primary/20">
+                      {connection.recent_tasks.slice(0, 3).map((task, idx) => (
+                        <div key={idx} className="text-xs text-muted-foreground font-sans">
+                          • {task.title}
+                        </div>
+                      ))}
+                      {connection.recent_tasks.length > 3 && (
+                        <div className="text-xs text-muted-foreground/60 font-sans italic">
+                          +{connection.recent_tasks.length - 3} more
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category distribution as proxy for value alignment */}
-      {Object.keys(alignData.value_alignment).length > 0 && (
+      {alignData && alignData.value_alignment && Object.keys(alignData.value_alignment).length > 0 && (
         <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <div className="p-5 bg-card rounded-2xl shadow-soft border border-border/50">
             <div className="flex items-center gap-2 mb-3">
@@ -817,13 +858,15 @@ const Explore = () => {
       )}
 
       {/* Simple progress line */}
-      <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.25s" }}>
-        <div className="p-4 bg-card rounded-2xl shadow-soft border border-border/50">
-          <p className="text-sm text-foreground font-sans text-center">
-            {alignData.progress}
-          </p>
+      {alignData && alignData.progress && (
+        <div className="px-4 py-3 animate-slide-up" style={{ animationDelay: "0.25s" }}>
+          <div className="p-4 bg-card rounded-2xl shadow-soft border border-border/50">
+            <p className="text-sm text-foreground font-sans text-center">
+              {alignData.progress}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
 
 
