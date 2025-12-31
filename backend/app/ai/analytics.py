@@ -208,13 +208,35 @@ def calculate_monthly_trends(tasks: List[Dict[str, Any]], checkins: List[Dict[st
     
     for i in range(months - 1, -1, -1):  # Go back N months, starting from oldest
         # Calculate month date by going back i months from today
+        # Use a safer method that handles edge cases (e.g., Jan 31 -> Feb doesn't have 31 days)
         month_date = today
         for _ in range(i):
-            # Go back one month
+            # Go back one month - handle edge cases where day doesn't exist in target month
             if month_date.month == 1:
-                month_date = date(month_date.year - 1, 12, month_date.day)
+                # Going from January to December of previous year
+                try:
+                    month_date = date(month_date.year - 1, 12, month_date.day)
+                except ValueError:
+                    # Day doesn't exist in December (shouldn't happen, but be safe)
+                    month_date = date(month_date.year - 1, 12, 31)
             else:
-                month_date = date(month_date.year, month_date.month - 1, month_date.day)
+                # Going to previous month in same year
+                try:
+                    month_date = date(month_date.year, month_date.month - 1, month_date.day)
+                except ValueError:
+                    # Day doesn't exist in target month (e.g., March 31 -> February 31 doesn't exist)
+                    # Use last day of target month instead
+                    target_month = month_date.month - 1
+                    if target_month == 2:  # February
+                        # Check if it's a leap year
+                        if month_date.year % 4 == 0 and (month_date.year % 100 != 0 or month_date.year % 400 == 0):
+                            month_date = date(month_date.year, 2, 29)
+                        else:
+                            month_date = date(month_date.year, 2, 28)
+                    elif target_month in [4, 6, 9, 11]:  # Months with 30 days
+                        month_date = date(month_date.year, target_month, 30)
+                    else:  # Months with 31 days
+                        month_date = date(month_date.year, target_month, 31)
         
         month_start, month_end = get_month_boundaries(month_date)
         month_metrics = calculate_month_metrics(tasks, checkins, month_start, month_end)
@@ -372,10 +394,18 @@ def calculate_consistency_metrics(checkins: List[Dict[str, Any]], days_back: int
     today = datetime.now(tz).date()
     cutoff_date = today - timedelta(days=days_back)
     
-    recent_checkins = [
-        c for c in checkins
-        if c.get("date") and date.fromisoformat(c["date"][:10]) >= cutoff_date
-    ]
+    # Safely parse dates - skip invalid dates
+    recent_checkins = []
+    for c in checkins:
+        checkin_date_str = c.get("date")
+        if checkin_date_str:
+            try:
+                checkin_date = date.fromisoformat(checkin_date_str[:10])
+                if checkin_date >= cutoff_date:
+                    recent_checkins.append(c)
+            except (ValueError, TypeError):
+                # Skip invalid dates
+                continue
     
     if not recent_checkins:
         return {

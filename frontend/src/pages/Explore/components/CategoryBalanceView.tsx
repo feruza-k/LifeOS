@@ -60,13 +60,13 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
 
       {/* Pie Chart Visualization */}
       <div className="mb-6 flex items-center justify-center">
-        <div className="relative">
+        <div className="relative" style={{ width: '200px', height: '200px' }}>
           <svg 
             width="200" 
             height="200" 
             viewBox="0 0 200 200" 
             className="transform -rotate-90"
-            style={{ display: 'block', width: '200px', height: '200px' }}
+            style={{ display: 'block', width: '100%', height: '100%' }}
             xmlns="http://www.w3.org/2000/svg"
           >
             {/* Background circle */}
@@ -151,7 +151,7 @@ export function CategoryBalanceView({ categoryBalance }: CategoryBalanceViewProp
               });
             })()}
           </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
             <span className="text-2xl font-sans font-bold text-foreground">
               {Math.round(categoryBalance.score * 100)}%
             </span>

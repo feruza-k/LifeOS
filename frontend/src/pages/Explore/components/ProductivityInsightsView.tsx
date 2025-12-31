@@ -47,11 +47,11 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
       {/* Overall Completion - Large Visual Metric */}
       <div className="mb-6">
         <div className="flex items-center justify-center mb-3">
-          <div className="relative w-32 h-32">
+          <div className="relative" style={{ width: '128px', height: '128px' }}>
             <svg 
-              className="transform -rotate-90 w-32 h-32" 
+              className="transform -rotate-90" 
               viewBox="0 0 100 100"
-              style={{ display: 'block', width: '128px', height: '128px' }}
+              style={{ display: 'block', width: '100%', height: '100%' }}
               xmlns="http://www.w3.org/2000/svg"
             >
               <circle
@@ -75,7 +75,7 @@ export function ProductivityInsightsView({ productivityInsights, consistency }: 
                 strokeLinecap="round"
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
               <span className="text-2xl font-sans font-bold text-foreground">
                 {Math.round(productivityInsights.completion_rate * 100)}%
               </span>

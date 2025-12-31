@@ -3095,35 +3095,37 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
     Returns: historical trends, week/month comparisons, completion rates, category analysis, energy patterns.
     """
     from datetime import datetime, timedelta, date
-    from app.ai.analytics import (
-        calculate_completion_trends,
-        calculate_monthly_trends,
-        compare_weeks,
-        compare_months,
-        detect_category_drift,
-        calculate_consistency_metrics,
-        calculate_energy_patterns,
-        get_week_boundaries
-    )
-    from app.ai.intelligent_assistant import get_user_context
-    from app.logic.week_engine import get_week_stats
-    from collections import defaultdict
-    
     from app.utils.timezone import get_timezone_from_request
     
+    # Get timezone and current month outside try block for error handling
     tz = get_timezone_from_request(request)
     today = datetime.now(tz)
     current_month = today.strftime("%Y-%m")
     
-    # Get user's historical data
-    user_context = await get_user_context(current_user["id"])
-    historical = user_context.get("historical", {})
-    
-    all_tasks = historical.get("all_tasks", [])
-    checkins = historical.get("checkins", [])
-    
-    # Calculate completion trends (last 4 weeks)
-    weekly_trends = calculate_completion_trends(all_tasks, checkins, weeks=4)
+    try:
+        from app.ai.analytics import (
+            calculate_completion_trends,
+            calculate_monthly_trends,
+            compare_weeks,
+            compare_months,
+            detect_category_drift,
+            calculate_consistency_metrics,
+            calculate_energy_patterns,
+            get_week_boundaries
+        )
+        from app.ai.intelligent_assistant import get_user_context
+        from app.logic.week_engine import get_week_stats
+        from collections import defaultdict
+        
+        # Get user's historical data
+        user_context = await get_user_context(current_user["id"])
+        historical = user_context.get("historical", {})
+        
+        all_tasks = historical.get("all_tasks", [])
+        checkins = historical.get("checkins", [])
+        
+        # Calculate completion trends (last 4 weeks)
+        weekly_trends = calculate_completion_trends(all_tasks, checkins, weeks=4)
     
     # Calculate monthly trends (last 2 months)
     monthly_trends = calculate_monthly_trends(all_tasks, checkins, months=2)
@@ -3297,11 +3299,18 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
         days_until_monday = 7  # If today is Monday, show next week
     next_week_start = today.date() + timedelta(days=days_until_monday)
     next_week_end = next_week_start + timedelta(days=6)
-    upcoming_tasks = [
-        t for t in all_tasks
-        if t.get("date") and date.fromisoformat(t["date"][:10]) >= next_week_start
-        and date.fromisoformat(t["date"][:10]) <= next_week_end
-    ]
+    # Safely parse dates - skip invalid dates
+    upcoming_tasks = []
+    for t in all_tasks:
+        task_date_str = t.get("date")
+        if task_date_str:
+            try:
+                task_date = date.fromisoformat(task_date_str[:10])
+                if next_week_start <= task_date <= next_week_end:
+                    upcoming_tasks.append(t)
+            except (ValueError, TypeError):
+                # Skip invalid dates
+                continue
     
     # Calculate upcoming week load
     upcoming_load_by_day = defaultdict(int)
@@ -3360,31 +3369,74 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
                 "action": "review_schedule"
             })
     
-    return {
-        "weekly_trends": weekly_trends,
-        "monthly_trends": monthly_trends,
-        "week_comparison": week_comparison,
-        "month_comparison": month_comparison,
-        "category_trends": dict(category_trends),
-        "drift_analysis": drift_analysis,
-        "consistency": consistency,
-        "energy_patterns": energy_patterns,
-        "category_balance": category_balance,
-        "goal_task_connections": goal_task_connections,
-        "productivity_insights": productivity_insights,
-        "upcoming_week_preview": upcoming_week_preview,
-        "quick_actions": quick_actions[:3],  # Max 3 actions
-        "current_week": {
-            "total_tasks": week_stats.get("total_tasks", 0),
-            "week_start": week_stats.get("week_start"),
-            "week_end": week_stats.get("week_end")
-        },
-        "monthly_focus": {
-            "title": monthly_focus.get("title") if monthly_focus else None,
-            "progress": monthly_focus.get("progress") if monthly_focus else None,
-            "month": current_month
+        return {
+            "weekly_trends": weekly_trends,
+            "monthly_trends": monthly_trends,
+            "week_comparison": week_comparison,
+            "month_comparison": month_comparison,
+            "category_trends": dict(category_trends),
+            "drift_analysis": drift_analysis,
+            "consistency": consistency,
+            "energy_patterns": energy_patterns,
+            "category_balance": category_balance,
+            "goal_task_connections": goal_task_connections,
+            "productivity_insights": productivity_insights,
+            "upcoming_week_preview": upcoming_week_preview,
+            "quick_actions": quick_actions[:3],  # Max 3 actions
+            "current_week": {
+                "total_tasks": week_stats.get("total_tasks", 0),
+                "week_start": week_stats.get("week_start"),
+                "week_end": week_stats.get("week_end")
+            },
+            "monthly_focus": {
+                "title": monthly_focus.get("title") if monthly_focus else None,
+                "progress": monthly_focus.get("progress") if monthly_focus else None,
+                "month": current_month
+            }
         }
-    }
+    except ValueError as e:
+        # Handle date parsing errors specifically
+        error_msg = str(e)
+        if "day is out of range" in error_msg.lower():
+            logger.error(f"[Analytics] Date parsing error: {error_msg}. This may indicate invalid date data in tasks or check-ins.")
+            # Return empty analytics instead of crashing
+            return {
+                "weekly_trends": [],
+                "monthly_trends": [],
+                "week_comparison": {"has_comparison": False},
+                "month_comparison": {"has_comparison": False},
+                "category_trends": {},
+                "drift_analysis": {"drift_indicators": {}},
+                "consistency": {
+                    "checkin_frequency": 0.0,
+                    "days_with_checkins": 0,
+                    "total_days": 30,
+                    "consistency_rate": 0.0,
+                    "current_streak": 0
+                },
+                "energy_patterns": None,
+                "category_balance": None,
+                "goal_task_connections": [],
+                "productivity_insights": None,
+                "upcoming_week_preview": None,
+                "quick_actions": [],
+                "current_week": {
+                    "total_tasks": 0,
+                    "week_start": None,
+                    "week_end": None
+                },
+                "monthly_focus": {
+                    "title": None,
+                    "progress": None,
+                    "month": current_month
+                }
+            }
+        else:
+            raise
+    except Exception as e:
+        # Log and re-raise other errors
+        logger.error(f"[Analytics] Unexpected error: {e}", exc_info=True)
+        raise
 
 @app.get("/align/habit-reinforcement")
 async def get_habit_reinforcement(current_user: dict = Depends(get_current_user)):

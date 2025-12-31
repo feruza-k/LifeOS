@@ -25,22 +25,22 @@ export function useRotatingStats({
   if (hasProductivity) availableViews.push("productivity");
   if (hasHabits) availableViews.push("habits");
 
-  // Initialize currentStatsView - start with category as default, will update when data loads
-  const [currentStatsView, setCurrentStatsView] = useState<StatsView>("category");
+  // Initialize currentStatsView - use first available view, or category as fallback
+  const [currentStatsView, setCurrentStatsView] = useState<StatsView>(() => {
+    if (hasCategoryBalance) return "category";
+    if (hasEnergyPatterns) return "energy";
+    if (hasProductivity) return "productivity";
+    if (hasHabits) return "habits";
+    return "category"; // Fallback
+  });
 
   // Update current view when available views change - this ensures we show the first available view
   useEffect(() => {
-    const views: StatsView[] = [];
-    if (hasCategoryBalance) views.push("category");
-    if (hasEnergyPatterns) views.push("energy");
-    if (hasProductivity) views.push("productivity");
-    if (hasHabits) views.push("habits");
-    
-    if (views.length > 0) {
+    if (availableViews.length > 0) {
       setCurrentStatsView((prev) => {
         // If current view is not available, switch to first available
-        if (!views.includes(prev)) {
-          return views[0];
+        if (!availableViews.includes(prev)) {
+          return availableViews[0];
         }
         return prev;
       });
@@ -123,4 +123,3 @@ export function useRotatingStats({
     handleSwipeEnd,
   };
 }
-

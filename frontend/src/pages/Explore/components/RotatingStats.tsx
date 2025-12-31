@@ -110,7 +110,10 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
       currentStatsView,
       availableViews,
       analyticsData: analyticsData ? Object.keys(analyticsData) : null,
-      fullAnalyticsData: analyticsData
+      fullAnalyticsData: analyticsData,
+      willRenderCategory: currentStatsView === "category" && hasCategoryBalance && !!analyticsData?.category_balance,
+      willRenderEnergy: currentStatsView === "energy" && hasEnergyPatterns && !!analyticsData?.energy_patterns,
+      willRenderProductivity: currentStatsView === "productivity" && hasProductivity && !!analyticsData?.productivity_insights
     });
   }
 
@@ -146,46 +149,53 @@ export function RotatingStats({ analyticsData, habitReinforcement }: RotatingSta
           handleSwipeEnd(endX);
         }}
       >
-        {/* Determine which view to actually render */}
-        {(() => {
-          // Use current view if available, otherwise use first available
-          const viewToRender = availableViews.includes(currentStatsView) 
-            ? currentStatsView 
-            : (availableViews.length > 0 ? availableViews[0] : null);
-          
-          if (!viewToRender) return null;
-          
-          // Render the determined view
-          if (viewToRender === "category" && hasCategoryBalance && analyticsData?.category_balance) {
-            return (
+        {/* Render views based on currentStatsView */}
+        {currentStatsView === "category" && hasCategoryBalance && analyticsData?.category_balance && (
+          <CategoryBalanceView 
+            categoryBalance={analyticsData.category_balance} 
+            key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
+          />
+        )}
+
+        {currentStatsView === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
+          <EnergyPatternsView 
+            energyPatterns={analyticsData.energy_patterns}
+            key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
+          />
+        )}
+
+        {currentStatsView === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
+          <ProductivityInsightsView 
+            productivityInsights={analyticsData.productivity_insights}
+            consistency={analyticsData.consistency || null}
+            key={`productivity-${analyticsData.productivity_insights.completion_rate}`}
+          />
+        )}
+        
+        {/* Fallback: if current view doesn't match, show first available */}
+        {!availableViews.includes(currentStatsView) && availableViews.length > 0 && (
+          <>
+            {availableViews[0] === "category" && hasCategoryBalance && analyticsData?.category_balance && (
               <CategoryBalanceView 
                 categoryBalance={analyticsData.category_balance} 
-                key={`category-${JSON.stringify(analyticsData.category_balance.distribution)}`}
+                key={`category-fallback-${JSON.stringify(analyticsData.category_balance.distribution)}`}
               />
-            );
-          }
-          
-          if (viewToRender === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns) {
-            return (
+            )}
+            {availableViews[0] === "energy" && hasEnergyPatterns && analyticsData?.energy_patterns && (
               <EnergyPatternsView 
                 energyPatterns={analyticsData.energy_patterns}
-                key={`energy-${analyticsData.energy_patterns.weekly_patterns.length}`}
+                key={`energy-fallback-${analyticsData.energy_patterns.weekly_patterns.length}`}
               />
-            );
-          }
-          
-          if (viewToRender === "productivity" && hasProductivity && analyticsData?.productivity_insights) {
-            return (
+            )}
+            {availableViews[0] === "productivity" && hasProductivity && analyticsData?.productivity_insights && (
               <ProductivityInsightsView 
                 productivityInsights={analyticsData.productivity_insights}
                 consistency={analyticsData.consistency || null}
-                key={`productivity-${analyticsData.productivity_insights.completion_rate}`}
+                key={`productivity-fallback-${analyticsData.productivity_insights.completion_rate}`}
               />
-            );
-          }
-          
-          return null;
-        })()}
+            )}
+          </>
+        )}
 
         {/* Navigation dots - Always show if there are multiple views */}
         {availableViews.length > 1 && (
