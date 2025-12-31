@@ -162,10 +162,11 @@ def calculate_month_metrics(tasks: List[Dict[str, Any]], checkins: List[Dict[str
     
     completion_rate = tasks_completed / tasks_planned if tasks_planned > 0 else 0.0
     
-    # Category distribution
+    # Category distribution - check multiple possible field names
+    # Tasks from get_user_context may have: category_id, category, or value (frontend format)
     category_dist = defaultdict(int)
     for task in month_tasks:
-        cat = task.get("category")
+        cat = task.get("category_id") or task.get("category") or task.get("value")
         if cat:
             category_dist[cat] += 1
     
@@ -345,9 +346,9 @@ def detect_category_drift(tasks: List[Dict[str, Any]], checkins: List[Dict[str, 
                 except (ValueError, TypeError):
                     continue
         
-        # Count by category
+        # Count by category - check multiple possible field names
         for task in week_tasks:
-            cat = task.get("category")
+            cat = task.get("category_id") or task.get("category") or task.get("value")
             if cat:
                 category_stats[cat]["planned"] += 1
                 if task.get("completed", False):
