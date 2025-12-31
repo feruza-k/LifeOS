@@ -3126,249 +3126,249 @@ async def align_analytics(request: Request, current_user: dict = Depends(get_cur
         
         # Calculate completion trends (last 4 weeks)
         weekly_trends = calculate_completion_trends(all_tasks, checkins, weeks=4)
-    
-    # Calculate monthly trends (last 2 months)
-    monthly_trends = calculate_monthly_trends(all_tasks, checkins, months=2)
-    
-    # Week-over-week comparison
-    current_week_start, current_week_end = get_week_boundaries(today.date())
-    current_week_metrics = None
-    previous_week_metrics = None
-    
-    if len(weekly_trends) >= 2:
-        current_week_metrics = weekly_trends[-1]  # Most recent week
-        previous_week_metrics = weekly_trends[-2]  # Previous week
-    
-    week_comparison = compare_weeks(current_week_metrics or {}, previous_week_metrics or {}) if current_week_metrics else {}
-    
-    # Month-over-month comparison
-    month_comparison = {}
-    if len(monthly_trends) >= 2:
-        current_month_metrics = monthly_trends[-1]
-        previous_month_metrics = monthly_trends[-2]
-        month_comparison = compare_months(current_month_metrics, previous_month_metrics)
-    
-    # Category drift detection
-    drift_analysis = detect_category_drift(all_tasks, checkins, weeks=4)
-    
-    # Consistency metrics
-    consistency = calculate_consistency_metrics(checkins, days_back=30)
-    
-    # Energy patterns
-    energy_patterns = calculate_energy_patterns(all_tasks, checkins, weeks=4)
-    
-    # Current week stats (from week_engine for consistency)
-    week_stats = await get_week_stats(current_user["id"])
-    
-    # Calculate category distribution trends (last 4 weeks)
-    category_trends = defaultdict(list)
-    for week_data in weekly_trends:
-        week_cats = week_data.get("categories", {})
-        for cat, count in week_cats.items():
-            category_trends[cat].append({
-                "week": week_data.get("week_start"),
-                "count": count
-            })
-    
-    # Get current month focus
-    monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
-    monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
-    
-    # Calculate category balance (current week)
-    category_balance = None
-    if current_week_metrics:
-        week_categories = current_week_metrics.get("categories", {})
-        logger.info(f"[Category Balance] Raw week_categories: {week_categories}, current_week_metrics keys: {list(current_week_metrics.keys())}")
         
-        # Get categories mapping to convert labels to IDs
-        categories_list = await db_repo.get_categories(current_user["id"])
-        category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
-        category_id_to_label = {cat["id"]: cat["label"] for cat in categories_list}
+        # Calculate monthly trends (last 2 months)
+        monthly_trends = calculate_monthly_trends(all_tasks, checkins, months=2)
         
-        # Convert category labels to IDs if needed
-        week_categories_by_id = {}
-        for cat_key, count in week_categories.items():
-            if count > 0 and cat_key:
-                # Check if it's already an ID (UUID format)
-                if isinstance(cat_key, str) and len(cat_key) == 36 and cat_key.count("-") == 4:
-                    # It's already an ID
-                    week_categories_by_id[cat_key] = week_categories_by_id.get(cat_key, 0) + count
-                else:
-                    # It's a label or frontend value, convert to ID
-                    cat_id = category_label_to_id.get(str(cat_key).lower())
-                    if cat_id:
-                        week_categories_by_id[cat_id] = week_categories_by_id.get(cat_id, 0) + count
-                    else:
-                        # Try to find by matching any category ID that might match
-                        # This handles edge cases where the key might be a partial match
-                        logger.warning(f"[Category Balance] Could not convert category key '{cat_key}' to ID")
+        # Week-over-week comparison
+        current_week_start, current_week_end = get_week_boundaries(today.date())
+        current_week_metrics = None
+        previous_week_metrics = None
         
-        week_categories = week_categories_by_id
-        logger.info(f"[Category Balance] Converted to IDs: {week_categories}, total={sum(week_categories.values())}")
+        if len(weekly_trends) >= 2:
+            current_week_metrics = weekly_trends[-1]  # Most recent week
+            previous_week_metrics = weekly_trends[-2]  # Previous week
         
-        # Filter out empty categories and ensure we have valid data
-        week_categories = {k: v for k, v in week_categories.items() if v > 0 and k}
-        total_cat_tasks = sum(week_categories.values())
-        logger.info(f"[Category Balance] Filtered: {week_categories}, total={total_cat_tasks}")
-        if total_cat_tasks > 0 and len(week_categories) > 0:
-            # Calculate balance score (0-1, where 1 is perfectly balanced)
-            # Use coefficient of variation (lower = more balanced)
-            category_counts = list(week_categories.values())
-            if len(category_counts) > 1:
-                mean_count = sum(category_counts) / len(category_counts)
-                variance = sum((x - mean_count) ** 2 for x in category_counts) / len(category_counts)
-                std_dev = variance ** 0.5
-                cv = std_dev / mean_count if mean_count > 0 else 1.0
-                balance_score = max(0, 1 - min(cv, 1.0))  # Invert CV, cap at 1
-            else:
-                balance_score = 0.5  # Only one category, not balanced
+        week_comparison = compare_weeks(current_week_metrics or {}, previous_week_metrics or {}) if current_week_metrics else {}
+        
+        # Month-over-month comparison
+        month_comparison = {}
+        if len(monthly_trends) >= 2:
+            current_month_metrics = monthly_trends[-1]
+            previous_month_metrics = monthly_trends[-2]
+            month_comparison = compare_months(current_month_metrics, previous_month_metrics)
+        
+        # Category drift detection
+        drift_analysis = detect_category_drift(all_tasks, checkins, weeks=4)
+        
+        # Consistency metrics
+        consistency = calculate_consistency_metrics(checkins, days_back=30)
+        
+        # Energy patterns
+        energy_patterns = calculate_energy_patterns(all_tasks, checkins, weeks=4)
+        
+        # Current week stats (from week_engine for consistency)
+        week_stats = await get_week_stats(current_user["id"])
+        
+        # Calculate category distribution trends (last 4 weeks)
+        category_trends = defaultdict(list)
+        for week_data in weekly_trends:
+            week_cats = week_data.get("categories", {})
+            for cat, count in week_cats.items():
+                category_trends[cat].append({
+                    "week": week_data.get("week_start"),
+                    "count": count
+                })
+        
+        # Get current month focus
+        monthly_goals = await db_repo.get_monthly_goals(current_month, current_user["id"])
+        monthly_focus = monthly_goals[0] if monthly_goals else None  # For backward compatibility
+        
+        # Calculate category balance (current week)
+        category_balance = None
+        if current_week_metrics:
+            week_categories = current_week_metrics.get("categories", {})
+            logger.info(f"[Category Balance] Raw week_categories: {week_categories}, current_week_metrics keys: {list(current_week_metrics.keys())}")
             
-            category_balance = {
-                "distribution": week_categories,
-                "score": round(balance_score, 2),
-                "status": "balanced" if balance_score > 0.7 else "imbalanced" if balance_score < 0.4 else "moderate"
-            }
-            logger.info(f"[Category Balance] Final result: {category_balance}")
+            # Get categories mapping to convert labels to IDs
+            categories_list = await db_repo.get_categories(current_user["id"])
+            category_label_to_id = {cat["label"].lower(): cat["id"] for cat in categories_list}
+            category_id_to_label = {cat["id"]: cat["label"] for cat in categories_list}
+            
+            # Convert category labels to IDs if needed
+            week_categories_by_id = {}
+            for cat_key, count in week_categories.items():
+                if count > 0 and cat_key:
+                    # Check if it's already an ID (UUID format)
+                    if isinstance(cat_key, str) and len(cat_key) == 36 and cat_key.count("-") == 4:
+                        # It's already an ID
+                        week_categories_by_id[cat_key] = week_categories_by_id.get(cat_key, 0) + count
+                    else:
+                        # It's a label or frontend value, convert to ID
+                        cat_id = category_label_to_id.get(str(cat_key).lower())
+                        if cat_id:
+                            week_categories_by_id[cat_id] = week_categories_by_id.get(cat_id, 0) + count
+                        else:
+                            # Try to find by matching any category ID that might match
+                            # This handles edge cases where the key might be a partial match
+                            logger.warning(f"[Category Balance] Could not convert category key '{cat_key}' to ID")
+            
+            week_categories = week_categories_by_id
+            logger.info(f"[Category Balance] Converted to IDs: {week_categories}, total={sum(week_categories.values())}")
+            
+            # Filter out empty categories and ensure we have valid data
+            week_categories = {k: v for k, v in week_categories.items() if v > 0 and k}
+            total_cat_tasks = sum(week_categories.values())
+            logger.info(f"[Category Balance] Filtered: {week_categories}, total={total_cat_tasks}")
+            if total_cat_tasks > 0 and len(week_categories) > 0:
+                # Calculate balance score (0-1, where 1 is perfectly balanced)
+                # Use coefficient of variation (lower = more balanced)
+                category_counts = list(week_categories.values())
+                if len(category_counts) > 1:
+                    mean_count = sum(category_counts) / len(category_counts)
+                    variance = sum((x - mean_count) ** 2 for x in category_counts) / len(category_counts)
+                    std_dev = variance ** 0.5
+                    cv = std_dev / mean_count if mean_count > 0 else 1.0
+                    balance_score = max(0, 1 - min(cv, 1.0))  # Invert CV, cap at 1
+                else:
+                    balance_score = 0.5  # Only one category, not balanced
+                
+                category_balance = {
+                    "distribution": week_categories,
+                    "score": round(balance_score, 2),
+                    "status": "balanced" if balance_score > 0.7 else "imbalanced" if balance_score < 0.4 else "moderate"
+                }
+                logger.info(f"[Category Balance] Final result: {category_balance}")
+            else:
+                logger.info(f"[Category Balance] No valid data: total={total_cat_tasks}, categories={len(week_categories)}")
         else:
-            logger.info(f"[Category Balance] No valid data: total={total_cat_tasks}, categories={len(week_categories)}")
-    else:
-        logger.info(f"[Category Balance] current_week_metrics is None")
-    
-    # Get goal-task connections (from align_summary logic)
-    from app.ai.goal_engine import match_tasks_to_goals
-    completed_tasks = [t for t in all_tasks if t.get("completed", False)]
-    goal_matches = match_tasks_to_goals(monthly_goals, completed_tasks, days_back=30)
-    
-    # Build goal-task connections for display
-    goal_task_connections = []
-    for goal in monthly_goals:
-        goal_id = goal.get("id")
-        if goal_id and goal_id in goal_matches:
-            matches = goal_matches[goal_id]
-            recent_tasks = matches.get("matched_tasks", [])[:5]  # Top 5 recent tasks
-            goal_task_connections.append({
-                "goal_id": goal_id,
-                "goal_title": goal.get("title", ""),
-                "recent_tasks": [
-                    {
-                        "title": t.get("title", ""),
-                        "date": t.get("date", ""),
-                        "similarity": round(t.get("similarity", 0) * 100, 0)
-                    }
-                    for t in recent_tasks
-                ],
-                "total_matches": matches.get("total_matches", 0)
-            })
-    
-    # Calculate productivity insights (best day/time)
-    from app.ai.pattern_analyzer import analyze_task_patterns
-    task_patterns = analyze_task_patterns(all_tasks, days_back=30)
-    productivity_insights = {
-        "best_times": task_patterns.get("preferred_times", [])[:3],
-        "best_day": None,  # Will calculate from check-ins
-        "completion_rate": task_patterns.get("completion_rate", 0)
-    }
-    
-    # Calculate best day of week from check-ins
-    if checkins:
-        day_completion = defaultdict(lambda: {"completed": 0, "total": 0})
-        for checkin in checkins:
-            checkin_date_str = checkin.get("date")
-            if checkin_date_str:
+            logger.info(f"[Category Balance] current_week_metrics is None")
+        
+        # Get goal-task connections (from align_summary logic)
+        from app.ai.goal_engine import match_tasks_to_goals
+        completed_tasks = [t for t in all_tasks if t.get("completed", False)]
+        goal_matches = match_tasks_to_goals(monthly_goals, completed_tasks, days_back=30)
+        
+        # Build goal-task connections for display
+        goal_task_connections = []
+        for goal in monthly_goals:
+            goal_id = goal.get("id")
+            if goal_id and goal_id in goal_matches:
+                matches = goal_matches[goal_id]
+                recent_tasks = matches.get("matched_tasks", [])[:5]  # Top 5 recent tasks
+                goal_task_connections.append({
+                    "goal_id": goal_id,
+                    "goal_title": goal.get("title", ""),
+                    "recent_tasks": [
+                        {
+                            "title": t.get("title", ""),
+                            "date": t.get("date", ""),
+                            "similarity": round(t.get("similarity", 0) * 100, 0)
+                        }
+                        for t in recent_tasks
+                    ],
+                    "total_matches": matches.get("total_matches", 0)
+                })
+        
+        # Calculate productivity insights (best day/time)
+        from app.ai.pattern_analyzer import analyze_task_patterns
+        task_patterns = analyze_task_patterns(all_tasks, days_back=30)
+        productivity_insights = {
+            "best_times": task_patterns.get("preferred_times", [])[:3],
+            "best_day": None,  # Will calculate from check-ins
+            "completion_rate": task_patterns.get("completion_rate", 0)
+        }
+        
+        # Calculate best day of week from check-ins
+        if checkins:
+            day_completion = defaultdict(lambda: {"completed": 0, "total": 0})
+            for checkin in checkins:
+                checkin_date_str = checkin.get("date")
+                if checkin_date_str:
+                    try:
+                        checkin_date = date.fromisoformat(checkin_date_str[:10])
+                        day_name = checkin_date.strftime("%A")
+                        completed = len(checkin.get("completedTaskIds", []))
+                        incomplete = len(checkin.get("incompleteTaskIds", []))
+                        day_completion[day_name]["completed"] += completed
+                        day_completion[day_name]["total"] += (completed + incomplete)
+                    except:
+                        pass
+            
+            if day_completion:
+                best_day = max(day_completion.items(), key=lambda x: x[1]["completed"] / x[1]["total"] if x[1]["total"] > 0 else 0)
+                productivity_insights["best_day"] = {
+                    "day": best_day[0],
+                    "completion_rate": round(best_day[1]["completed"] / best_day[1]["total"], 2) if best_day[1]["total"] > 0 else 0
+                }
+        
+        # Get upcoming week preview (next Monday to Sunday)
+        # Calculate days until next Monday (0 = Monday, 6 = Sunday)
+        days_until_monday = (7 - today.weekday()) % 7
+        if days_until_monday == 0:
+            days_until_monday = 7  # If today is Monday, show next week
+        next_week_start = today.date() + timedelta(days=days_until_monday)
+        next_week_end = next_week_start + timedelta(days=6)
+        # Safely parse dates - skip invalid dates
+        upcoming_tasks = []
+        for t in all_tasks:
+            task_date_str = t.get("date")
+            if task_date_str:
                 try:
-                    checkin_date = date.fromisoformat(checkin_date_str[:10])
-                    day_name = checkin_date.strftime("%A")
-                    completed = len(checkin.get("completedTaskIds", []))
-                    incomplete = len(checkin.get("incompleteTaskIds", []))
-                    day_completion[day_name]["completed"] += completed
-                    day_completion[day_name]["total"] += (completed + incomplete)
+                    task_date = date.fromisoformat(task_date_str[:10])
+                    if next_week_start <= task_date <= next_week_end:
+                        upcoming_tasks.append(t)
+                except (ValueError, TypeError):
+                    # Skip invalid dates
+                    continue
+        
+        # Calculate upcoming week load
+        upcoming_load_by_day = defaultdict(int)
+        for task in upcoming_tasks:
+            task_date_str = task.get("date", "")
+            if task_date_str:
+                try:
+                    task_date = date.fromisoformat(task_date_str[:10])
+                    day_name = task_date.strftime("%A")
+                    upcoming_load_by_day[day_name] += 1
                 except:
                     pass
         
-        if day_completion:
-            best_day = max(day_completion.items(), key=lambda x: x[1]["completed"] / x[1]["total"] if x[1]["total"] > 0 else 0)
-            productivity_insights["best_day"] = {
-                "day": best_day[0],
-                "completion_rate": round(best_day[1]["completed"] / best_day[1]["total"], 2) if best_day[1]["total"] > 0 else 0
-            }
-    
-    # Get upcoming week preview (next Monday to Sunday)
-    # Calculate days until next Monday (0 = Monday, 6 = Sunday)
-    days_until_monday = (7 - today.weekday()) % 7
-    if days_until_monday == 0:
-        days_until_monday = 7  # If today is Monday, show next week
-    next_week_start = today.date() + timedelta(days=days_until_monday)
-    next_week_end = next_week_start + timedelta(days=6)
-    # Safely parse dates - skip invalid dates
-    upcoming_tasks = []
-    for t in all_tasks:
-        task_date_str = t.get("date")
-        if task_date_str:
-            try:
-                task_date = date.fromisoformat(task_date_str[:10])
-                if next_week_start <= task_date <= next_week_end:
-                    upcoming_tasks.append(t)
-            except (ValueError, TypeError):
-                # Skip invalid dates
-                continue
-    
-    # Calculate upcoming week load
-    upcoming_load_by_day = defaultdict(int)
-    for task in upcoming_tasks:
-        task_date_str = task.get("date", "")
-        if task_date_str:
-            try:
-                task_date = date.fromisoformat(task_date_str[:10])
-                day_name = task_date.strftime("%A")
-                upcoming_load_by_day[day_name] += 1
-            except:
-                pass
-    
-    upcoming_week_preview = {
-        "week_start": next_week_start.isoformat(),
-        "week_end": next_week_end.isoformat(),
-        "total_tasks": len(upcoming_tasks),
-        "load_by_day": dict(upcoming_load_by_day),
-        "heaviest_day": max(upcoming_load_by_day.items(), key=lambda x: x[1])[0] if upcoming_load_by_day else None
-    }
-    
-    # Generate quick actions based on insights
-    quick_actions = []
-    
-    # Action 1: Category balance
-    if category_balance and category_balance.get("status") == "imbalanced":
-        top_category = max(category_balance["distribution"].items(), key=lambda x: x[1])[0] if category_balance["distribution"] else None
-        if top_category:
-            quick_actions.append({
-                "type": "balance_category",
-                "label": f"Add more {top_category} tasks",
-                "message": f"Your week is heavy on {top_category}. Consider adding tasks from other categories.",
-                "action": "schedule_category"
-            })
-    
-    # Action 2: Neglected goals
-    for goal_conn in goal_task_connections:
-        if goal_conn["total_matches"] == 0:
-            quick_actions.append({
-                "type": "neglected_goal",
-                "label": f"Work on {goal_conn['goal_title']}",
-                "message": f"Your goal '{goal_conn['goal_title']}' needs attention.",
-                "action": "schedule_goal_task",
-                "goal_id": goal_conn["goal_id"]
-            })
-            break  # Only suggest one at a time
-    
-    # Action 3: Energy/load
-    if energy_patterns and energy_patterns.get("weekly_patterns"):
-        recent_energy = energy_patterns["weekly_patterns"][-1] if energy_patterns["weekly_patterns"] else None
-        if recent_energy and recent_energy.get("energy_level") == "heavy":
-            quick_actions.append({
-                "type": "reduce_load",
-                "label": "Plan lighter days",
-                "message": "Your recent load has been heavy. Consider scheduling fewer tasks.",
-                "action": "review_schedule"
-            })
-    
+        upcoming_week_preview = {
+            "week_start": next_week_start.isoformat(),
+            "week_end": next_week_end.isoformat(),
+            "total_tasks": len(upcoming_tasks),
+            "load_by_day": dict(upcoming_load_by_day),
+            "heaviest_day": max(upcoming_load_by_day.items(), key=lambda x: x[1])[0] if upcoming_load_by_day else None
+        }
+        
+        # Generate quick actions based on insights
+        quick_actions = []
+        
+        # Action 1: Category balance
+        if category_balance and category_balance.get("status") == "imbalanced":
+            top_category = max(category_balance["distribution"].items(), key=lambda x: x[1])[0] if category_balance["distribution"] else None
+            if top_category:
+                quick_actions.append({
+                    "type": "balance_category",
+                    "label": f"Add more {top_category} tasks",
+                    "message": f"Your week is heavy on {top_category}. Consider adding tasks from other categories.",
+                    "action": "schedule_category"
+                })
+        
+        # Action 2: Neglected goals
+        for goal_conn in goal_task_connections:
+            if goal_conn["total_matches"] == 0:
+                quick_actions.append({
+                    "type": "neglected_goal",
+                    "label": f"Work on {goal_conn['goal_title']}",
+                    "message": f"Your goal '{goal_conn['goal_title']}' needs attention.",
+                    "action": "schedule_goal_task",
+                    "goal_id": goal_conn["goal_id"]
+                })
+                break  # Only suggest one at a time
+        
+        # Action 3: Energy/load
+        if energy_patterns and energy_patterns.get("weekly_patterns"):
+            recent_energy = energy_patterns["weekly_patterns"][-1] if energy_patterns["weekly_patterns"] else None
+            if recent_energy and recent_energy.get("energy_level") == "heavy":
+                quick_actions.append({
+                    "type": "reduce_load",
+                    "label": "Plan lighter days",
+                    "message": "Your recent load has been heavy. Consider scheduling fewer tasks.",
+                    "action": "review_schedule"
+                })
+        
         return {
             "weekly_trends": weekly_trends,
             "monthly_trends": monthly_trends,
