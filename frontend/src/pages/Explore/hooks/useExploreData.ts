@@ -143,27 +143,6 @@ export function useExploreData() {
       
       for (const { dateStr, note } of results) {
         if (note) {
-          // Check if content exists and is not empty (after trimming)
-          const content = note.content;
-          const trimmedContent = content ? String(content).trim() : '';
-          const hasReflection = trimmedContent.length > 0;
-          
-          // Debug logging
-          if (import.meta.env.DEV) {
-            console.log(`[Explore] Note for ${dateStr}:`, {
-              hasNote: !!note,
-              content: content ? `"${content.substring(0, 50)}..."` : 'null/undefined',
-              trimmedLength: trimmedContent.length,
-              hasReflection
-            });
-          }
-          
-          // Only process if there's a non-empty reflection
-          if (!hasReflection) {
-            // Skip notes with empty or no content
-            continue;
-          }
-          
           let photoData = null;
           // Check for photo in new format first
           if (note.photo && typeof note.photo === 'object' && note.photo.filename) {
@@ -176,13 +155,31 @@ export function useExploreData() {
           
           const hasPhoto = photoData && photoData.filename;
           
-          // Include this note with reflection
-          photosWithNotes.push({
-            date: dateStr,
-            filename: hasPhoto ? photoData.filename : '', // Empty if no photo
-            url: hasPhoto ? api.getPhotoUrl(photoData.filename) : '',
-            note: trimmedContent // Always include the reflection text
-          });
+          // Check if content exists and is not empty (after trimming)
+          const content = note.content;
+          const trimmedContent = content ? String(content).trim() : '';
+          const hasReflection = trimmedContent.length > 0;
+          
+          // Debug logging
+          if (import.meta.env.DEV) {
+            console.log(`[Explore] Note for ${dateStr}:`, {
+              hasNote: !!note,
+              hasPhoto,
+              content: content ? `"${content.substring(0, 50)}..."` : 'null/undefined',
+              trimmedLength: trimmedContent.length,
+              hasReflection
+            });
+          }
+          
+          // Include if there's at least a photo OR a reflection
+          if (hasPhoto || hasReflection) {
+            photosWithNotes.push({
+              date: dateStr,
+              filename: hasPhoto ? photoData.filename : '', // Empty if no photo
+              url: hasPhoto ? api.getPhotoUrl(photoData.filename) : '',
+              note: hasReflection ? trimmedContent : undefined // Only include reflection if it exists
+            });
+          }
         }
       }
       
