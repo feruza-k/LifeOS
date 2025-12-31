@@ -395,6 +395,12 @@ export const useLifeOSStore = create<LifeOSStore>()((set, get) => ({
         updatedAt: new Date().toISOString(),
       });
       set({ note: saved });
+      
+      // Dispatch event to notify other components (e.g., Explore page) that note was saved
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('note-saved', { detail: { date: noteData.date } }));
+      }
+      
       return saved;
     } catch (error) {
       throw error;

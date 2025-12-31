@@ -355,6 +355,23 @@ const Explore = () => {
     }
   }, [weeklyPhotos.length]);
 
+  // Listen for note changes to reload photos/reflections
+  useEffect(() => {
+    const handleNoteChange = () => {
+      // Reload photos when notes are saved or deleted
+      reloadPhotos();
+    };
+
+    // Listen for custom event when notes are saved/deleted
+    window.addEventListener('note-saved', handleNoteChange);
+    window.addEventListener('note-deleted', handleNoteChange);
+
+    return () => {
+      window.removeEventListener('note-saved', handleNoteChange);
+      window.removeEventListener('note-deleted', handleNoteChange);
+    };
+  }, [reloadPhotos]);
+
 
   const handleSetFocus = async (goals: Array<{ title: string; description?: string }>) => {
     try {

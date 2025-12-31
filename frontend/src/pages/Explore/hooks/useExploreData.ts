@@ -153,15 +153,15 @@ export function useExploreData() {
           }
           
           const hasPhoto = photoData && photoData.filename;
-          const hasReflection = note.content && note.content.trim();
+          const hasReflection = note.content && note.content.trim() && note.content.trim().length > 0;
           
-          // Include if there's at least a photo OR a reflection
-          if (hasPhoto || hasReflection) {
+          // Only include if there's a non-empty reflection (photos without reflections are not shown)
+          if (hasReflection) {
             photosWithNotes.push({
               date: dateStr,
               filename: hasPhoto ? photoData.filename : '', // Empty if no photo
               url: hasPhoto ? api.getPhotoUrl(photoData.filename) : '',
-              note: hasReflection ? note.content.trim() : undefined
+              note: note.content.trim() // Always include the reflection text
             });
           }
         }
