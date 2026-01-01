@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { TopBrand } from "@/components/lifeos/TopBrand";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
-import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
+import { QuickMenu } from "@/components/lifeos/QuickMenu";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { i18n } from "@/utils/i18n";
@@ -39,7 +39,6 @@ export default function Reminders() {
   const [isAddingReminder, setIsAddingReminder] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [isLoadingReminders, setIsLoadingReminders] = useState(false);
-  const [showSideMenu, setShowSideMenu] = useState(false);
 
   // Load reminders from backend on mount - prioritize backend over localStorage
   useEffect(() => {
@@ -263,21 +262,22 @@ export default function Reminders() {
       </div>;
   };
   return <div className="min-h-screen bg-background pb-24">
-      <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
       <TopBrand />
       
       <div className="px-4 pt-4 pb-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <SideMenuButton onClick={() => setShowSideMenu(true)} />
           <div className="flex-1">
             <h1 className="text-2xl text-foreground font-sans font-semibold">{i18n.t("nav.reminders")}</h1>
             <p className="text-sm text-muted-foreground mt-1">Never miss what matters</p>
           </div>
-          <Button onClick={() => setIsAddingReminder(true)} size="sm" className="rounded-full gap-1">
-            <Plus className="w-4 h-4" />
-            {i18n.t("common.add")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setIsAddingReminder(true)} size="sm" className="rounded-full gap-1">
+              <Plus className="w-4 h-4" />
+              {i18n.t("common.add")}
+            </Button>
+            <QuickMenu />
+          </div>
         </div>
 
         {/* Loading State - Show only while loading */}

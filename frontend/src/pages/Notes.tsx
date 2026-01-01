@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
+import { QuickMenu } from "@/components/lifeos/QuickMenu";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { RichTextEditor } from "@/components/lifeos/RichTextEditor";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
@@ -57,7 +57,6 @@ export default function Notes() {
   const [notes, setNotes] = useState<GlobalNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [showSideMenu, setShowSideMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<string>("updated_at");
   const [showArchived, setShowArchived] = useState(false);
@@ -276,8 +275,6 @@ export default function Notes() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
-      
       {/* Onboarding Dialog */}
       {showOnboarding && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in-0">
@@ -332,19 +329,21 @@ export default function Notes() {
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="px-4 pt-4 pb-3">
           <div className="flex items-center gap-3 mb-3">
-            <SideMenuButton onClick={() => setShowSideMenu(true)} />
             <div className="flex-1">
               <h1 className="text-2xl font-sans font-semibold text-foreground">Notes</h1>
               <p className="text-sm text-muted-foreground mt-1">Your thoughts & ideas</p>
             </div>
-            <Button
-              onClick={() => setSelectedNoteId("new")}
-              size="lg"
-              className="rounded-full gap-2 h-11 px-5"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="font-sans font-medium">New</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setSelectedNoteId("new")}
+                size="lg"
+                className="rounded-full gap-2 h-11 px-5"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="font-sans font-medium">New</span>
+              </Button>
+              <QuickMenu />
+            </div>
           </div>
           
           {/* Search and Filters */}
@@ -592,7 +591,6 @@ function NoteEditor({ note, onBack, onSave, onDelete }: NoteEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [showSideMenu, setShowSideMenu] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -782,13 +780,10 @@ function NoteEditor({ note, onBack, onSave, onDelete }: NoteEditorProps) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 animate-in fade-in-0">
-      <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
-      
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 shrink-0">
         <div className="px-4 pt-4 pb-3">
           <div className="flex items-center gap-3 mb-3">
-            <SideMenuButton onClick={() => setShowSideMenu(true)} />
             <Button
               onClick={onBack}
               variant="ghost"
@@ -851,6 +846,7 @@ function NoteEditor({ note, onBack, onSave, onDelete }: NoteEditorProps) {
                   <Trash2 className="w-5 h-5" />
                 </Button>
               )}
+              <QuickMenu />
             </div>
           </div>
           

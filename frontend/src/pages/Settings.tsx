@@ -21,7 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { TopBrand } from "@/components/lifeos/TopBrand";
 import { BottomNav } from "@/components/lifeos/BottomNav";
 import { CoreAIFAB } from "@/components/lifeos/CoreAI/CoreAIFAB";
-import { SideMenu, SideMenuButton } from "@/components/lifeos/SideMenu";
+import { QuickMenu } from "@/components/lifeos/QuickMenu";
 import { useLifeOSStore } from "@/stores/useLifeOSStore";
 import { useCoreAI } from "@/hooks/useCoreAI";
 import { cn } from "@/lib/utils";
@@ -106,8 +106,6 @@ export default function Settings() {
   const navigate = useNavigate();
   const store = useLifeOSStore();
   const coreAI = useCoreAI();
-  const [showSideMenu, setShowSideMenu] = useState(false);
-  
   const [name, setName] = useState("User");
   const [language, setLanguage] = useState(() => {
     // Load from localStorage or default to English
@@ -153,17 +151,16 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <SideMenu isOpen={showSideMenu} onClose={() => setShowSideMenu(false)} />
       <TopBrand />
       
       <div className="px-4 pt-4 pb-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <SideMenuButton onClick={() => setShowSideMenu(true)} />
           <div className="flex-1">
             <h1 className="text-2xl text-foreground font-sans font-semibold">Settings</h1>
             <p className="text-sm text-muted-foreground mt-1">Customize your LifeOS experience</p>
           </div>
+          <QuickMenu />
         </div>
 
         {/* Profile */}
